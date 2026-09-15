@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=YourStrong@Pass123 # Đặt mật khẩu có chữ hoa, thường, số, ký tự đặc biệt
+      - MSSQL_SA_PASSWORD=${DB_PASSWORD}
     ports:
       - "1433:1433"
     volumes:
