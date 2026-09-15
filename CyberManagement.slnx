@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="CyberManagement.API/CyberManagement.API.csproj" />
+  <Project Path="CyberManagement.Application/CyberManagement.Application.csproj" Id="b1ccf8c6-c79a-494c-ba88-58263dea59dd" />
+  <Project Path="CyberManagement.Domain/CyberManagement.Domain.csproj" Id="a443776a-5b94-46c9-92e6-32fe4021a0a3" />
+  <Project Path="CyberManagement.Infrastructure/CyberManagement.Infrastructure.csproj" Id="2c500b20-78d2-4358-939f-9855216724c5" />
+</Solution>
