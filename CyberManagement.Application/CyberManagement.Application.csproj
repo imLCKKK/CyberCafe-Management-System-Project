@@ -13,7 +13,6 @@
   <ItemGroup>
     <Folder Include="Validators\" />
     <Folder Include="Services\" />
-    <Folder Include="DTOs\" />
     <Folder Include="Interfaces\" />
   </ItemGroup>
 
