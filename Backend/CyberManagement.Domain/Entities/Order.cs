@@ -13,6 +13,6 @@ namespace CyberManagement.Domain.Entities
         public string Status { get; set; } = "Completed";
 
         public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
-        public virtual Invoice? Invoice { get; set; }
+        public virtual ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
     }
 }

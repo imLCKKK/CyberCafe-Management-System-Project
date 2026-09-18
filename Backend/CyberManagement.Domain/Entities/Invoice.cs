@@ -12,7 +12,7 @@ namespace CyberManagement.Domain.Entities
         public decimal TotalAmount { get; set; }
         public DateTime? PaymentTime { get; set; } = DateTime.UtcNow;
 
-        public virtual Order? Order { get; set; }
-        public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
+        public virtual Order? Order { get; set; }   
+        public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>(); //1 invoice can have many payments
     }
 }
