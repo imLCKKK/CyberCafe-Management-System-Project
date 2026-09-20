@@ -6,7 +6,7 @@ namespace CyberManagement.Application.Services
 {
     public class InvoiceService
     {
-        public 
+         
 
 
     }
