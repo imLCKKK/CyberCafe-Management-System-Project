@@ -1,4 +1,4 @@
-﻿using CyberManagement.Domain.Entities;
+﻿using CyberManagement.Application.DTOs;
 using System;
 using System.Collections.Generic;
 using System.Text;
