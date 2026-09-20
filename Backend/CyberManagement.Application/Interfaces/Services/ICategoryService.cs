@@ -12,7 +12,8 @@ namespace CyberManagement.Application.Interfaces.Services
         Task<IEnumerable<CategoryDTOs>> GetAllCategoriesAsync();
         Task<CategoryDTOs?> GetCategoryByIdAsync(int id);
         Task<CategoryDTOs> CreateCategoryAsync(CreateCategoryDTOs request);
-        Task<IEnumerable<ProductDTOs>> UpdateCategoryAsync(int Id , UpdateCategoryDTOs request);
+        Task<bool> UpdateCategoryAsync(int Id , UpdateCategoryDTOs request);
         Task<bool> DeleteCategoryAsync(int id);
+        //Task<bool> ExistsByNameAsync(string categoryName); kiểm tra trùng tên
     }
 }
