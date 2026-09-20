@@ -9,9 +9,9 @@ namespace CyberManagement.Application.Interfaces.Services
     {
         Task<OrderDTOs?> GetByIdAsync(int id);
 
-        Task<OrderDTOs> CreateOrderAsync(CreateOrderRequest request); //createOrder -> check product -> check stock -> create orderdetail -> caculate total -> create order -> update stock
+        Task<OrderDTOs> CreateOrderAsync(CreateOrderRequest request); //createOrder -> check product -> check stock -> create orderdetail -> caculate total -> create order
 
-        Task<bool> ConfirmOrderAsync(int orderId); //confirmOrder -> subtract stock -> create invoice -> payment -> update order status
+        Task<bool> ConfirmOrderAsync(int orderId, string paymentMethod); //CheckOrder -> check status -> check stock -> subtract stock -> create invoice/payment -> update order status
 
         Task<bool> CancelOrderAsync(int orderId);
     }

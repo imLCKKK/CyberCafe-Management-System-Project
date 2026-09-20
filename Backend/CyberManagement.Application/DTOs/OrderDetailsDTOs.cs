@@ -4,15 +4,16 @@ using System.Text;
 
 namespace CyberManagement.Application.DTOs
 {
-    public class OrderItemDto
+    public class OrderDetailsDTOs
     {
         public int ProductId { get; set; }
-        public int Quantity { get; set; }
-    }
 
-    public class CreateOrderRequest
-    {
-        public int? CustomerId { get; set; }
-        public List<OrderItemDto> Items { get; set; } = new();
+        public string ProductName { get; set; } = string.Empty;
+
+        public int Quantity { get; set; }
+
+        public decimal UnitPrice { get; set; }
+
+        public decimal SubTotal { get; set; }
     }
 }

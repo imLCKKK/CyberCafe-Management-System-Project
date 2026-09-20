@@ -12,6 +12,6 @@ namespace CyberManagement.Application.DTOs
         public string Status { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
 
-        public List<CreateOrderRequest> Items { get; set; } = new();    
+        public List<OrderDetailsDTOs> Items { get; set; } = new();
     }
 }
