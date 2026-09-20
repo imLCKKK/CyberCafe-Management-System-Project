@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace CyberManagement.Domain.Entities
+namespace CyberManagement.Application.DTOs
 {
     public class InvoiceDTOs
     {
