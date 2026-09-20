@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CyberManagement.Application\CyberManagement.Application.csproj" />
     <ProjectReference Include="..\CyberManagement.Infrastructure\CyberManagement.Infrastructure.csproj" />
   </ItemGroup>
 
