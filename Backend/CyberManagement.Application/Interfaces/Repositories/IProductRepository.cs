@@ -10,10 +10,10 @@ namespace CyberManagement.Application.Interfaces.Repositories
         Task<IEnumerable<Product>> GetAllAsync();
         Task<Product?> GetByIdAsync(int id);
         Task<IEnumerable<Product>> GetByCategoryIdAsync(int categoryId);
-        Task<IEnumerable<Product>> SearchByNameAsync(string keyword);
-        Task AddAsync(Product product);
-        void Update(Product product);
-        void Delete(Product product);
+        Task<IEnumerable<Product>> SearchAsync(string keyword);
+        Task<Product> AddAsync(Product product);
+        Task UpdateAsync(Product product);
+        Task DeleteAsync(Product product);
 
         Task<int> GetStockQuantityAsync(int productId); // kiểm tra số lượng tồn kho của sản phẩm
     }
