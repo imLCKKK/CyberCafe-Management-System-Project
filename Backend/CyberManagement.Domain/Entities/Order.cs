@@ -8,11 +8,17 @@ namespace CyberManagement.Domain.Entities
     {
         public int OrderId { get; set; }
         public int? CustomerId { get; set; }
-        public int EmployeeId { get; set; }
+        public int? SessionId { get; set; }
+        public int? EmployeeId { get; set; }
+        public int InventoryId { get; set; }
         public DateTime OrderTime { get; set; } = DateTime.UtcNow;
         public string Status { get; set; } = "Pending";
+        public decimal TotalAmount { get; set; }
 
         public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
         public virtual ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
+
+        public virtual ICollection<OrderStatusHistory> StatusHistories { get; set; } = new List<OrderStatusHistory>();
+
     }
 }
