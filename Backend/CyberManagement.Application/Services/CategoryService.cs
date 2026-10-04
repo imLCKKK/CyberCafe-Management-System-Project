@@ -24,17 +24,18 @@ namespace CyberManagement.Application.Services
             }
             var category = new Category
             {
-                CategoryName = request.CategoryName
+                CategoryName = request.CategoryName,
+                IsActive = true
             };
 
             var createdCategory = await _categoryRepository.AddAsync(category);
             
-            var categoryDTO = new CategoryDTOs
+            return new CategoryDTOs
             {
-                CategoryId = createdCategory.CategoryId,
-                CategoryName = createdCategory.CategoryName
+                CategoryId = category.CategoryId,
+                CategoryName = category.CategoryName,
+                IsActive = category.IsActive
             };
-            return categoryDTO;
         }
 
         //delete tạm thời, sau này sẽ thêm việc xóa category có ảnh hưởng đến product hay không? 
@@ -44,12 +45,15 @@ namespace CyberManagement.Application.Services
             var category = await _categoryRepository.GetByIdAsync(id);
             if (category == null) return false;
 
-            await _categoryRepository.DeleteAsync(category);
+            category.IsActive = false;
+
+            await _categoryRepository.UpdateAsync(category);
             return true;
         }
 
         public async Task<IEnumerable<CategoryDTOs>> GetAllCategoriesAsync()
         {
+
             var categories = await _categoryRepository.GetAllAsync();
             
             var categoryDTOs = categories.Select(category => new CategoryDTOs
@@ -83,7 +87,9 @@ namespace CyberManagement.Application.Services
 
             var category = await _categoryRepository.GetByIdAsync(Id);
             if(category == null) return false;
+
             category.CategoryName = request.CategoryName;
+            category.IsActive = request.IsActive;
 
             await _categoryRepository.UpdateAsync(category);
             return true;
