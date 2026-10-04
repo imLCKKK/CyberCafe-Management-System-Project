@@ -8,7 +8,6 @@ namespace CyberManagement.Application.Interfaces.Repositories
     public interface IInvoiceRepository
     {
         Task<Invoice?> GetByIdAsync(int id);
-        Task<Invoice?> GetByOrderIdAsync(int orderId);
         Task<IEnumerable<Invoice>> GetAllAsync();
         Task AddAsync(Invoice invoice);
         Task<IEnumerable<Invoice>> GetByDateRangeAsync(DateTime fromDate, DateTime toDate); // Thống kê doanh thu theo ngày/ca
