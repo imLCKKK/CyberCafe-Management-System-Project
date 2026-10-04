@@ -7,5 +7,6 @@ namespace CyberManagement.Application.DTOs
     public class ConfirmOrderRequest
     {
         public string PaymentMethod { get; set; } = string.Empty;
+        public int? PromotionId { get; set; }
     }
 }

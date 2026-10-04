@@ -8,6 +8,7 @@ namespace CyberManagement.Application.DTOs
     {
         public int CategoryId { get; set; }
         public string CategoryName { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
     }
 
     public class CreateCategoryDTOs
@@ -19,5 +20,6 @@ namespace CyberManagement.Application.DTOs
     {
         //public int CategoryId { get; set; }
         public string CategoryName { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
     }
 }

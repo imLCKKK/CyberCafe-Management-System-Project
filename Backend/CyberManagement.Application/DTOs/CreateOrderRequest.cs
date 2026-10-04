@@ -13,6 +13,7 @@ namespace CyberManagement.Application.DTOs
     public class CreateOrderRequest
     {
         public int? CustomerId { get; set; }
+        public int? SessionId { get; set; }
         public List<OrderItemDto> Items { get; set; } = new();
     }
 }
