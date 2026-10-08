@@ -2,14 +2,19 @@
    1. LAYOUT CHUNG & ADMIN SHELL
    ================================================================ */
 .admin-shell {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: flex;
+  overflow: hidden;
   background: var(--bg);
 }
 
 .main {
   min-width: 0;
+  height: 100vh;
   flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 
@@ -19,7 +24,9 @@
 .sidebar {
   width: 260px;
   min-width: 260px;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  flex: 0 0 auto;
   background: #111C30;
   color: #fff;
   display: flex;

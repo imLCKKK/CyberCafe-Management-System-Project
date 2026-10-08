@@ -1,1 +1,14 @@
-export const mockData = [];
+export const mockData = [
+	{ id: 'KH-1024', name: 'Nguyễn Minh Anh', email: 'minhanh.nguyen@email.com', phone: '090 123 4567', tier: 'Diamond', status: 'active', visits: 128, spent: 18650000, walletBalance: 425000, joinedAt: '2024-02-18', lastVisit: '2026-10-07' },
+	{ id: 'KH-1023', name: 'Trần Quốc Bảo', email: 'quocbao.tran@email.com', phone: '091 234 5678', tier: 'Gold', status: 'active', visits: 76, spent: 9840000, walletBalance: 185000, joinedAt: '2024-05-03', lastVisit: '2026-10-06' },
+	{ id: 'KH-1022', name: 'Lê Hoàng Nam', email: 'hoangnam.le@email.com', phone: '093 345 6789', tier: 'Silver', status: 'active', visits: 34, spent: 3260000, walletBalance: 72000, joinedAt: '2024-08-12', lastVisit: '2026-10-05' },
+	{ id: 'KH-1021', name: 'Phạm Gia Hân', email: 'g.han.pham@email.com', phone: '098 456 7890', tier: 'Gold', status: 'inactive', visits: 62, spent: 7520000, walletBalance: 0, joinedAt: '2024-03-27', lastVisit: '2026-08-21' },
+	{ id: 'KH-1020', name: 'Võ Thanh Tùng', email: 'thanhtung.vo@email.com', phone: '097 567 8901', tier: 'Bronze', status: 'active', visits: 12, spent: 840000, walletBalance: 98000, joinedAt: '2025-01-10', lastVisit: '2026-10-04' },
+	{ id: 'KH-1019', name: 'Đặng Thuỳ Linh', email: 'thuylinh.dang@email.com', phone: '096 678 9012', tier: 'Diamond', status: 'active', visits: 103, spent: 14320000, walletBalance: 680000, joinedAt: '2024-01-19', lastVisit: '2026-10-03' },
+	{ id: 'KH-1018', name: 'Bùi Đức Mạnh', email: 'ducmanh.bui@email.com', phone: '094 789 0123', tier: 'Silver', status: 'inactive', visits: 27, spent: 2180000, walletBalance: 25000, joinedAt: '2024-11-05', lastVisit: '2026-07-14' },
+	{ id: 'KH-1017', name: 'Hoàng Khánh Vy', email: 'khanhvy.hoang@email.com', phone: '092 890 1234', tier: 'Gold', status: 'active', visits: 58, spent: 6940000, walletBalance: 330000, joinedAt: '2024-06-30', lastVisit: '2026-10-02' },
+	{ id: 'KH-1016', name: 'Đỗ Nhật Huy', email: 'nhathuy.do@email.com', phone: '090 901 2345', tier: 'Bronze', status: 'active', visits: 8, spent: 510000, walletBalance: 0, joinedAt: '2025-04-22', lastVisit: '2026-09-29' },
+	{ id: 'KH-1015', name: 'Phan Ngọc Mai', email: 'ngocmai.phan@email.com', phone: '091 012 3456', tier: 'Silver', status: 'active', visits: 41, spent: 4210000, walletBalance: 154000, joinedAt: '2024-07-16', lastVisit: '2026-09-28' },
+	{ id: 'KH-1014', name: 'Ngô Tuấn Kiệt', email: 'tuankiet.ngo@email.com', phone: '093 123 4560', tier: 'Gold', status: 'active', visits: 69, spent: 8120000, walletBalance: 92000, joinedAt: '2024-04-08', lastVisit: '2026-09-27' },
+	{ id: 'KH-1013', name: 'Dương Bảo Châu', email: 'baochau.duong@email.com', phone: '098 234 5671', tier: 'Bronze', status: 'inactive', visits: 5, spent: 320000, walletBalance: 0, joinedAt: '2025-06-02', lastVisit: '2026-06-19' },
+];

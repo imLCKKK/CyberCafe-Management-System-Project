@@ -4,6 +4,7 @@ import { AdminLayout } from './AdminLayout';
 import { ClientLayout } from './ClientLayout';
 import HomePage from '../client/home/HomePage';
 import ClientPlaceholder from '../client/ClientPlaceholder';
+import { CustomersPage } from '../admin/customers/CustomersPage';
 
 const admin={
   dashboard:['Tổng quan','C'],computers:['Máy','C'],customers:['Khách hàng','B'],orders:['Order','D'],products:['Sản phẩm','D'],inventory:['Kho','E'],invoices:['Hóa đơn & thanh toán','E'],tournaments:['Giải đấu','B'],staff:['Nhân viên','A'],reports:['Báo cáo','E']
@@ -23,7 +24,7 @@ export function AppRoutes(){
   return <Routes>
     <Route path="/" element={<Navigate to="/client/home" replace/>}/>
     <Route path="/admin" element={<AdminLayout/>}>
-      {Object.entries(admin).map(([path,[title,owner]])=><Route key={path} path={path} element={adminPage(title,owner)}/>)}
+      {Object.entries(admin).map(([path,[title,owner]])=><Route key={path} path={path} element={path === 'customers' ? <CustomersPage/> : adminPage(title,owner)}/>)}
       <Route path="auth" element={adminPage('Admin Auth','A')}/>
       <Route path="promotions" element={adminPage('Khuyến mãi','B')}/>
     </Route>
