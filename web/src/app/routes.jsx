@@ -7,6 +7,7 @@ import ClientPlaceholder from '../client/ClientPlaceholder';
 import { CustomersPage } from '../admin/customers/CustomersPage';
 import { TournamentsPage } from '../admin/tournaments/TournamentsPage';
 import { PromotionsPage } from '../admin/promotions/PromotionsPage';
+import { WalletPage } from '../client/wallet/WalletPage';
 
 const admin={
   dashboard:['Tổng quan','C'],computers:['Máy','C'],customers:['Khách hàng','B'],orders:['Order','D'],products:['Sản phẩm','D'],inventory:['Kho','E'],invoices:['Hóa đơn & thanh toán','E'],tournaments:['Giải đấu','B'],staff:['Nhân viên','A'],reports:['Báo cáo','E']
@@ -32,7 +33,7 @@ export function AppRoutes(){
     </Route>
     <Route path="/client" element={<ClientLayout/>}>
       <Route path="home" element={<HomePage/>}/>
-      {Object.entries(clientPages).map(([path,[title,description]])=><Route key={path} path={path} element={<ClientPlaceholder title={title} description={description}/>}/>)}
+      {Object.entries(clientPages).map(([path,[title,description]])=><Route key={path} path={path} element={path === 'wallet' ? <WalletPage/> : <ClientPlaceholder title={title} description={description}/>}/>)}
       <Route path="auth" element={<ClientPlaceholder title="Đăng nhập" description="Khung xác thực client."/>}/>
     </Route>
     <Route path="*" element={<Navigate to="/client/home" replace/>}/>
