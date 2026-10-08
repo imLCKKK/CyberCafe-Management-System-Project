@@ -1,0 +1,857 @@
+/* --- 1. GLOBAL & SHELL STYLES --- */
+.client-shell {
+  min-height: 100vh;
+  display: flex;
+  background: #0f1214;
+  color: #e8ecee;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.client-main {
+  min-width: 0;
+  flex: 1;
+  background: #101416;
+}
+
+.client-page {
+  padding: 20px 21px 26px;
+}
+
+/* --- 2. SIDEBAR --- */
+.client-sidebar {
+  width: 155px;
+  min-width: 155px;
+  background: #131719;
+  border-right: 1px solid #293034;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 12px 12px;
+}
+
+.client-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 5px 24px;
+  border-bottom: 1px solid #293034;
+}
+
+.client-brand-mark {
+  width: 25px;
+  height: 25px;
+  border-radius: 7px;
+  background: #baf34c;
+  color: #16200e;
+  display: grid;
+  place-items: center;
+}
+
+.client-brand strong {
+  display: block;
+  font-size: 19px;
+  line-height: 18px;
+  letter-spacing: .5px;
+}
+
+.client-brand span {
+  display: block;
+  font-size: 6.5px;
+  color: #858d90;
+  letter-spacing: .7px;
+  margin-top: 3px;
+}
+
+/* Sidebar Navigation */
+.client-nav-title {
+  font-size: 7px;
+  color: #6d7578;
+  font-weight: 700;
+  margin: 24px 5px 8px;
+}
+
+.client-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.client-nav-item {
+  height: 33px;
+  border-radius: 6px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #a4abad;
+  font-size: 10px;
+}
+
+.client-nav-item:hover {
+  background: #1d2425;
+  color: #eaf0ed;
+}
+
+.client-nav-item.active {
+  background: #25391d;
+  color: #baf34c;
+}
+
+.client-nav-item.active:after {
+  content: "•";
+  margin-left: auto;
+  font-size: 14px;
+}
+
+/* Sidebar Support & User Profile */
+.client-support {
+  margin-top: auto;
+  background: #1a2022;
+  border: 1px solid #30383b;
+  border-radius: 10px;
+  padding: 11px 10px;
+}
+
+.support-icon {
+  color: #baf34c;
+  margin-bottom: 7px;
+}
+
+.client-support strong {
+  font-size: 9px;
+  display: block;
+}
+
+.client-support p {
+  font-size: 7.5px;
+  line-height: 1.45;
+  color: #7e878a;
+  margin: 7px 0;
+}
+
+.client-support button {
+  border: 0;
+  background: none;
+  color: #baf34c;
+  font-size: 7.5px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.client-user {
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid #293034;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.client-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #252b2d;
+  color: #dfe5e5;
+  display: grid;
+  place-items: center;
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.client-user div:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+
+.client-user strong,
+.client-user span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.client-user strong {
+  font-size: 7.5px;
+}
+
+.client-user span {
+  font-size: 6.5px;
+  color: #70797c;
+  margin-top: 2px;
+}
+
+.client-user > svg {
+  color: #596164;
+}
+
+/* --- 3. TOPBAR --- */
+.client-topbar {
+  height: 55px;
+  border-bottom: 1px solid #293034;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 21px;
+  background: #101416;
+}
+
+.client-breadcrumb {
+  font-size: 8px;
+  color: #727b7e;
+}
+
+.client-breadcrumb b {
+  margin: 0 8px;
+  color: #3f474a;
+}
+
+.client-breadcrumb strong {
+  color: #e8ecee;
+}
+
+.client-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  font-size: 8px;
+}
+
+.client-time {
+  color: #727b7e;
+}
+
+.client-machine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #dfe5e3;
+  font-weight: 700;
+}
+
+.client-machine svg {
+  color: #baf34c;
+}
+
+.client-bell {
+  width: 25px;
+  height: 25px;
+  border: 1px solid #30383b;
+  background: #1b2123;
+  color: #8b9496;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+}
+
+/* --- 4. PAGE HEADINGS & BUTTONS --- */
+.client-page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.client-page-heading h1 {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.client-page-heading p {
+  font-size: 9px;
+  color: #737c7f;
+  margin: 6px 0 0;
+}
+
+.client-action {
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: #202628;
+  color: #e5eae8;
+  padding: 0 12px;
+  font-size: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+/* --- 5. CARDS & GRID LAYOUTS --- */
+.client-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(210px, .9fr);
+  gap: 12px;
+}
+
+.client-card {
+  background: #1a1f21;
+  border: 1px solid #303638;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.client-card-inner {
+  padding: 14px;
+}
+
+.client-skeleton {
+  background: linear-gradient(110deg, #202628 8%, #292f31 18%, #202628 33%);
+  background-size: 200% 100%;
+  animation: clientShimmer 2s linear infinite;
+}
+
+/* Machine Card */
+.client-machine-card {
+  height: 173px;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+.client-machine-card .client-card-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.client-machine-image {
+  position: absolute;
+  inset: 0 0 0 52%;
+  background: linear-gradient(90deg, #1a1f21 0%, #182021 30%, #253032 100%);
+  opacity: .9;
+}
+
+.client-machine-image:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #1a1f21 0%, transparent 60%);
+}
+
+.client-machine-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #baf34c;
+  background: #263b1e;
+  border-radius: 20px;
+  padding: 4px 7px;
+  font-size: 7px;
+  margin-bottom: 11px;
+}
+
+.client-machine-status i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #baf34c;
+}
+
+.client-machine-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.client-machine-name svg {
+  color: #baf34c;
+}
+
+.client-machine-time {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  margin-top: 7px;
+}
+
+.client-machine-meta {
+  font-size: 7px;
+  color: #737c7f;
+  margin-top: 5px;
+}
+
+/* Side Card & Balance */
+.client-side-card {
+  height: 173px;
+}
+
+.client-balance-label {
+  font-size: 8px;
+  color: #7d8689;
+}
+
+.client-balance {
+  font-size: 23px;
+  color: #baf34c;
+  margin: 7px 0 13px;
+}
+
+.client-balance-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 7.5px;
+  color: #8b9497;
+  margin: 6px 0;
+}
+
+.client-balance-row strong {
+  color: #e7ecea;
+}
+
+.client-deposit {
+  width: 100%;
+  height: 25px;
+  border: 0;
+  border-radius: 6px;
+  background: #baf34c;
+  color: #16200e;
+  font-size: 8px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+/* Sections & Order Grid */
+.client-section {
+  margin-top: 12px;
+}
+
+.client-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.client-section-title > div {
+  min-width: 0;
+}
+
+.client-section-title h2 {
+  font-size: 12px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.client-section-title a {
+  font-size: 7.5px;
+  color: #baf34c;
+}
+
+.client-order-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+}
+
+/* Food Items */
+.client-food {
+  height: 135px;
+  background: #1a1f21;
+  border: 1px solid #303638;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.client-food-img {
+  height: 73px;
+  background: linear-gradient(110deg, #2a3032, #4b4f47, #252b2c);
+}
+
+.client-food-body {
+  padding: 7px 8px;
+}
+
+.client-food-type {
+  font-size: 6.5px;
+  color: #697274;
+}
+
+.client-food-name {
+  font-size: 8px;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+.client-food-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 7px;
+}
+
+.client-food-price {
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.client-add {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 5px;
+  background: #2a421f;
+  color: #baf34c;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Tournaments */
+.client-tournament-card {
+  min-height: 135px;
+  position: relative;
+  background: linear-gradient(135deg, #1a1f21, #1d2a20);
+}
+
+.client-tournament-card:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, #31462c55);
+}
+
+.client-tournament-content {
+  position: relative;
+  padding: 12px;
+}
+
+.client-tag {
+  display: inline-block;
+  background: #2c431f;
+  color: #baf34c;
+  padding: 4px 7px;
+  border-radius: 10px;
+  font-size: 6.5px;
+}
+
+.client-tournament-content h3 {
+  font-size: 14px;
+  margin: 16px 0 10px;
+}
+
+.client-tournament-content p {
+  font-size: 7px;
+  color: #a1a9aa;
+  margin: 5px 0;
+}
+
+.client-tournament-button {
+  width: 100%;
+  height: 24px;
+  margin-top: 7px;
+  border: 0;
+  border-radius: 5px;
+  background: #2a401f;
+  color: #baf34c;
+  font-size: 7px;
+}
+
+/* Activity Logs Table */
+.client-activity {
+  background: #1a1f21;
+  border: 1px solid #303638;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.client-activity-head,
+.client-activity-row {
+  display: grid;
+  grid-template-columns: 1fr 75px 75px 90px 18px;
+  align-items: center;
+}
+
+.client-activity-head {
+  padding: 9px 12px;
+  border-bottom: 1px solid #303638;
+}
+/* --- TOURNAMENTS PAGE STYLES --- */
+.client-tournament-container {
+    padding: 24px;
+    color: #ffffff;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.client-tournament-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+    margin-top: 24px;
+}
+
+.client-tournament-card {
+    background-color: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.client-tournament-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.client-tournament-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: rgba(163, 230, 53, 0.15);
+    color: #a3e635;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.client-tournament-status {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+    .client-tournament-status.open {
+        background-color: #065f46;
+        color: #34d399;
+    }
+
+    .client-tournament-status.finished {
+        background-color: #374151;
+        color: #9ca3af;
+    }
+
+.client-tournament-name {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 16px 0;
+    line-height: 1.3;
+}
+
+.client-tournament-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-grow: 1;
+}
+
+.client-tournament-info-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #d1d5db;
+}
+
+.client-icon-gray {
+    color: #9ca3af;
+}
+
+.client-tournament-fee {
+    font-weight: 600;
+    color: #f3f4f6;
+    margin-top: 4px;
+}
+
+.client-btn-outline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: transparent;
+    color: #a3e635;
+    border: 1px solid #a3e635;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+    .client-btn-outline:hover:not(:disabled) {
+        background-color: rgba(163, 230, 53, 0.1);
+    }
+
+    .client-btn-outline:disabled {
+        border-color: #4b5563;
+        color: #6b7280;
+        cursor: not-allowed;
+    }
+/* --- AUTH PAGE STYLES --- */
+.client-auth-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 40px); /* Bù trừ padding mặc định nếu có */
+    color: #ffffff;
+}
+
+.client-auth-card {
+    background-color: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 16px;
+    padding: 40px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.client-auth-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.client-auth-logo {
+    font-size: 24px;
+    font-weight: 800;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+    .client-auth-logo .logo-icon {
+        background-color: #a3e635;
+        color: #111827;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        font-size: 18px;
+    }
+
+.client-auth-header h2 {
+    font-size: 24px;
+    margin: 0 0 8px 0;
+}
+
+.client-auth-header p {
+    color: #9ca3af;
+    font-size: 14px;
+    margin: 0;
+}
+
+.client-auth-toggle {
+    color: #a3e635;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+    .client-auth-toggle:hover {
+        text-decoration: underline;
+    }
+
+.client-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+    .client-input-wrapper .input-icon {
+        position: absolute;
+        left: 14px;
+        color: #9ca3af;
+    }
+
+.client-input-icon {
+    background-color: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 12px 16px 12px 42px; /* Dịch text sang phải nhường chỗ cho icon */
+    color: #ffffff;
+    font-size: 15px;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+    .client-input-icon:focus {
+        border-color: #a3e635;
+    }
+
+.client-auth-btn {
+    margin-top: 24px;
+    padding: 14px;
+    font-size: 16px;
+}
+.client-auth-btn {
+    width: 100%;
+    background-color: #a3e635;
+    color: #111827;
+    border: none;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    margin-top: 24px;
+    transition: opacity 0.2s;
+}
+
+    .client-auth-btn:hover {
+        opacity: 0.9;
+    }
+/* --- AUTH MESSAGES --- */
+.auth-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.auth-message.error {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.auth-message.success {
+    background-color: rgba(163, 230, 53, 0.1);
+    color: #a3e635;
+    border: 1px solid rgba(163, 230, 53, 0.2);
+}
+
+/* Nút bị mờ khi đang loading */
+.client-auth-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.loading-spinner {
+    font-weight: normal;
+}

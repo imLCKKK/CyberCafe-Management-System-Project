@@ -1,0 +1,283 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\app\\client.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\app\\client.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\app\\layout.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\app\\layout.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\auth\\AuthPage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\client\\auth\\AuthPage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\staff\\StaffPage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\admin\\staff\\StaffPage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\app\\routes.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\app\\routes.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\staff\\mockData.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\admin\\staff\\mockData.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\auth\\AdminAuthPage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\admin\\auth\\AdminAuthPage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\tournaments\\TournamentsPage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\client\\tournaments\\TournamentsPage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\vite.config.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:vite.config.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\main.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\main.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\tournaments\\mockData.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\client\\tournaments\\mockData.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\computers\\ComputersPage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\admin\\computers\\ComputersPage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\computers\\mockData.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\admin\\computers\\mockData.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\auth\\mockData.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\admin\\auth\\mockData.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\home\\HomePage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\client\\home\\HomePage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\home\\mockData.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\client\\home\\mockData.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 5,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:8:0:{e8034f19-ab72-4f06-83fd-f6832b41aa63}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "mockData.js",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\staff\\mockData.js",
+              "RelativeDocumentMoniker": "src\\admin\\staff\\mockData.js",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\staff\\mockData.js",
+              "RelativeToolTip": "src\\admin\\staff\\mockData.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAMAAAB6AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-10-05T21:09:20.658Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "layout.css",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\app\\layout.css",
+              "RelativeDocumentMoniker": "src\\app\\layout.css",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\app\\layout.css",
+              "RelativeToolTip": "src\\app\\layout.css",
+              "ViewState": "AgIAAEICAAAAAAAAAAAAAFQCAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003000|",
+              "WhenOpened": "2026-10-05T20:53:47.566Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "vite.config.js",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\vite.config.js",
+              "RelativeDocumentMoniker": "vite.config.js",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\vite.config.js",
+              "RelativeToolTip": "vite.config.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAACAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-10-05T20:18:23.694Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "routes.jsx",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\app\\routes.jsx",
+              "RelativeDocumentMoniker": "src\\app\\routes.jsx",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\app\\routes.jsx",
+              "RelativeToolTip": "src\\app\\routes.jsx",
+              "ViewState": "AgIAAAEAAAAAAAAAAADwv0sAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-10-05T20:11:51.978Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "client.css",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\app\\client.css",
+              "RelativeDocumentMoniker": "src\\app\\client.css",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\app\\client.css",
+              "RelativeToolTip": "src\\app\\client.css",
+              "ViewState": "AgIAADoDAAAAAAAAAAAAAFgDAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003000|",
+              "WhenOpened": "2026-10-05T20:11:05.644Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "mockData.js",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\tournaments\\mockData.js",
+              "RelativeDocumentMoniker": "src\\client\\tournaments\\mockData.js",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\tournaments\\mockData.js",
+              "RelativeToolTip": "src\\client\\tournaments\\mockData.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACIAAAACAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-10-05T20:09:06.537Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "TournamentsPage.jsx",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\tournaments\\TournamentsPage.jsx",
+              "RelativeDocumentMoniker": "src\\client\\tournaments\\TournamentsPage.jsx",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\tournaments\\TournamentsPage.jsx",
+              "RelativeToolTip": "src\\client\\tournaments\\TournamentsPage.jsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-10-05T20:09:00.356Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "AuthPage.jsx",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\auth\\AuthPage.jsx",
+              "RelativeDocumentMoniker": "src\\client\\auth\\AuthPage.jsx",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\auth\\AuthPage.jsx",
+              "RelativeToolTip": "src\\client\\auth\\AuthPage.jsx",
+              "ViewState": "AgIAAGwAAAAAAAAAAAAIwIgAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-10-05T20:42:29.721Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "StaffPage.jsx",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\staff\\StaffPage.jsx",
+              "RelativeDocumentMoniker": "src\\admin\\staff\\StaffPage.jsx",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\staff\\StaffPage.jsx",
+              "RelativeToolTip": "src\\admin\\staff\\StaffPage.jsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAJAAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-10-05T21:09:46.219Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "mockData.js",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\auth\\mockData.js",
+              "RelativeDocumentMoniker": "src\\admin\\auth\\mockData.js",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\auth\\mockData.js",
+              "RelativeToolTip": "src\\admin\\auth\\mockData.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-10-05T19:47:26.416Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "main.jsx",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\main.jsx",
+              "RelativeDocumentMoniker": "src\\main.jsx",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\main.jsx",
+              "RelativeToolTip": "src\\main.jsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-10-05T19:46:48.922Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "AdminAuthPage.jsx",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\auth\\AdminAuthPage.jsx",
+              "RelativeDocumentMoniker": "src\\admin\\auth\\AdminAuthPage.jsx",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\auth\\AdminAuthPage.jsx",
+              "RelativeToolTip": "src\\admin\\auth\\AdminAuthPage.jsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAADEAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-10-05T19:47:25.24Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "mockData.js",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\computers\\mockData.js",
+              "RelativeDocumentMoniker": "src\\admin\\computers\\mockData.js",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\computers\\mockData.js",
+              "RelativeToolTip": "src\\admin\\computers\\mockData.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-10-05T19:47:29.425Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "ComputersPage.jsx",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\computers\\ComputersPage.jsx",
+              "RelativeDocumentMoniker": "src\\admin\\computers\\ComputersPage.jsx",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\admin\\computers\\ComputersPage.jsx",
+              "RelativeToolTip": "src\\admin\\computers\\ComputersPage.jsx",
+              "ViewState": "AgIAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-10-05T19:47:28.746Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "mockData.js",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\home\\mockData.js",
+              "RelativeDocumentMoniker": "src\\client\\home\\mockData.js",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\home\\mockData.js",
+              "RelativeToolTip": "src\\client\\home\\mockData.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-10-05T19:47:02.974Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "HomePage.jsx",
+              "DocumentMoniker": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\home\\HomePage.jsx",
+              "RelativeDocumentMoniker": "src\\client\\home\\HomePage.jsx",
+              "ToolTip": "C:\\Users\\minhn\\source\\repos\\CyberCafe-Management-System-Project\\web\\src\\client\\home\\HomePage.jsx",
+              "RelativeToolTip": "src\\client\\home\\HomePage.jsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-10-05T19:47:00.25Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
