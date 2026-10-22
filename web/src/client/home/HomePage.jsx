@@ -1,46 +1,44 @@
-import React from 'react';
-import { Monitor, Plus, ArrowUpRight, Utensils, WalletCards, ReceiptText, ChevronRight } from 'lucide-react';
+﻿import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowUpRight, ChevronRight, Clock3, Cpu, Gamepad2, History, Info, Monitor, Plus, ReceiptText, Trophy, Users, Utensils, WalletCards, Zap } from 'lucide-react';
+import { useClientDemo } from '../shared/ClientDemoContext';
+import { Badge, DemoStrip, Empty, FoodArt, OrderDetail } from '../shared/ClientUI';
+import { dateTime, getReceipts, minutesLabel, money, orderStatus, transactionLabels } from '../shared/demoModel';
+import { useHomeData } from './useHomeData';
+import './home.css';
 
-const foods = [
-  ['Mì xào bò', '28.000đ'],
-  ['Cơm gà xối mỡ', '35.000đ'],
-  ['Trà đào cam sả', '15.000đ'],
-];
-
-export default function HomePage(){
-  return <div className="client-page">
-    <div className="client-page-heading">
-      <div><h1>Chào Minh Anh, sẵn sàng vào trận?</h1><p>Mọi thứ bạn cần cho buổi chơi hôm nay, ngay tại đây.</p></div>
-      <button className="client-action"><Utensils size={12}/> Gọi món tại máy</button>
+export default function HomePage() {
+  const navigate = useNavigate();
+  const { db, account, customer, session, computer, type } = useClientDemo();
+  // Keep the existing Phuc tournament module and its saved registrations available.
+  const { db: tournamentData } = useHomeData();
+  const [now, setNow] = useState(() => new Date());
+  const [filter, setFilter] = useState('all');
+  const [showAll, setShowAll] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  useEffect(() => { const timer = setInterval(() => setNow(new Date()), 30000); return () => clearInterval(timer); }, []);
+  const firstName = account.display_name.split(' ').slice(-2).join(' ');
+  const receipt = getReceipts(db).find((r) => r.id === session?.id);
+  const remaining = session ? customer.wallet_balance / session.hourly_rate_snapshot : 0;
+  const tournament = tournamentData.Tournaments.find((r) => r.Status === 'Open');
+  const registered = tournamentData.TournamentRegistrations.some((r) => r.TournamentId === tournament?.TournamentId && r.CustomerId === 1);
+  const activities = [
+    ...db.orders.filter((r) => r.customer_id === customer.id).map((r) => ({ key: `order-${r.id}`, id: r.id, kind: 'order', title: `Đơn món #GM${r.id}`, subtitle: `${db.order_items.filter((i) => i.order_id === r.id).reduce((s, i) => s + i.quantity, 0)} phần · Phục vụ tại máy`, time: r.placed_at, amount: r.total_amount, status: orderStatus(db, r.id), Icon: Utensils })),
+    ...db.wallet_transactions.filter((r) => r.customer_id === customer.id).map((r) => ({ key: `wallet-${r.id}`, id: r.id, kind: 'wallet', title: transactionLabels[r.transaction_type], subtitle: `Giao dịch #GD${r.id} · Số dư ${money(r.balance_after)}`, time: r.recorded_at, amount: r.amount, status: 'Paid', Icon: WalletCards })),
+    ...getReceipts(db).filter((r) => r.session.status === 'Ended').map((r) => ({ key: `invoice-${r.id}`, id: r.id, kind: 'invoice', title: `Bảng kê #PC${r.id}`, subtitle: `${r.computer?.code} · Phiên đã kết thúc`, time: r.session.ended_at, amount: r.total, status: 'Ended', Icon: ReceiptText })),
+  ].sort((a, b) => new Date(b.time) - new Date(a.time));
+  const filtered = activities.filter((r) => filter === 'all' || filter === r.kind);
+  function goToOrdering(product) { navigate('/client/ordering', { state: { openCart: Boolean(product), initialCartItems: product ? [{ ProductId: product.id, Quantity: 1 }] : [] } }); }
+  function openActivity(row) { if (row.kind === 'order') setSelectedOrder(row.id); else navigate(row.kind === 'wallet' ? '/client/wallet' : '/client/invoices'); }
+  return <div className="cafe-home"><DemoStrip/>
+    <div className="home-heading"><div><div className="home-eyebrow">PLAY. CONNECT. REPEAT.</div><h1>Chào {firstName}, sẵn sàng vào trận<span>?</span></h1><p>Mọi thứ bạn cần cho buổi chơi hôm nay, ngay tại đây.</p></div><button className="home-button" onClick={() => goToOrdering()}><Utensils size={16}/> Gọi món tại máy</button></div>
+    <div className="home-dashboard-grid">
+      <section className="home-panel home-session" aria-labelledby="session-title"><div className="home-session-content"><div className="home-card-top"><h2 id="session-title"><Monitor size={19}/>{computer?.code || 'Phiên chơi của bạn'}</h2><Badge status={session ? 'Active' : 'Ended'}/></div>{session ? <><div className="home-eyebrow home-timer-label">THỜI GIAN ĐÃ CHƠI</div><div className="home-timer home-timer-minutes" aria-label="Thời gian đã chơi">{minutesLabel(session.started_at, now)}</div><p className="home-start"><Clock3 size={13}/> Bắt đầu {dateTime(session.started_at)}</p><div className="home-machine-meta"><span>Không gian thi đấu · Khu máy {type?.name}</span><span><Cpu size={13}/>Sẵn sàng cho những trận đấu của bạn</span></div></> : <Empty title="Chưa có phiên chơi">Liên hệ nhân viên tại quầy để bắt đầu.</Empty>}</div><div className="home-rig" aria-hidden="true"><div className="home-rig-orbit"/><div className="home-rig-screen"><Gamepad2 size={60} strokeWidth={1}/><span>READY TO PLAY</span><div className="home-rig-line"/></div><div className="home-rig-stand"/><div className="home-rig-keyboard"/></div><div className="home-session-footer"><span>Đơn giá phiên <strong>{money(session?.hourly_rate_snapshot)}<small> / giờ</small></strong></span><span>Tiền máy đã trừ ví <strong>{money(session?.charged_amount)}</strong></span><button onClick={() => navigate('/client/invoices')}>Chi tiết phiên <ChevronRight size={14}/></button></div></section>
+      <section className="home-panel home-wallet" aria-labelledby="wallet-title"><div className="home-card-top"><h2 id="wallet-title">Ví của bạn</h2><WalletCards size={20}/></div><span className="home-muted">Số dư hiện tại</span><div className="home-balance">{money(customer.wallet_balance)}</div><button className="home-button primary" onClick={() => navigate('/client/wallet')}><Plus size={16}/> Nạp tiền vào ví</button><div className="home-balance-row"><span>Đơn món phiên này · ghi nhận</span><strong>{money(receipt?.food || 0)}</strong></div><div className="home-balance-row"><span>Tổng phiên · đã ghi nhận</span><strong>{money(receipt?.total || 0)}</strong></div>{session && <div className={`home-remaining ${remaining < 1 ? 'low' : ''}`}><Clock3 size={13}/>Dự kiến còn {Math.floor(remaining)} giờ {Math.floor(remaining * 60) % 60} phút<span title="Ước tính theo số dư hiện tại và đơn giá phiên, chưa tính đơn món mới."><Info size={13}/></span></div>}</section>
+      <section className="home-food-section" aria-labelledby="food-title"><div className="home-section-heading"><div><span className="home-eyebrow">TRAM KITCHEN</span><h2 id="food-title">Nạp năng lượng, tiếp trận</h2></div><button className="home-text-button" onClick={() => goToOrdering()}>Xem thực đơn <ArrowUpRight size={15}/></button></div><div className="home-food-grid">{db.products.filter((product) => product.is_active !== false).slice(0, 3).map((product) => <article className="home-food-card" key={product.id}><FoodArt product={product}/><div className="home-food-body"><span className="home-food-category">{db.product_categories.find((r) => r.id === product.category_id)?.name}</span><h3>{product.name}</h3><div className="home-food-bottom"><strong>{money(product.current_price)}</strong><button className="home-add" disabled={!session || !account.is_active || account.must_change_password || customer.wallet_balance <= 0} aria-label={`Thêm ${product.name} vào giỏ`} onClick={() => goToOrdering(product)}><Plus size={18}/></button></div></div></article>)}</div></section>
+      <section className="home-panel home-tournament" aria-labelledby="tournament-title"><Trophy className="home-trophy-art" size={145} strokeWidth={.7} aria-hidden="true"/><div className="home-tournament-content"><span className="home-badge"><i/>{registered ? 'BẠN ĐÃ ĐĂNG KÝ' : 'GIẢI ĐẤU SẮP TỚI'}</span><h2 id="tournament-title">{tournament?.TournamentName || 'Hẹn bạn ở giải đấu tới'}</h2>{tournament ? <><p><Gamepad2 size={15}/> VALORANT <span>·</span><Users size={15}/> Đội 5 người</p><p><Clock3 size={15}/>{dateTime(tournament.StartTime)}</p><div className="home-tournament-fee">{tournament.EntryFee === 0 ? 'Miễn phí tham gia' : money(tournament.EntryFee)}<span> / người chơi</span></div><button className="home-button tournament" onClick={() => navigate(`/client/tournaments?tournament=${tournament.TournamentId}`)}>{registered ? 'Xem đăng ký của bạn' : 'Chi tiết & đăng ký'}<ArrowUpRight size={16}/></button></> : <p>Giải đấu mới sẽ xuất hiện khi lịch được công bố.</p>}</div></section>
     </div>
-
-    <div className="client-grid">
-      <div>
-        <section className="client-card client-machine-card">
-          <div className="client-card-inner">
-            <div className="client-machine-name"><Monitor size={14}/> Máy 12 <span className="client-machine-status"><i/> Đang chơi</span></div>
-            <div className="client-machine-time">02:15:00</div>
-            <div className="client-machine-meta">Bắt đầu lúc 14:00 hôm nay</div>
-            <div className="client-machine-meta">Phòng Thi đấu · Tầng 2 · Máy hiệu năng cao</div>
-            <div className="client-machine-meta">Intel Core i5-12400F · RAM 16 GB · RTX 3060</div>
-          </div>
-          <div className="client-machine-image" />
-        </section>
-
-        <section className="client-section">
-          <div className="client-section-title"><div><h2>Nạp năng lượng, tiếp trận</h2></div><a>Xem thực đơn ↗</a></div>
-          <div className="client-order-grid">
-            {foods.map(([name,price])=><div className="client-food" key={name}><div className="client-food-img client-skeleton"/><div className="client-food-body"><div className="client-food-type">Món ăn</div><div className="client-food-name">{name}</div><div className="client-food-bottom"><span className="client-food-price">{price}</span><button className="client-add"><Plus size={11}/></button></div></div></div>)}
-          </div>
-        </section>
-      </div>
-
-      <div>
-        <section className="client-card client-side-card"><div className="client-card-inner"><div className="client-balance-label">Số dư ví hiện tại</div><div className="client-balance">153.000đ</div><button className="client-deposit"><WalletCards size={11}/> + &nbsp;Nạp tiền</button><div className="client-balance-row"><span>Gọi món · chưa thanh toán</span><strong>43.000đ</strong></div><div className="client-balance-row"><span>Tổng chi tiêu phiên này</span><strong>70.000đ</strong></div></div></section>
-        <section className="client-section client-card client-tournament-card"><div className="client-tournament-content"><span className="client-tag">GIẢI ĐẤU SẮP TỚI</span><h3>Đấu trường cuối tuần</h3><p>VALORANT · Tối 5 người</p><p>14:00 · Thứ Bảy, 10/10/2026</p><button className="client-tournament-button">Xem chi tiết & đăng ký →</button></div></section>
-      </div>
-    </div>
-
-    <section className="client-section"><div className="client-section-title"><h2>Hoạt động gần đây</h2><a>Xem báo cáo ↗</a></div><div className="client-activity"><div className="client-activity-head"><div>Giao dịch / đơn hàng</div><div>Thời gian</div><div>Số tiền</div><div>Trạng thái</div><div/></div>{[['Đơn món #GM1048','16:05','43.000đ','Đang chuẩn bị',Utensils],['Nạp tiền vào ví','13:55','+150.000đ','Thành công',WalletCards],['Hóa đơn #HD1026','19:00','52.000đ','Đã thanh toán',ReceiptText]].map(([title,time,amount,status,Icon])=><div className="client-activity-row" key={title}><div className="client-activity-main"><div className="activity-icon"><Icon size={11}/></div><div><span>{title}</span><small>Chi tiết giao dịch / đơn hàng</small></div></div><div>{time}</div><div>{amount}</div><div className={`client-status ${status==='Đang chuẩn bị'?'pending':''}`}>{status}</div><ChevronRight size={12}/></div>)}</div></section>
-  </div>
+    <section className="home-activity-section" aria-labelledby="activity-title"><div className="home-section-heading"><div><span className="home-eyebrow">MỌI THỨ TRONG TẦM TAY</span><h2 id="activity-title">Hoạt động gần đây</h2></div><button className="home-text-button" onClick={() => setShowAll(!showAll)}>{showAll ? 'Thu gọn' : 'Xem tất cả'}<History size={15}/></button></div><div className="home-panel"><div className="home-tabs" role="group" aria-label="Lọc hoạt động">{[['all', 'Tất cả'], ['order', 'Đơn món'], ['wallet', 'Giao dịch ví'], ['invoice', 'Hóa đơn']].map(([value, label]) => <button key={value} aria-pressed={filter === value} className={filter === value ? 'selected' : ''} onClick={() => setFilter(value)}>{label}{value === 'all' && <span>{activities.length}</span>}</button>)}</div><div className="home-table-wrap"><table className="home-table"><thead><tr><th>Giao dịch / đơn hàng</th><th>Thời gian</th><th>Số tiền</th><th>Trạng thái</th><th><span className="home-sr-only">Chi tiết</span></th></tr></thead><tbody>{(showAll ? filtered : filtered.slice(0, 5)).map((row) => <tr key={row.key}><td><div className="home-activity-name"><span className={`home-activity-icon ${row.kind}`}><row.Icon size={18}/></span><div><button onClick={() => openActivity(row)}>{row.title}</button><small>{row.subtitle}</small></div></div></td><td className="home-date">{dateTime(row.time)}</td><td className={`home-amount ${row.kind === 'wallet' && row.amount > 0 ? 'positive' : ''}`}>{row.kind === 'wallet' && row.amount > 0 ? '+' : row.amount < 0 ? '−' : ''}{money(Math.abs(row.amount))}</td><td><Badge status={row.status}/></td><td><button className="home-icon-button" aria-label={`Xem ${row.title}`} onClick={() => openActivity(row)}><ChevronRight size={17}/></button></td></tr>)}</tbody></table></div>{!filtered.length && <Empty title="Chưa có hoạt động trong mục này"/>}</div></section>
+    <footer className="home-footer"><span><Zap size={13}/> TRAM · Chơi hết mình, kết nối hết cỡ.</span><time dateTime={now.toISOString()}>{dateTime(now)}</time></footer>{selectedOrder && <OrderDetail order={db.orders.find((r) => r.id === selectedOrder)} onClose={() => setSelectedOrder(null)}/>}
+  </div>;
 }

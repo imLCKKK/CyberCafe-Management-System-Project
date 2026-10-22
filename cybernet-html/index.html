@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Giao diện quản trị CyberNet cho đồ án Công nghệ .NET">
+  <title>CyberNet — Quản lý phòng máy</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+<div id="cybernet">
+
+<div class="cn-titlebar"><span>CyberNet Admin</span><span>Giao diện quản trị · Demo</span></div>
+<div class="cn-layout"><aside><div class="cn-brand">CyberNet<span style="color:var(--cn-ink)">.</span></div><div class="cn-sub cn-brand-sub">Quản lý phòng máy</div><nav aria-label="Chức năng chính">
+<button data-page="machines" aria-current="page"><span class="cn-icon" aria-hidden="true">▣</span>Phòng máy</button>
+<button data-page="sessions"><span class="cn-icon" aria-hidden="true">◷</span>Phiên sử dụng</button>
+<button data-page="combos"><span class="cn-icon" aria-hidden="true">▤</span>Gói giờ / combo</button>
+<button data-page="members"><span class="cn-icon" aria-hidden="true">♙</span>Hội viên & ví</button>
+<button data-page="services"><span class="cn-icon" aria-hidden="true">♧</span>Dịch vụ</button>
+<button data-page="bills"><span class="cn-icon" aria-hidden="true">▧</span>Hóa đơn</button>
+<button data-page="reports"><span class="cn-icon" aria-hidden="true">▥</span>Báo cáo</button>
+</nav></aside><main><div class="cn-heading"><div><h2 id="cn-title">Phòng máy</h2><div class="cn-sub">CyberNet · Chi nhánh mẫu</div></div><div class="cn-profile">Quản trị viên · Demo</div></div><div id="cn-content"></div><div id="cn-feedback" class="cn-note" role="status" aria-live="polite"></div></main></div>
+<div class="cn-footer"><span>● Chế độ xem thử · Dữ liệu minh họa</span><span>CyberNet / Admin</span></div>
+
+<dialog id="cn-purchase" class="cn-dialog" aria-labelledby="cn-purchase-title"><header><h3 id="cn-purchase-title">Thanh toán combo</h3><button class="cn-button" id="cn-close" aria-label="Đóng hộp thoại">×</button></header><div id="cn-purchase-body"></div></dialog>
+
+</div>
+
+</body>
+</html>
