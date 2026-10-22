@@ -89,7 +89,7 @@ test('deposit updates wallet and balance-after ledger together', () => {
 test('registration saves Riot ID without inventing tracker statistics, ML scores or teams', () => {
   const next = registerTournament(fresh(), 1, form, now);
   const registration = next.TournamentRegistrations[0];
-  assert.equal(registration.RankId, 4);
+  assert.equal(registration.RankId, null);
   assert.equal(registration.RiotId, 'Minh Anh#VN1');
   assert.equal(registration.WinRate, null);
   assert.equal(registration.HoursPlayed, null);
@@ -98,12 +98,12 @@ test('registration saves Riot ID without inventing tracker statistics, ML scores
   assert.throws(() => registerTournament(next, 1, form, now), /đã đăng ký/);
 });
 
-test('registration rejects closed windows, a different game rank and invalid Riot IDs', () => {
+test('registration rejects closed windows and invalid Riot IDs but never trusts a supplied rank', () => {
   const db = fresh();
   assert.throws(() => registerTournament(db, 1, form, new Date(db.Tournaments[0].RegistrationEnd)));
   assert.throws(() => registerTournament(db, 1, form, new Date('2020-01-01')));
   db.GameRanks[3].GameId = 999;
-  assert.throws(() => registerTournament(db, 1, form, now));
+  assert.equal(registerTournament(db, 1, form, now).TournamentRegistrations[0].RankId, null);
   for (const invalid of [{ riotId: '' }, { riotId: 'Player' }, { riotId: '#VN1' }, { riotId: 'Player#' }, { riotId: 'Player#VN#1' }, { riotId: 'Player#VN 1' }, { riotId: 'Player\n#VN1' }, { riotId: null }, { role: 'unknown' }]) assert.throws(() => registerTournament(fresh(), 1, { ...form, ...invalid }, now));
 });
 

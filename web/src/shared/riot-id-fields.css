@@ -1,0 +1,10 @@
+.riot-id-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.riot-id-fields legend { padding: 0; margin-bottom: 9px; font-weight: 600; }
+.riot-id-parts { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, .65fr); gap: 8px; align-items: end; }
+.riot-id-parts label { display: grid; gap: 7px; min-width: 0; }
+.riot-id-parts input { width: 100%; min-width: 0; }
+.riot-id-separator { padding-bottom: 11px; font-size: 20px; font-weight: 700; }
+.riot-id-fields > small { display: block; margin-top: 8px; line-height: 1.5; }
+.opgg-privacy-note { margin: 0; padding: 12px 14px; border: 1px solid #6e965e70; border-radius: 8px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.opgg-privacy-note strong { display: block; }
+.admin-form > .riot-id-fields { grid-column: 1 / -1; }

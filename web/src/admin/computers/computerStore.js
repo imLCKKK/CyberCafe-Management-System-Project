@@ -38,7 +38,7 @@ window.addEventListener("storage", (event) => {
   }
 });
 export function useComputers() {
-  return useSyncExternalStore(subscribe, () => computers);
+  return useSyncExternalStore(subscribe, () => computers, () => mockData);
 }
 export function saveComputer(computer) {
   const name = computer.ComputerName.trim();

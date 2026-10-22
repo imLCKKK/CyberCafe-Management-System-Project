@@ -24,8 +24,9 @@ export function flightRecords(text) {
     }
     let end = buffer.indexOf(10, start);
     if (end < 0) end = buffer.length;
-    if ([91, 123].includes(buffer[start])) {
-      try { records.push(JSON.parse(buffer.subarray(start, end).toString('utf8'))); } catch { /* malformed row */ }
+    const jsonStart = buffer[start] === 73 ? start + 1 : start; // I: public module imports
+    if ([34, 91, 123].includes(buffer[jsonStart])) {
+      try { records.push(JSON.parse(buffer.subarray(jsonStart, end).toString('utf8'))); } catch { /* malformed row */ }
     }
     cursor = end + 1;
   }
@@ -57,13 +58,22 @@ export function parseProfile(html, expectedId) {
   const context = findObject(records, (item) => item.queueId === 'competitive' && typeof item.seasonId === 'string' && Array.isArray(item.seasonOptions));
   const season = context?.seasonOptions.find((item) => item.value === context.seasonId);
   if (!season || !/^[a-f\d-]{36}$/i.test(context.seasonId) || typeof season.label !== 'string') throw changed();
-  const scripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((match) => match[1]).filter((url) => {
+  const importedScripts = [];
+  function collectChunks(value) {
+    if (typeof value === 'string' && value.startsWith('static/chunks/') && value.endsWith('.js')) importedScripts.push(new URL(value, 'https://c-valorant-web-v2.op.gg/prod/_next/').href);
+    else if (value && typeof value === 'object') Object.values(value).forEach(collectChunks);
+  }
+  collectChunks(records);
+  const scripts = [...new Set([...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((match) => match[1]).concat(importedScripts))].filter((url) => {
     try { const parsed = new URL(url); return parsed.origin === 'https://c-valorant-web-v2.op.gg' && parsed.pathname.startsWith('/prod/_next/static/chunks/') && parsed.pathname.endsWith('.js'); } catch { return false; }
   });
   // Shared profile chunks appear immediately before the profile page entry point.
   const pageIndex = scripts.findIndex((url) => /\/profile\/.*\/page-/.test(url));
   if (pageIndex < 0) throw changed();
-  return { profile, seasonId: context.seasonId, scope: `${season.label} · Competitive`, scripts: scripts.slice(0, pageIndex + 1).reverse() };
+  const tier = findObject(records, (item) => item.id === profile.competitiveTier && typeof item.name === 'string' && Number.isInteger(item.division) && typeof item.i18n === 'string' && item.i18n.startsWith('tiers:'));
+  const rank = tier && Number.isSafeInteger(tier.id) && tier.id >= 0 && typeof tier.name === 'string' && tier.name.length <= 50 && Number.isInteger(tier.division) && tier.division >= 0 && tier.division <= 3
+    ? { tier: tier.id, name: tier.name, division: tier.division, label: `${tier.name}${tier.division ? ` ${tier.division}` : ''}` } : null;
+  return { profile, rank, seasonId: context.seasonId, scope: `${season.label} · Competitive`, scripts: scripts.slice(0, pageIndex + 1).reverse() };
 }
 
 export function findStatsAction(script) {
@@ -73,7 +83,11 @@ export function findStatsAction(script) {
 export function normalizeStatistics(data, context, requestedId, now = new Date()) {
   if (!data || !sameId(`${data.gameName}#${data.tagLine}`, requestedId) || data.platform !== 'pc') throw changed();
   const raw = data.playerStatistics;
-  if (!raw) throw new StatsError(404, 'OP.GG chưa có thống kê Competitive cho mùa hiện tại.');
+  if (raw == null) return {
+    riotId: requestedId, source: 'opgg', queue: 'competitive', scope: context.scope,
+    fetchedAt: now.toISOString(), sourceUpdatedAt: Number.isFinite(Date.parse(context.profile.lastUpdatedAt)) ? context.profile.lastUpdatedAt : null,
+    rank: context.rank || null, matches: null, winRate: null, headshotRate: null, damagePerRound: null, kda: null,
+  };
   if (!Number.isSafeInteger(raw.gameCount) || raw.gameCount < 0) throw changed();
   const keys = ['wins', 'draws', 'defeats', 'rounds', 'damage', 'headShots', 'bodyShots', 'legShots', 'kills', 'deaths', 'assists'];
   for (const key of keys) if (raw[key] != null && (!Number.isFinite(raw[key]) || raw[key] < 0)) throw changed();
@@ -85,7 +99,7 @@ export function normalizeStatistics(data, context, requestedId, now = new Date()
   return {
     riotId: requestedId, source: 'opgg', queue: 'competitive', scope: context.scope,
     fetchedAt: now.toISOString(), sourceUpdatedAt: Number.isFinite(Date.parse(context.profile.lastUpdatedAt)) ? context.profile.lastUpdatedAt : null,
-    matches: raw.gameCount,
+    rank: context.rank || null, matches: raw.gameCount,
     winRate: ratio(raw.wins, raw.gameCount, true),
     headshotRate: ratio(raw.headShots, sum(raw.headShots, raw.bodyShots, raw.legShots), true),
     damagePerRound: ratio(raw.damage, raw.rounds),

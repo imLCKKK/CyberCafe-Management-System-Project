@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, CalendarDays, Check, Crosshair, ExternalLink, Gamepad2, Info, RefreshCw, Search, Trophy, Users } from 'lucide-react';
 import { useHomeData } from '../home/useHomeData';
 import { dateTime, money, registerTournament, statusLabels } from '../home/homeModel';
 import { CURRENT_CUSTOMER_ID } from '../home/mockData';
 import HomeDialog from '../home/HomeDialog';
-import { fetchParticipantStats, filterParticipants, getParticipants, roles, statColumns, opggUrl } from './tournamentModel';
+import { RiotIdFields, OpggPrivacyNote } from '../../shared/RiotIdFields';
+import { fetchParticipantStats, filterParticipants, getParticipants, roles, statColumns, opggUrl, saveParticipantStats } from './tournamentModel';
 import '../home/home.css';
 import './tournaments.css';
 
@@ -16,7 +17,7 @@ const keyFor = (row) => `${row.RegistrationId}:${row.RiotId}:${row.RegisteredAt}
 
 function StatsSource({ stats, loading }) {
   if (!stats) return <small role="status">{loading ? 'Đang lấy thống kê OP.GG…' : 'Chưa đồng bộ OP.GG'}</small>;
-  return <><small>OP.GG · {stats.matches} trận · {stats.scope}</small><small>Lấy dữ liệu: {dateTime(stats.fetchedAt)}</small><small>OP.GG cập nhật: {stats.sourceUpdatedAt ? dateTime(stats.sourceUpdatedAt) : 'Không rõ thời điểm'}</small></>;
+  return <><small>OP.GG · {stats.matches == null ? 'Chưa có thống kê trận' : `${stats.matches} trận`} · {stats.scope}</small><small>Lấy dữ liệu: {dateTime(stats.fetchedAt)}</small><small>OP.GG cập nhật: {stats.sourceUpdatedAt ? dateTime(stats.sourceUpdatedAt) : 'Không rõ thời điểm'}</small></>;
 }
 
 function OpggNote() {
@@ -33,7 +34,7 @@ export function TournamentsPage() {
   const [sort, setSort] = useState({ key: 'RegisteredAt', direction: -1 });
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ riotId: '', rankId: '', role: 'Flex' });
+  const [form, setForm] = useState({ riotId: '', role: 'Flex' });
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [stats, setStats] = useState({});
@@ -41,13 +42,14 @@ export function TournamentsPage() {
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const request = useRef(null);
+  const autoRequested = useRef(new Set());
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 30000); return () => clearInterval(timer); }, []);
   useEffect(() => {
     setPage(1); setModal(false); setError(''); setNotice('');
     request.current?.abort(); request.current = null; setBusy(false);
     return () => { request.current?.abort(); request.current = null; };
   }, [tournament?.TournamentId]);
-  const participants = getParticipants(db, tournament?.TournamentId).map((row) => ({ ...row, stats: stats[keyFor(row)] }));
+  const participants = getParticipants(db, tournament?.TournamentId).map((row) => ({ ...row, stats: stats[keyFor(row)] || row.stats }));
   const filtered = filterParticipants(participants, query, role, sort.key, sort.direction);
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pages);
@@ -78,10 +80,12 @@ export function TournamentsPage() {
       for (const row of rows.filter((item) => item.RiotId)) {
         if (controller.signal.aborted) break;
         const key = keyFor(row);
+        autoRequested.current.add(key);
         const timeout = setTimeout(() => controller.abort(), 30000);
         try {
           const result = await fetchParticipantStats(row, { baseUrl: statsApi, signal: controller.signal });
           if (controller.signal.aborted) break;
+          commit((data) => saveParticipantStats(data, row.RegistrationId, row.RiotId, result));
           setStats((old) => ({ ...old, [key]: result }));
           setSyncErrors((old) => ({ ...old, [key]: '' }));
           succeeded++;
@@ -105,7 +109,7 @@ export function TournamentsPage() {
   const visibleKeys = visible.filter((row) => row.RiotId).map(keyFor).join('|');
   const autoSync = useRef(null);
   autoSync.current = () => {
-    const missing = visible.filter((row) => row.RiotId && !stats[keyFor(row)] && !syncErrors[keyFor(row)]);
+    const missing = visible.filter((row) => row.RiotId && !autoRequested.current.has(keyFor(row)) && (!row.stats || Date.now() - Date.parse(row.stats.fetchedAt) >= 600000) && !syncErrors[keyFor(row)]);
     if (missing.length) void sync(missing, false);
   };
   useEffect(() => {
@@ -129,12 +133,12 @@ export function TournamentsPage() {
       <div className="tour-facts"><div className="tour-fact"><span>Người chơi đã đăng ký</span><strong>{participants.length} người</strong></div><div className="tour-fact"><span>Hạn đăng ký</span><strong>{dateTime(tournament.RegistrationEnd)}</strong></div><div className="tour-fact"><span>Hồ sơ đã tải thống kê</span><strong>{participants.filter((row) => row.stats).length} / {participants.length}</strong></div></div>
       <section className="tour-panel" aria-labelledby="participants-title"><div className="tour-section-heading"><div><h2 id="participants-title">Danh sách người đăng ký</h2><p>Thống kê Competitive · Phạm vi và thời gian cập nhật theo từng hồ sơ.</p></div><button className="tour-button" onClick={() => sync()} disabled={busy || !statsApi || !visible.some((row) => row.RiotId)} title={!statsApi ? 'Chưa kết nối dịch vụ thống kê' : 'Cập nhật các hồ sơ trên trang đang xem'}><RefreshCw size={15}/>{busy ? 'Đang đồng bộ…' : 'Đồng bộ OP.GG'}</button></div>
         <div className="tour-toolbar"><label className="tour-search"><Search size={17}/><input aria-label="Tìm người chơi hoặc Riot ID" placeholder="Tìm người chơi, Riot ID…" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }}/></label><select className="tour-select" aria-label="Lọc vai trò" value={role} onChange={(event) => { setRole(event.target.value); setPage(1); }}><option value="">Tất cả vai trò</option>{roles.map((item) => <option key={item}>{item}</option>)}</select></div>
-        <div className="tour-table-wrap"><table className="tour-table"><caption className="home-sr-only">Người đăng ký và thống kê Valorant của {tournament.TournamentName}</caption><thead><tr><th scope="col">Người chơi / Riot ID</th><th scope="col">Hạng khai báo</th><th scope="col">Vai trò</th>{statColumns.map(([key, label]) => <th scope="col" key={key} aria-sort={sort.key === key ? sort.direction === 1 ? 'ascending' : 'descending' : 'none'}><button onClick={() => toggleSort(key)}>{label}{sort.key === key && (sort.direction === 1 ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}</button></th>)}<th scope="col">Thống kê / nguồn</th></tr></thead><tbody>{visible.map((row) => <tr key={row.RegistrationId}><td><div className="tour-player"><span className="tour-avatar" aria-hidden="true">{row.name.split(' ').slice(-1)[0].slice(0, 2).toUpperCase()}</span><div><strong>{row.name}{row.isMe && <span className="tour-me">BẠN</span>}</strong><small>{row.RiotId || 'Chưa có Riot ID'} · {statusLabels[row.Status] || row.Status}</small></div></div></td><td>{row.rank}</td><td>{row.PreferredRole}</td>{statColumns.map(([key, , suffix]) => <td key={key} className={`tour-metric ${row.stats?.[key] == null ? 'missing' : ''}`}>{metric(row.stats?.[key], suffix)}</td>)}<td className="tour-sync">{row.RiotId && <a className="tour-link" href={opggUrl(row.RiotId)} target="_blank" rel="noopener noreferrer">Mở OP.GG <ExternalLink size={12}/></a>}<StatsSource stats={row.stats} loading={busy && !syncErrors[keyFor(row)]}/>{syncErrors[keyFor(row)] && <small role="status">{row.stats ? 'Đang hiển thị bản trước. ' : ''}{syncErrors[keyFor(row)]}</small>}</td></tr>)}</tbody></table></div>
+        <div className="tour-table-wrap"><table className="tour-table"><caption className="home-sr-only">Người đăng ký và thống kê Valorant của {tournament.TournamentName}</caption><thead><tr><th scope="col">Người chơi / Riot ID</th><th scope="col">Rank OP.GG</th><th scope="col">Vai trò</th>{statColumns.map(([key, label]) => <th scope="col" key={key} aria-sort={sort.key === key ? sort.direction === 1 ? 'ascending' : 'descending' : 'none'}><button onClick={() => toggleSort(key)}>{label}{sort.key === key && (sort.direction === 1 ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}</button></th>)}<th scope="col">Thống kê / nguồn</th></tr></thead><tbody>{visible.map((row) => <tr key={row.RegistrationId}><td><div className="tour-player"><span className="tour-avatar" aria-hidden="true">{row.name.split(' ').slice(-1)[0].slice(0, 2).toUpperCase()}</span><div><strong>{row.name}{row.isMe && <span className="tour-me">BẠN</span>}</strong><small>{row.RiotId || 'Chưa có Riot ID'} · {statusLabels[row.Status] || row.Status}</small></div></div></td><td>{row.rank}</td><td>{row.PreferredRole}</td>{statColumns.map(([key, , suffix]) => <td key={key} className={`tour-metric ${row.stats?.[key] == null ? 'missing' : ''}`}>{metric(row.stats?.[key], suffix)}</td>)}<td className="tour-sync">{row.RiotId && <a className="tour-link" href={opggUrl(row.RiotId)} target="_blank" rel="noopener noreferrer">Mở OP.GG <ExternalLink size={12}/></a>}<StatsSource stats={row.stats} loading={busy && !syncErrors[keyFor(row)]}/>{syncErrors[keyFor(row)] && <small role="status">{row.stats ? 'Đang hiển thị bản trước. ' : ''}{syncErrors[keyFor(row)]}</small>}</td></tr>)}</tbody></table></div>
         {!visible.length && <div className="tour-empty"><Crosshair size={34}/><h3>{participants.length ? 'Không tìm thấy người chơi' : 'Sẵn sàng ghi tên vào đấu trường?'}</h3><p>{participants.length ? 'Thử tên, Riot ID hoặc vai trò khác.' : 'Hãy là người đầu tiên đăng ký. Hồ sơ của bạn sẽ xuất hiện tại đây.'}</p>{participants.length > 0 && <button className="tour-button" onClick={() => { setQuery(''); setRole(''); }}>Xóa bộ lọc</button>}</div>}
         <div className="tour-pagination"><span>{filtered.length ? `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)}` : '0'} / {filtered.length} người chơi</span><div><button className="tour-button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</button><span>{currentPage} / {pages}</span><button className="tour-button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>Sau</button></div></div>
       </section>
       <OpggNote/>
     </>}
-    {modal && tournament && <HomeDialog title="Đăng ký giải đấu" onClose={() => { setModal(false); setError(''); }}><form className="tour-form" onSubmit={submit}><p className="tour-muted">{tournament.TournamentName} · Đăng ký trải nghiệm được lưu trên trình duyệt.</p>{error && <div className="tour-note tour-error" role="alert">{error}</div>}<label>Riot ID<input required maxLength={128} placeholder="Tên người chơi#VN1" value={form.riotId} onChange={(event) => setForm({ ...form, riotId: event.target.value })}/><small>Dùng đúng Riot ID của bạn. Nhập ID chưa liên kết hay xác minh tài khoản Riot.</small></label><label>Hạng hiện tại<select required value={form.rankId} onChange={(event) => setForm({ ...form, rankId: event.target.value })}><option value="">Chọn hạng của bạn</option>{db.GameRanks.filter((rank) => rank.GameId === tournament.GameId).map((rank) => <option key={rank.RankId} value={rank.RankId}>{rank.RankName}</option>)}</select></label><label>Vai trò sở trường<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>{roles.map((item) => <option key={item}>{item}</option>)}</select></label><div className="tour-actions"><button type="button" className="tour-button" onClick={() => { setModal(false); setError(''); }}>Để sau</button><button className="tour-button primary" type="submit">Xác nhận đăng ký</button></div></form></HomeDialog>}
+    {modal && tournament && <HomeDialog title="Đăng ký giải đấu" onClose={() => { setModal(false); setError(''); }}><form className="tour-form" onSubmit={submit}><p className="tour-muted">{tournament.TournamentName} · Đăng ký trải nghiệm được lưu trên trình duyệt.</p>{error && <div className="tour-note tour-error" role="alert">{error}</div>}<RiotIdFields value={form.riotId} onChange={(riotId) => setForm({ ...form, riotId })}/><OpggPrivacyNote/><label>Vai trò sở trường<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>{roles.map((item) => <option key={item}>{item}</option>)}</select></label><div className="tour-actions"><button type="button" className="tour-button" onClick={() => { setModal(false); setError(''); }}>Để sau</button><button className="tour-button primary" type="submit">Xác nhận đăng ký</button></div></form></HomeDialog>}
   </div>;
 }

@@ -6,19 +6,20 @@ import { createDemoData } from '../home/mockData.js';
 import { registerTournament } from '../home/homeModel.js';
 
 let db = createDemoData();
-globalThis.localStorage = { getItem: () => JSON.stringify(db) };
+globalThis.localStorage = { getItem: (key) => key === 'tram.client.home.demo.v1' ? JSON.stringify(db) : null };
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', ssr: { noExternal: ['react-router-dom', 'react-router'], resolve: { conditions: ['module', 'module-sync', 'node', 'development'] } } });
 try {
   const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
   const { TournamentsPage } = await server.ssrLoadModule('/web/src/client/tournaments/TournamentsPage.jsx');
   const { default: HomePage } = await server.ssrLoadModule('/web/src/client/home/HomePage.jsx');
-  const render = (path) => renderToString(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(path === '/client/home' ? HomePage : TournamentsPage))).replace(/<!-- -->/g, '');
+  const { ClientDemoProvider } = await server.ssrLoadModule('/web/src/client/shared/ClientDemoContext.jsx');
+  const render = (path) => renderToString(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(ClientDemoProvider, null, React.createElement(path === '/client/home' ? HomePage : TournamentsPage)))).replace(/<!-- -->/g, '');
   const empty = render('/client/tournaments?tournament=1');
   for (const text of ['Giải đấu cộng đồng', 'Tỷ lệ thắng', 'Headshot', 'Damage / round', 'KDA', 'Sẵn sàng ghi tên']) assert.ok(empty.includes(text), `Missing ${text}`);
   assert.ok(!empty.includes('CHƯA TRIỂN KHAI'));
-  db = registerTournament(db, 1, { riotId: 'Player#VN1', rankId: 4, role: 'Duelist' });
+  db = registerTournament(db, 1, { riotId: 'Player#VN1', role: 'Duelist' });
   const registered = render('/client/tournaments?tournament=1');
-  for (const text of ['Bạn đã đăng ký', 'Player#VN1', 'Gold', 'Chưa đồng bộ', 'Player-VN1']) assert.ok(registered.includes(text), `Missing ${text}`);
+  for (const text of ['Bạn đã đăng ký', 'Player#VN1', 'Rank OP.GG', 'Chưa đồng bộ', 'Player-VN1']) assert.ok(registered.includes(text), `Missing ${text}`);
   assert.equal((registered.match(/tour-metric missing/g) || []).length, 4);
   assert.ok(!registered.includes('NaN'));
   assert.ok(render('/client/home').includes('Xem đăng ký của bạn'));

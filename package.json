@@ -4,11 +4,17 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test:frontend": "node tests/frontend/run.mjs",
+    "test:frontend:render": "node web/src/admin/shared/render-smoke.mjs && node web/src/client/home/render-smoke.mjs && node web/src/client/tournaments/render-smoke.mjs",
+    "test:frontend:models": "node --test server/opgg.test.js web/src/admin/shared/adminModel.test.js web/src/client/shared/demoModel.test.js web/src/client/home/homeModel.test.js web/src/client/ordering/recommendation.test.js web/src/client/invoices/invoiceModel.test.js web/src/client/tournaments/tournamentModel.test.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "stats:server": "node server/index.js",
-    "test:opgg": "node --test --test-isolation=none server/opgg.test.js web/src/client/tournaments/tournamentModel.test.js"
+    "test:opgg": "node --test --test-isolation=none server/opgg.test.js web/src/client/tournaments/tournamentModel.test.js",
+    "test:client": "node --test web/src/client/shared/demoModel.test.js web/src/client/ordering/recommendation.test.js web/src/client/invoices/invoiceModel.test.js",
+    "test:admin": "node --test web/src/admin/shared/adminModel.test.js",
+    "test:admin:render": "node web/src/admin/shared/render-smoke.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

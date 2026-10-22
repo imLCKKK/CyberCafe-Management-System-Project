@@ -1,0 +1,356 @@
+// Paste this file into https://dbdiagram.io to view the logical ERD.
+// SQL Server is the source of truth. Monetary values are whole VND.
+// This models the agreed MVP; it is not an EF Core migration.
+
+Enum account_role {
+  Customer
+  Staff
+  Admin
+}
+
+Enum top_up_status {
+  Pending
+  Rejected
+  CreditedUnpaid
+  Collected
+}
+
+Enum collection_method {
+  Cash
+  BankTransfer
+}
+
+Enum gaming_session_status {
+  Active
+  Ended
+}
+
+Enum gaming_session_end_reason {
+  CustomerLogout
+  BalanceDepleted
+  StaffEnded
+}
+
+Enum order_item_status {
+  Pending
+  Confirmed
+  Cancelled
+}
+
+Enum cancel_request_status {
+  Pending
+  Approved
+  Rejected
+}
+
+Enum tournament_status {
+  Open
+  Closed
+  TeamsFinalized
+  Cancelled
+}
+
+Enum registration_fee_status {
+  Paid
+  Refunded
+}
+
+Enum registration_refund_reason {
+  Unassigned
+  TournamentCancelled
+}
+
+Enum stats_status {
+  Available
+  Unavailable
+}
+
+Enum wallet_transaction_type {
+  TopUpCredit
+  GamingCharge
+  OrderDebit
+  OrderItemRefund
+  TournamentFee
+  TournamentRefund
+}
+
+Table accounts {
+  id bigint [pk, increment]
+  phone varchar(20) [not null, unique, note: 'Username của khách là số điện thoại.']
+  display_name nvarchar(100) [not null]
+  password_hash varchar(255) [not null, note: 'Không lưu mật khẩu gốc; mật khẩu ban đầu của khách bằng số điện thoại.']
+  role account_role [not null]
+  must_change_password boolean [not null, default: false, note: 'True cho tài khoản khách mới; reset theo yêu cầu không bật lại cờ.']
+  is_active boolean [not null, default: true]
+  created_by_account_id bigint [ref: > accounts.id]
+  created_at datetimeoffset [not null]
+
+  Note: 'Ví bằng 0 thì từ chối đăng nhập khách, báo tài khoản đã hết tiền và yêu cầu nhân viên nạp tại quầy; không cấp phiên đăng nhập giới hạn. Khách mới phải đổi mật khẩu lần đầu khi đủ tiền để đăng nhập.'
+}
+
+Table customers {
+  id bigint [pk, increment]
+  account_id bigint [not null, unique, ref: - accounts.id]
+  wallet_balance decimal(18,0) [not null, default: 0]
+  wallet_version bigint [not null, default: 0, note: 'Dùng cho optimistic concurrency hoặc thay bằng rowversion trong SQL Server.']
+
+  Note: 'Số dư không âm; chỉ server đổi số dư cùng transaction với wallet_transactions.'
+}
+
+Table top_ups {
+  id bigint [pk, increment]
+  customer_id bigint [not null, ref: > customers.id]
+  amount decimal(18,0) [not null]
+  requested_by_customer boolean [not null, default: false]
+  status top_up_status [not null]
+  requested_at datetimeoffset [not null]
+  credited_by_account_id bigint [ref: > accounts.id]
+  credited_at datetimeoffset
+  collected_by_account_id bigint [ref: > accounts.id]
+  collected_at datetimeoffset
+  collection_method collection_method
+
+  Note: 'Khách chỉ có thể gửi yêu cầu từ máy khi đã đăng nhập và ví còn tiền; ví bằng 0 phải nhờ nhân viên nạp tại quầy. Bấm Nạp cộng ví ngay, sau đó mới đánh dấu Đã thu tiền. Phải thu xong khoản CreditedUnpaid trước khi tạo/nạp khoản tiếp theo cho cùng khách. Pending có thể bị từ chối. Mỗi top-up chỉ được cộng ví một lần.'
+}
+
+Table wallet_transactions {
+  id bigint [pk, increment]
+  customer_id bigint [not null, ref: > customers.id]
+  transaction_type wallet_transaction_type [not null]
+  amount decimal(18,0) [not null, note: 'Có dấu: cộng ví dương, trừ ví âm.']
+  balance_after decimal(18,0) [not null]
+  top_up_id bigint [ref: > top_ups.id]
+  gaming_session_id bigint [ref: > gaming_sessions.id]
+  order_id bigint [ref: > orders.id]
+  order_item_id bigint [ref: > order_items.id]
+  tournament_registration_id bigint [ref: > tournament_registrations.id]
+  recorded_by_account_id bigint [ref: > accounts.id, note: 'NULL khi hệ thống tự tính tiền hoặc hoàn tiền.']
+  recorded_at datetimeoffset [not null]
+
+  indexes {
+    (customer_id, recorded_at)
+  }
+
+  Note: 'Tùy transaction_type, đúng một FK nguồn phải có giá trị. Tạo giao dịch và cập nhật ví trong cùng SQL transaction. Áp ràng buộc chống cộng/hoàn hai lần bằng filtered unique indexes trong SQL Server.'
+}
+
+Table computer_types {
+  id bigint [pk, increment]
+  name varchar(30) [not null, unique]
+  hourly_rate decimal(18,0) [not null]
+
+  Note: 'Seed: Normal 8000, FPS 12000, Couple 15000, FPS+ 16000, Stream 22000 VND/giờ. Couple vẫn một khách/máy.'
+}
+
+Table computers {
+  id bigint [pk, increment]
+  code varchar(30) [not null, unique]
+  computer_type_id bigint [not null, ref: > computer_types.id]
+  is_under_maintenance boolean [not null, default: false]
+
+  Note: 'Đang dùng được suy ra từ gaming_sessions Active. Chỉ bật bảo trì khi máy không có phiên Active.'
+}
+
+Table gaming_sessions {
+  id bigint [pk, increment]
+  customer_id bigint [not null, ref: > customers.id]
+  computer_id bigint [not null, ref: > computers.id]
+  hourly_rate_snapshot decimal(18,0) [not null]
+  started_at datetimeoffset [not null]
+  last_charged_at datetimeoffset [not null]
+  charged_amount decimal(18,0) [not null, default: 0]
+  status gaming_session_status [not null]
+  ended_at datetimeoffset
+  end_reason gaming_session_end_reason
+  ended_by_account_id bigint [ref: > accounts.id]
+
+  indexes {
+    (customer_id, status)
+    (computer_id, status)
+  }
+
+  Note: 'Đăng nhập thành công trên máy (ví > 0, đã đổi mật khẩu lần đầu nếu cần) là bắt đầu phiên ngay. Một khách và một máy chỉ có tối đa một phiên Active (filtered unique indexes). Tính phí theo giây thực tế, trừ dần bằng chênh lệch phí cộng dồn để không làm tròn sai; UI chỉ hiện phút. Đổi máy phải kết thúc phiên cũ. Không theo dõi heartbeat/mất kết nối trong MVP.'
+}
+
+Table product_categories {
+  id bigint [pk, increment]
+  name nvarchar(80) [not null, unique]
+
+  Note: 'Phục vụ thực đơn và bộ lọc vòng quay món.'
+}
+
+Table products {
+  id bigint [pk, increment]
+  category_id bigint [not null, ref: > product_categories.id]
+  name nvarchar(120) [not null]
+  current_price decimal(18,0) [not null]
+
+  Note: 'Không quản lý số lượng tồn hoặc cờ hết món. Nhân viên kiểm tra thực tế rồi xác nhận/hủy từng món.'
+}
+
+Table orders {
+  id bigint [pk, increment]
+  customer_id bigint [not null, ref: > customers.id]
+  gaming_session_id bigint [not null, ref: > gaming_sessions.id]
+  total_amount decimal(18,0) [not null]
+  placed_at datetimeoffset [not null]
+
+  Note: 'Chỉ đặt khi phiên Active; trừ toàn bộ đơn ngay lúc xác nhận đặt. Đơn vẫn tồn tại sau khi phiên kết thúc; trạng thái toàn đơn suy ra từ các order_items.'
+}
+
+Table order_items {
+  id bigint [pk, increment]
+  order_id bigint [not null, ref: > orders.id]
+  product_id bigint [not null, ref: > products.id]
+  quantity int [not null]
+  unit_price_snapshot decimal(18,0) [not null]
+  status order_item_status [not null, default: 'Pending']
+  confirmed_by_account_id bigint [ref: > accounts.id]
+  confirmed_at datetimeoffset
+  cancelled_by_account_id bigint [ref: > accounts.id]
+  cancelled_at datetimeoffset
+
+  Note: 'Hủy cả dòng (quantity x unit_price_snapshot), không hủy bớt số lượng. Chỉ nhân viên hủy khi còn Pending; Confirmed không thể hủy. Không bắt chọn lý do.'
+}
+
+Table order_item_cancel_requests {
+  id bigint [pk, increment]
+  order_item_id bigint [not null, ref: > order_items.id]
+  requested_by_customer_id bigint [not null, ref: > customers.id]
+  status cancel_request_status [not null, default: 'Pending']
+  requested_at datetimeoffset [not null]
+  handled_by_account_id bigint [ref: > accounts.id]
+  handled_at datetimeoffset
+
+  Note: 'Khách chỉ gửi yêu cầu, không tự hủy. Nếu món đã Confirmed trước khi xử lý thì từ chối yêu cầu. Một món không có hai yêu cầu Pending.'
+}
+
+Table tournaments {
+  id bigint [pk, increment]
+  name nvarchar(150) [not null]
+  registration_closes_at datetimeoffset [not null]
+  status tournament_status [not null, default: 'Open']
+  created_by_account_id bigint [not null, ref: > accounts.id]
+  created_at datetimeoffset [not null]
+  closed_at datetimeoffset
+  teams_finalized_at datetimeoffset
+  cancelled_by_account_id bigint [ref: > accounts.id]
+  cancelled_at datetimeoffset
+
+  Note: 'MVP chỉ có VALORANT, đội 5 người, không lưu lịch thi đấu/kết quả. Admin có thể hủy cả sau khi chốt đội; giữ đội đã lưu và hoàn mọi phí chưa hoàn.'
+}
+
+Table tournament_registrations {
+  id bigint [pk, increment]
+  tournament_id bigint [not null, ref: > tournaments.id]
+  customer_id bigint [not null, ref: > customers.id]
+  riot_game_name nvarchar(100) [not null]
+  riot_tagline varchar(20) [not null]
+  fee_amount_snapshot decimal(18,0) [not null, default: 50000]
+  fee_status registration_fee_status [not null, default: 'Paid']
+  registered_at datetimeoffset [not null]
+  refunded_at datetimeoffset
+  refund_reason registration_refund_reason
+
+  indexes {
+    (tournament_id, customer_id) [unique]
+    (tournament_id, registered_at)
+  }
+
+  Note: 'Trừ 50000 VND khi đăng ký; khách không tự rút. Ưu tiên đăng ký hợp lệ sớm nhất để lập đội 5 người; người lẻ được hoàn đủ phí. Riot ID nhập lại cho từng giải. Nếu hoàn do hủy giải thì chỉ hoàn người chưa được hoàn.'
+}
+
+Table player_stats_snapshots {
+  id bigint [pk, increment]
+  tournament_registration_id bigint [not null, unique, ref: - tournament_registrations.id]
+  status stats_status [not null]
+  source varchar(30) [note: 'Ví dụ: opgg']
+  scope varchar(80) [note: 'Mùa Competitive của snapshot.']
+  matches int
+  win_rate decimal(5,2)
+  headshot_rate decimal(5,2)
+  damage_per_round decimal(10,2)
+  kda decimal(10,2)
+  fetched_at datetimeoffset
+  source_updated_at datetimeoffset
+
+  Note: 'Các chỉ số bám dữ liệu hiện có từ server/opgg.js. Nếu không lấy được, status Unavailable và các chỉ số NULL; vẫn cho đăng ký, nhân viên tự xếp người này.'
+}
+
+Table team_generation_runs {
+  id bigint [pk, increment]
+  tournament_id bigint [not null, ref: > tournaments.id]
+  model_name varchar(100) [not null]
+  model_version varchar(50) [not null]
+  generated_by_account_id bigint [not null, ref: > accounts.id]
+  generated_at datetimeoffset [not null]
+
+  Note: 'Mỗi lần nhân viên bấm chia đội tạo một run và lưu đề xuất ML; không ghi đè run cũ.'
+}
+
+Table team_proposals {
+  id bigint [pk, increment]
+  generation_run_id bigint [not null, ref: > team_generation_runs.id]
+  tournament_registration_id bigint [not null, ref: > tournament_registrations.id]
+  proposed_team_number int [not null]
+  predicted_skill_score decimal(10,4)
+
+  indexes {
+    (generation_run_id, tournament_registration_id) [unique]
+  }
+
+  Note: 'Đề xuất ML trước khi nhân viên đổi đội; không phải kết quả cuối. Người thiếu thống kê có thể không có dòng proposal và được xếp thủ công.'
+}
+
+Table teams {
+  id bigint [pk, increment]
+  tournament_id bigint [not null, ref: > tournaments.id]
+  team_number int [not null]
+  finalized_by_account_id bigint [not null, ref: > accounts.id]
+  finalized_at datetimeoffset [not null]
+
+  indexes {
+    (tournament_id, team_number) [unique]
+  }
+
+  Note: 'Chỉ tạo khi nhân viên chốt đội. Giữ lại cả khi admin hủy giải.'
+}
+
+Table team_members {
+  id bigint [pk, increment]
+  team_id bigint [not null, ref: > teams.id]
+  tournament_registration_id bigint [not null, unique, ref: > tournament_registrations.id]
+
+  Note: 'Đội cuối cùng sau khi nhân viên chỉnh đề xuất ML; mỗi đội đúng 5 thành viên, registration và team phải cùng tournament.'
+}
+
+TableGroup identity_wallet [color: #D6EAF8] {
+  accounts
+  customers
+  top_ups
+  wallet_transactions
+}
+
+TableGroup computers_and_sessions [color: #D5F5E3] {
+  computer_types
+  computers
+  gaming_sessions
+}
+
+TableGroup food_orders [color: #FDEBD0] {
+  product_categories
+  products
+  orders
+  order_items
+  order_item_cancel_requests
+}
+
+TableGroup tournaments_and_ml [color: #E8DAEF] {
+  tournaments
+  tournament_registrations
+  player_stats_snapshots
+  team_generation_runs
+  team_proposals
+  teams
+  team_members
+}

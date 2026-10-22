@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDemoData } from '../home/mockData.js';
 import { registerTournament, isValidHomeData } from '../home/homeModel.js';
-import { fetchParticipantStats, filterParticipants, getParticipants, opggUrl, validateStats } from './tournamentModel.js';
+import { fetchParticipantStats, filterParticipants, getParticipants, opggUrl, validateStats, saveParticipantStats } from './tournamentModel.js';
 
 const now = new Date('2026-10-09T12:00:00Z');
-const form = { riotId: 'Player #VN1', rankId: '4', role: 'Duelist' };
-const payload = { riotId: 'Player#VN1', source: 'opgg', queue: 'competitive', scope: '20 trận gần nhất', fetchedAt: now.toISOString(), sourceUpdatedAt: now.toISOString(), matches: 20, winRate: 55, headshotRate: 25.5, damagePerRound: 145.2, kda: 1.6 };
+const form = { riotId: 'Player #VN1', role: 'Duelist' };
+const payload = { riotId: 'Player#VN1', source: 'opgg', queue: 'competitive', scope: '20 trận gần nhất', fetchedAt: now.toISOString(), sourceUpdatedAt: now.toISOString(), rank: { tier: 14, name: 'Gold', division: 3, label: 'Gold 3' }, matches: 20, winRate: 55, headshotRate: 25.5, damagePerRound: 145.2, kda: 1.6 };
 
 test('registration shares Home storage, survives reload and never fabricates stats', () => {
   const db = registerTournament(createDemoData(now), 1, form, now);
@@ -14,7 +14,8 @@ test('registration shares Home storage, survives reload and never fabricates sta
   assert.ok(isValidHomeData(reloaded));
   const [row] = getParticipants(reloaded, 1);
   assert.equal(row.RiotId, 'Player#VN1');
-  assert.equal(row.rank, 'Gold');
+  assert.equal(row.rank, 'Chưa đồng bộ');
+  assert.equal(row.RankId, null);
   assert.equal(row.isMe, true);
   assert.equal(row.WinRate, null);
   assert.equal(row.stats, undefined);
@@ -22,6 +23,27 @@ test('registration shares Home storage, survives reload and never fabricates sta
   assert.deepEqual(getParticipants(db, 2), []);
   reloaded.TournamentRegistrations[0].Status = 'Cancelled';
   assert.deepEqual(getParticipants(reloaded, 1), []);
+});
+
+test('OP.GG rank and statistics persist across routes and reload without using a declared rank', () => {
+  const db = registerTournament(createDemoData(now), 1, { ...form, rankId: 9 }, now);
+  const result = saveParticipantStats(db, 1, payload.riotId, payload);
+  const saved = JSON.parse(JSON.stringify(result));
+  assert.ok(isValidHomeData(saved));
+  const [row] = getParticipants(saved, 1);
+  assert.equal(row.rank, 'Gold 3');
+  assert.equal(row.RankId, 4);
+  assert.equal(row.stats.source, 'opgg');
+  assert.equal(db.TournamentRegistrations[0].RankId, null, 'Does not mutate the pending registration');
+  assert.throws(() => saveParticipantStats(db, 1, 'Other#VN1', payload));
+  assert.throws(() => saveParticipantStats(db, 999, payload.riotId, payload));
+  const missing = saveParticipantStats(db, 1, payload.riotId, { ...payload, rank: null });
+  assert.equal(getParticipants(missing, 1)[0].rank, 'OP.GG chưa có rank');
+  const malformed = structuredClone(result); malformed.TournamentRegistrations[0].OpggSnapshot.rank.tier = -1;
+  assert.equal(getParticipants(malformed, 1)[0].stats, undefined);
+  const unknownMatches = validateStats({ ...payload, matches: null, winRate: null, headshotRate: null, damagePerRound: null, kda: null }, payload.riotId);
+  assert.equal(unknownMatches.rank.label, 'Gold 3');
+  for (const rank of [{ ...payload.rank, tier: -1 }, { ...payload.rank, division: 9 }, { ...payload.rank, label: 'Radiant' }]) assert.throws(() => validateStats({ ...payload, rank }, payload.riotId));
 });
 
 test('filters and sorts numerical metrics, preserving zero and keeping missing values last', () => {

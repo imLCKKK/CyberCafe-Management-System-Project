@@ -12,7 +12,7 @@ function normalizeRiotId(value) {
 export function isValidHomeData(db) {
   if (!db || typeof db !== 'object') return false;
   const sample = createDemoData();
-  const nullable = new Set(['OldStatus', 'EmployeeId', 'InvoiceId', 'SessionId', 'PromotionId', 'CreatedBy', 'WalletTransactionId', 'EndTime', 'LastChargedAt', 'SkillScore', 'ChangedBy', 'WinRate', 'HoursPlayed']);
+  const nullable = new Set(['OldStatus', 'EmployeeId', 'InvoiceId', 'SessionId', 'PromotionId', 'CreatedBy', 'WalletTransactionId', 'EndTime', 'LastChargedAt', 'SkillScore', 'ChangedBy', 'WinRate', 'HoursPlayed', 'RankId']);
   const extraShapes = {
     InventoryTransactions: { InvTransId: 1, ProductId: 1, EmployeeId: null, Type: '', Quantity: 1, ReferenceId: 1, CreatedAt: '' },
     TournamentRegistrations: { RegistrationId: 1, TournamentId: 1, CustomerId: 1, RankId: 1, PreferredRole: '', WinRate: 1, HoursPlayed: 1, SkillScore: null, Status: '', RegisteredAt: '' },
@@ -106,12 +106,12 @@ export function registerTournament(db, tournamentId, form, now = new Date()) {
   if (!tournament || tournament.Status !== 'Open' || now < new Date(tournament.RegistrationStart) || now >= new Date(tournament.RegistrationEnd)) throw new Error('Giải đấu hiện không nhận đăng ký.');
   if (tournament.EntryFee > 0) throw new Error('Vui lòng liên hệ quầy để thanh toán lệ phí và đăng ký giải này.');
   if (db.TournamentRegistrations.some((r) => r.TournamentId === tournamentId && r.CustomerId === customer.CustomerId && r.Status !== 'Cancelled')) throw new Error('Bạn đã đăng ký giải đấu này.');
-  const rank = db.GameRanks.find((r) => r.RankId === Number(form.rankId) && r.GameId === tournament.GameId);
-  if (!rank || !['Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex'].includes(form.role)) throw new Error('Vui lòng chọn hạng và vai trò hợp lệ.');
+  if (!['Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex'].includes(form.role)) throw new Error('Vui lòng chọn vai trò hợp lệ.');
   const riotId = normalizeRiotId(form.riotId);
   if (!riotId) throw new Error('Nhập tên người chơi theo dạng Tên#TAG, ví dụ MinhAnh#VN1.');
+  if (db.TournamentRegistrations.some((r) => r.TournamentId === tournamentId && r.Status !== 'Cancelled' && r.RiotId?.toLocaleLowerCase('en') === riotId.toLocaleLowerCase('en'))) throw new Error('Riot ID này đã đăng ký giải đấu.');
   // RiotId is a demo extension pending backend/schema support. Unknown tracker
   // statistics stay null; submitting a name does not claim a successful sync.
-  return { ...db, TournamentRegistrations: [...db.TournamentRegistrations, { RegistrationId: nextId(db.TournamentRegistrations, 'RegistrationId'), TournamentId: tournamentId, CustomerId: customer.CustomerId, RankId: rank.RankId, PreferredRole: form.role, RiotId: riotId, WinRate: null, HoursPlayed: null, SkillScore: null, Status: 'Registered', RegisteredAt: now.toISOString() }] };
+  return { ...db, TournamentRegistrations: [...db.TournamentRegistrations, { RegistrationId: nextId(db.TournamentRegistrations, 'RegistrationId'), TournamentId: tournamentId, CustomerId: customer.CustomerId, RankId: null, PreferredRole: form.role, RiotId: riotId, WinRate: null, HoursPlayed: null, SkillScore: null, Status: 'Registered', RegisteredAt: now.toISOString() }] };
 }
 

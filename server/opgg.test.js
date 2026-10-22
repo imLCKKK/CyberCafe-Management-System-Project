@@ -5,7 +5,7 @@ import { createStatsMiddleware } from './statsMiddleware.js';
 import { opggUrl } from '../shared/opgg.js';
 
 const seasonId = '8102cd81-43a0-d0d7-bd59-47b8fe9bed1b';
-const profile = { gameName: 'Player', tagLine: 'VN1', policy: 'PUBLIC', platform: 'pc', lastUpdatedAt: '2026-10-04T10:55:31Z' };
+const profile = { gameName: 'Player', tagLine: 'VN1', policy: 'PUBLIC', platform: 'pc', competitiveTier: 14, lastUpdatedAt: '2026-10-04T10:55:31Z' };
 const raw = { gameName: 'Player', tagLine: 'VN1', platform: 'pc', playerStatistics: { gameCount: 48, wins: 25, draws: 1, defeats: 22, rounds: 1012, damage: 166157, headShots: 523, bodyShots: 1497, legShots: 112, kills: 858, deaths: 667, assists: 192 } };
 const context = { profile, scope: 'V26 - ACT5 · Competitive' };
 const actionId = 'a'.repeat(40);
@@ -49,6 +49,22 @@ test('calculates all four metrics from aggregate totals with draw included and c
   for (const key of ['winRate', 'headshotRate', 'damagePerRound', 'kda']) assert.equal(empty[key], null);
   assert.throws(() => normalizeStatistics({ ...raw, playerStatistics: { ...raw.playerStatistics, wins: 999 } }, context, 'Player#VN1'));
   assert.throws(() => normalizeStatistics(raw, context, 'Wrong#VN1'));
+});
+
+test('discovers streamed import/string chunks missing from HTML script tags and reads referenced rank metadata', () => {
+  const tier = { id: 14, name: 'Gold', division: 3, i18n: 'tiers:gold' };
+  const tree = { profile, queueId: 'competitive', seasonId, seasonOptions: [{ label: 'V26 - ACT5', value: seasonId }], meta: { tiers: '$8' } };
+  const flight = `1:I[123,["$2","$3"],"default"]\n2:"static/chunks/shared-test.js"\n3:"static/chunks/app/%5Blocale%5D/valorant/profile/%5Bplayer%5D/page-current.js"\n4:${JSON.stringify(tree)}\n8:${JSON.stringify([tier])}\n`;
+  const page = `<script src="${cdn}main-app.js"></script><script>self.__next_f.push(${JSON.stringify([1, flight])})</script>`;
+  const parsed = parseProfile(page, 'Player#VN1');
+  assert.ok(parsed.scripts[0].endsWith('page-current.js'));
+  assert.ok(parsed.scripts.some(url => url.endsWith('shared-test.js')));
+  assert.deepEqual(parsed.rank, { tier: 14, name: 'Gold', division: 3, label: 'Gold 3' });
+  assert.equal(normalizeStatistics(raw, parsed, 'Player#VN1').rank.label, 'Gold 3');
+  const absent = normalizeStatistics({ ...raw, playerStatistics: null }, parsed, 'Player#VN1');
+  assert.equal(absent.rank.label, 'Gold 3');
+  assert.equal(absent.matches, null, 'Missing statistics must not imply zero games');
+  for (const key of ['winRate', 'headshotRate', 'damagePerRound', 'kda']) assert.equal(absent[key], null);
 });
 
 test('full adapter flow discovers read-only action, caches results, deduplicates work and refreshes after TTL', async () => {

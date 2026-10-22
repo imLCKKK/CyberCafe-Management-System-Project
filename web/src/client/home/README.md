@@ -31,7 +31,7 @@ Module Home chưa có backend nghiệp vụ hoặc cấu hình SQL Server. Backe
 
 ## Quy ước của bản mẫu
 
-Đăng ký giải nhận `RiotId` (Tên#TAG) thay cho tự nhập tỉ lệ thắng và giờ chơi. `RiotId` là trường mở rộng của bản mẫu, chưa có trong DBML ban đầu; khi làm backend cần thêm trường này vào `TournamentRegistrations` hoặc bảng hồ sơ game của khách hàng. `WinRate`, `HoursPlayed` và `SkillScore` trong bản ghi đăng ký giữ `null`, không giả lập kết quả. Trang giải đấu hiện đồng bộ thống kê qua backend đọc hồ sơ OP.GG công khai; snapshot hiển thị riêng, không ghi vào bản ghi demo. Xem `../tournaments/README.md` để biết cách chạy và giới hạn nguồn.
+Đăng ký giải nhận `RiotId` (Tên#TAG) thay cho tự nhập tỉ lệ thắng và giờ chơi. `RiotId` là trường mở rộng của bản mẫu, chưa có trong DBML ban đầu; khi làm backend cần thêm trường này vào `TournamentRegistrations` hoặc bảng hồ sơ game của khách hàng. `WinRate`, `HoursPlayed` và `SkillScore` trong bản ghi đăng ký giữ `null`, không giả lập kết quả. Trang giải đấu hiện đồng bộ thống kê qua backend đọc hồ sơ OP.GG công khai; rank và thống kê được lưu vào `OpggSnapshot` của đăng ký, dùng chung với admin và giữ qua tải lại. Đăng ký chỉ nhận Riot ID và vai trò; `RankId` để null trước khi lấy rank từ OP.GG. Xem `../tournaments/README.md` để biết cách chạy và giới hạn nguồn.
 
 DBML chưa quy định tất cả giá trị trạng thái; module dùng `Active` cho khách hàng/phiên, `Occupied` cho máy, `Pending / Preparing / Ready / Delivered / Completed / Cancelled` cho đơn, `Paid / Unpaid` cho hóa đơn. Trạng thái giải và đăng ký theo ghi chú DBML. Các enum này phải được thống nhất với backend.
 

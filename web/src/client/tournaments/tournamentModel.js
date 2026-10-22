@@ -5,12 +5,16 @@ export const roles = ['Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex'];
 export const statColumns = [['winRate', 'Tỷ lệ thắng', '%'], ['headshotRate', 'Headshot', '%'], ['damagePerRound', 'Damage / round', ''], ['kda', 'KDA', '']];
 
 export function getParticipants(db, tournamentId) {
-  return db.TournamentRegistrations.filter((row) => row.TournamentId === tournamentId && row.Status !== 'Cancelled').map((row) => ({
-    ...row,
-    name: db.Customers.find((customer) => customer.CustomerId === row.CustomerId)?.FullName || 'Người chơi',
-    rank: db.GameRanks.find((rank) => rank.RankId === row.RankId)?.RankName || 'Chưa có hạng',
-    isMe: row.CustomerId === CURRENT_CUSTOMER_ID,
-  }));
+  return db.TournamentRegistrations.filter((row) => row.TournamentId === tournamentId && row.Status !== 'Cancelled').map((row) => {
+    let stats;
+    try { if (row.OpggSnapshot) stats = validateStats(row.OpggSnapshot, row.RiotId); } catch { /* Old or damaged snapshots require a fresh lookup. */ }
+    return {
+      ...row,
+      name: db.Customers.find((customer) => customer.CustomerId === row.CustomerId)?.FullName || 'Người chơi',
+      rank: stats ? stats.rank?.label || 'OP.GG chưa có rank' : 'Chưa đồng bộ', stats,
+      isMe: row.CustomerId === CURRENT_CUSTOMER_ID,
+    };
+  });
 }
 
 export function filterParticipants(rows, query, role, sortKey, direction) {
@@ -30,14 +34,25 @@ export function validateStats(payload, riotId) {
   if (!payload || payload.riotId !== riotId || payload.source !== 'opgg'
     || payload.queue !== 'competitive' || typeof payload.scope !== 'string' || !payload.scope.trim()
     || payload.scope.length > 160 || !Number.isFinite(Date.parse(payload.fetchedAt))
-    || !Number.isInteger(payload.matches) || payload.matches < 0
+    || (payload.matches !== null && (!Number.isInteger(payload.matches) || payload.matches < 0))
     || (payload.sourceUpdatedAt !== null && (typeof payload.sourceUpdatedAt !== 'string' || !Number.isFinite(Date.parse(payload.sourceUpdatedAt))))) invalid();
   for (const [key] of statColumns) {
     const value = payload[key];
     if (value !== null && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || (key.endsWith('Rate') && value > 100))) invalid();
-    if (payload.matches === 0 && value !== null) invalid();
+    if ((payload.matches === 0 || payload.matches === null) && value !== null) invalid();
   }
-  return Object.fromEntries(['riotId', 'source', 'queue', 'scope', 'fetchedAt', 'sourceUpdatedAt', 'matches', ...statColumns.map(([key]) => key)].map((key) => [key, payload[key]]));
+  const rank = payload.rank ?? null;
+  if (rank !== null && (!Number.isInteger(rank.tier) || rank.tier < 0 || rank.tier > 27 || typeof rank.name !== 'string' || !rank.name.trim() || rank.name.length > 50 || !Number.isInteger(rank.division) || rank.division < 0 || rank.division > 3 || rank.label !== `${rank.name}${rank.division ? ` ${rank.division}` : ''}`)) invalid();
+  return { ...Object.fromEntries(['riotId', 'source', 'queue', 'scope', 'fetchedAt', 'sourceUpdatedAt', 'matches', ...statColumns.map(([key]) => key)].map((key) => [key, payload[key]])), rank };
+}
+
+export function saveParticipantStats(db, registrationId, riotId, payload) {
+  const stats = validateStats(payload, riotId);
+  const row = db.TournamentRegistrations.find((item) => item.RegistrationId === registrationId && item.RiotId === riotId && item.Status !== 'Cancelled');
+  if (!row) throw new Error('Đăng ký đã thay đổi. Hãy tải lại danh sách trước khi đồng bộ.');
+  const tournament = db.Tournaments.find((item) => item.TournamentId === row.TournamentId);
+  const rank = db.GameRanks.find((item) => item.GameId === tournament?.GameId && item.RankName.toLowerCase() === stats.rank?.name.toLowerCase());
+  return { ...db, TournamentRegistrations: db.TournamentRegistrations.map((item) => item === row ? { ...item, RankId: rank?.RankId ?? null, OpggSnapshot: stats } : item) };
 }
 
 export async function fetchParticipantStats(row, { baseUrl = '/api', signal, fetcher = fetch } = {}) {

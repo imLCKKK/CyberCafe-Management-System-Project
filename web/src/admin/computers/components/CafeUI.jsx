@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useId, useRef } from "react";
 import { X, Monitor, Wrench, ShoppingBag } from "lucide-react";
 import { statusLabels } from "../mockData";
 
@@ -79,28 +79,31 @@ export function Station({ computer, foodAlert, onClick, type, room }) {
     </button>
   );
 }
-export function Modal({ title, children, onClose }) {
+export function Modal({ title, children, onClose, className = '' }) {
   const dialog = useRef(null);
+  const titleId = useId();
   useEffect(() => {
     const element = dialog.current;
+    const previous = document.activeElement;
     element.showModal();
     return () => {
       element.close();
+      previous?.focus();
     };
   }, []);
   return (
     <dialog
       ref={dialog}
-      className="cafe-dialog"
-      aria-labelledby="cafe-dialog-title"
-      onCancel={onClose}
+      className={`cafe-dialog ${className}`}
+      aria-labelledby={titleId}
+      onCancel={(event) => { event.preventDefault(); onClose(); }}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <div className="cafe-dialog-content">
         <div className="cafe-dialog-title">
-          <h2 id="cafe-dialog-title">{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           <button
             type="button"
             className="cafe-icon-button"

@@ -29,7 +29,8 @@ import {
   StatusBadge,
   Modal,
 } from "./components/CafeUI";
-import { foodAlertIds } from "../dashboard/mockData";
+import { useAdmin } from '../shared/AdminContext';
+import { foodComputerIds } from '../shared/adminModel';
 import "./cafe.css";
 
 function ComputerForm({ computer, onClose, onSaved }) {
@@ -130,6 +131,8 @@ function ComputerForm({ computer, onClose, onSaved }) {
 }
 
 export function ComputersPage() {
+  const { db } = useAdmin();
+  const foodAlertIds = foodComputerIds(db);
   const computers = useComputers();
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState("");
@@ -163,7 +166,10 @@ export function ComputersPage() {
     selected &&
     computerTypes.find((t) => t.ComputerTypeId === selected.ComputerTypeId);
   const session =
-    selected && demoSessions.find((s) => s.ComputerId === selected.ComputerId);
+    selected && db.gaming_sessions.find((row) => row.computer_id === selected.ComputerId && row.status === 'Active');
+  const sessionCustomer = session && db.customers.find((row) => row.id === session.customer_id);
+  const sessionAccount = sessionCustomer && db.accounts.find((row) => row.id === sessionCustomer.account_id);
+  const fallbackSession = selected && !session && demoSessions.find((row) => row.ComputerId === selected.ComputerId);
   function updateMaintenance() {
     try {
       saveComputer({
@@ -427,20 +433,20 @@ export function ComputersPage() {
               <span>Giá sử dụng</span>
               <strong>{currency(selectedType.PricePerHour)} / giờ</strong>
             </div>
-            {selected.Status === "Occupied" && session && (
+            {selected.Status === "Occupied" && (session || fallbackSession) && (
               <div className="cafe-session">
-                <h3>Phiên sử dụng mẫu</h3>
+                <h3>{session ? 'Phiên đang hoạt động' : 'Phiên sử dụng mẫu'}</h3>
                 <div className="cafe-detail-row">
                   <span>Khách hàng</span>
-                  <strong>{session.CustomerName}</strong>
+                  <strong>{session ? sessionAccount?.display_name || `KH${session.customer_id}` : fallbackSession.CustomerName}</strong>
                 </div>
                 <div className="cafe-detail-row">
-                  <span>Thời gian chơi</span>
+                  <span>{session ? 'Bắt đầu lúc' : 'Thời gian chơi'}</span>
                   <strong>
-                    {Math.floor(session.DurationMinutes / 60)} giờ{" "}
-                    {session.DurationMinutes % 60} phút
+                    {session ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }).format(new Date(session.started_at)) : `${Math.floor(fallbackSession.DurationMinutes / 60)} giờ ${fallbackSession.DurationMinutes % 60} phút`}
                   </strong>
                 </div>
+                {session && <div className="cafe-detail-row"><span>Đã ghi nhận</span><strong>{currency(session.charged_amount)}</strong></div>}
               </div>
             )}
             {selected.Status === "Occupied" ? (

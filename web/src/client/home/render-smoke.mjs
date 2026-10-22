@@ -17,8 +17,9 @@ const server = await createServer({
 try {
   const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
   const { default: HomePage } = await server.ssrLoadModule('/web/src/client/home/HomePage.jsx');
-  const html = renderToString(React.createElement(MemoryRouter, { initialEntries: ['/client/home'] }, React.createElement(HomePage))).replace(/<!-- -->/g, '');
-  for (const text of ['Chào Minh Anh', '02:15:00', 'Nạp tiền vào ví', 'Mì xào bò', 'Đấu trường cuối tuần', 'Hoạt động gần đây']) {
+  const { ClientDemoProvider } = await server.ssrLoadModule('/web/src/client/shared/ClientDemoContext.jsx');
+  const html = renderToString(React.createElement(MemoryRouter, { initialEntries: ['/client/home'] }, React.createElement(ClientDemoProvider, null, React.createElement(HomePage)))).replace(/<!-- -->/g, '');
+  for (const text of ['Chào Minh Anh', '2 giờ 15 phút', 'Nạp tiền vào ví', 'Mì xào bò', 'Đấu trường cuối tuần', 'Hoạt động gần đây']) {
     assert.ok(html.includes(text), `Missing rendered content: ${text}`);
   }
   assert.ok(!html.includes('NaN'));
