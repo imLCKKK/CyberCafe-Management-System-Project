@@ -14,6 +14,7 @@ import {
   ChevronRight 
 } from 'lucide-react';
 import './layout.css';
+import { AdminProvider } from '../admin/shared/AdminContext';
 
 const menu = [
   ['/admin/dashboard', 'Tổng quan', LayoutDashboard],
@@ -29,6 +30,10 @@ const menu = [
 ];
 
 export function AdminLayout() {
+  return <AdminProvider><AdminShell/></AdminProvider>;
+}
+
+function AdminShell() {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -51,7 +56,8 @@ export function AdminLayout() {
             <NavLink 
               key={to} 
               to={to} 
-              title={collapsed ? label : ''} 
+              title={label}
+              aria-label={label}
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             >
               <Icon size={19} />
@@ -70,7 +76,7 @@ export function AdminLayout() {
               </div>
             </div>
           )}
-          <button onClick={() => setCollapsed(v => !v)}>
+          <button aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} aria-expanded={!collapsed} onClick={() => setCollapsed(v => !v)}>
             <Menu size={19} />
           </button>
         </div>

@@ -33,11 +33,26 @@ Sử dụng SQL Server.
 
 ## Cách chạy
 
-1. Clone project về máy.
-2. Mở file '.sln' bằng Visual Studio.
-3. Cấu hình connection string trong 'appsettings.json'.
-4. Chạy Migration để tạo database.
-5. Build và chạy project.
+Giao diện hiện tại dùng React/Vite và dữ liệu mẫu lưu trong trình duyệt. Repository
+có dự án ASP.NET Core API, Entity Framework Core và migration trong `api/`, nhưng
+các trang admin chưa kết nối API hay SQL Server. Xem [hướng dẫn admin demo](docs/admin-demo.md)
+để biết các luồng mẫu, cách tính báo cáo và giới hạn hiện tại.
+
+Trên máy đã cài môi trường trong `.tools`, chạy:
+
+```powershell
+.\start.cmd
+```
+
+Mở http://127.0.0.1:5173. Dừng server bằng `Ctrl+C`.
+Xem [TEAM_GUIDE.md](TEAM_GUIDE.md) để dùng Node.js, npm và .NET SDK trong terminal.
+
+Nếu clone sang máy khác, cài Node.js LTS rồi chạy:
+
+```powershell
+npm.cmd ci
+npm.cmd run dev
+```
 
 ## Thành viên
 
