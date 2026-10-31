@@ -1,4 +1,4 @@
-﻿using CyberManagement.Domain.Entities;
+using CyberManagement.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -7,9 +7,11 @@ namespace CyberManagement.Application.Interfaces.Repositories
 {
     public interface IOrderRepository
     {
-        Task<Order?> GetWithDetailsByIdAsync(int id);// Lấy Order kèm theo OrderDetails (cần include thêm bảng Product) (dùng Include trong EF Core)
+        // Include OrderDetails.Product và OrderDetails.CancellationRequests khi lấy đơn hàng.
+        Task<Order?> GetWithDetailsByIdAsync(long id);
         Task<IEnumerable<Order>> GetAllAsync();
-        Task<IEnumerable<Order>> GetByCustomerIdAsync(int customerId);
+        Task<IEnumerable<Order>> GetByCustomerIdAsync(long customerId);
+        // Trả về OrderId và các OrderDetailId đã được tạo trong transaction xử lý đơn hàng.
         Task<Order> AddAsync(Order order);
         Task UpdateAsync(Order order);
 

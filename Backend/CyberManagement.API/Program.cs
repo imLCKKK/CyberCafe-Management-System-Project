@@ -8,8 +8,9 @@ namespace CyberManagement.API
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
-            //Chờ đến khi nào repository hoàn thiện thì gỡ comment
-            //builder.Services.AddApplicationServices();
+            // Đăng ký service Application và các thành phần HTTP; repository do Infrastructure cung cấp.
+            builder.Services.AddApplicationServices();
+            builder.Services.AddApiServices();
             builder.Services.AddInfrastructureServices(builder.Configuration);
 
             // Add services to the container.
@@ -32,7 +33,10 @@ namespace CyberManagement.API
                 app.UseSwaggerUI();
             }
 
+            // Xử lý lỗi thống nhất trước khi request đi qua xác thực và controller.
+            app.UseExceptionHandler();
             app.UseHttpsRedirection();
+            app.UseAuthentication();
 
             app.UseAuthorization();
 

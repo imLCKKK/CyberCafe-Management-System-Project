@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,8 +6,8 @@ namespace CyberManagement.Domain.Entities
 {
     public class InvoiceDetail // InvoiceDetailId, InvoiceId, ItemType, Description, Quantity, UnitPrice, Amount
     {
-        public int InvoiceDetailId { get; set; }
-        public int InvoiceId { get; set; }
+        public long InvoiceDetailId { get; set; }
+        public long InvoiceId { get; set; }
         public string ItemType { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public int Quantity { get; set; }

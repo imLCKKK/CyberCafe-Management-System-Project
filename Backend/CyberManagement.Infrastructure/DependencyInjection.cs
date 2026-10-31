@@ -1,6 +1,9 @@
-﻿using CyberManagement.Application.Interfaces.Services;
+﻿using CyberManagement.Application.Interfaces;
+using CyberManagement.Application.Interfaces.Repositories;
+using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Services;
 using CyberManagement.Infrastructure.Persistance;
+using CyberManagement.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +21,13 @@ namespace CyberManagement.Infrastructure
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(connectionString, b =>
                     b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+
+            services.AddScoped<IInventoryRepository, InventoryRepository>();
+            services.AddScoped<IInventoryTransactionRepository, InventoryTransactionRepository>();
+            services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
+
+
+
 
             return services;
         }

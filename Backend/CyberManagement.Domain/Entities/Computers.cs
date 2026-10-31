@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,9 +6,9 @@ namespace CyberManagement.Domain.Entities
 {
     public class Computers
     {
-        public int ComputerId { get; set; }
-        public int RoomId { get; set; }
-        public int ComputerTypeId { get; set; }
+        public long ComputerId { get; set; }
+        public long RoomId { get; set; }
+        public long ComputerTypeId { get; set; }
         public string ComputerName { get; set; } = string.Empty;
         public bool Status { get; set; }
 

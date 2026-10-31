@@ -1,38 +1,51 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using CyberManagement.Domain.Entities;
+﻿namespace CyberManagement.Infrastructure.Persistance.Configuration;
 
-namespace CyberManagement.Infrastructure.Persistance.Configuration
+public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
 {
-    public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
+    public void Configure(EntityTypeBuilder<Invoice> builder)
     {
-        public void Configure(EntityTypeBuilder<Invoice> builder)
-        {
-            builder.ToTable("Invoices");
-            builder.HasKey(i => i.InvoiceId); //primary key
+        builder.ToTable("Invoices", t =>
+            t.HasCheckConstraint(
+                "CK_Invoices_Amounts",
+                """
+                [SubTotal] >= 0
+                AND [Discount] >= 0
+                AND [Discount] <= [SubTotal]
+                AND [TotalAmount] = [SubTotal] - [Discount]
+                """));
 
-            builder.Property(i => i.TotalAmount) 
-                .IsRequired()
-                .HasPrecision(12,2);
+        builder.HasKey(x => x.InvoiceId);
 
-            builder.Property(i => i.PaymentTime) // cho phép PaymentTime có thể null khi không có thông tin thanh toán
-                .IsRequired(false);
+        builder.Property(x => x.SubTotal).HasPrecision(18, 0);
+        builder.Property(x => x.Discount).HasPrecision(18, 0);
+        builder.Property(x => x.TotalAmount).HasPrecision(18, 0);
+        builder.Property(x => x.Status).HasMaxLength(30);
 
-            builder.HasOne(o => o.Order)
-                .WithMany(i => i.Invoices)
-                .HasForeignKey(o => o.OrderId)
-                .IsRequired(false)
-                .OnDelete(DeleteBehavior.SetNull); // khi xóa Order thì Invoice sẽ được giữ lại và OrderId sẽ được đặt thành null
+        builder.HasOne(x => x.Customer)
+            .WithMany()
+            .HasForeignKey(x => x.CustomerId)
+            .OnDelete(DeleteBehavior.NoAction);
 
-            builder.HasMany(p => p.Payments)
-                .WithOne(i => i.Invoice)
-                .HasForeignKey(p => p.InvoiceId)
-                .IsRequired()
-                .OnDelete(DeleteBehavior.Cascade); // khi xóa Invoice thì các Payment liên quan sẽ bị xóa theo
-        }
+        builder.HasOne(x => x.Session)
+            .WithMany(x => x.Invoices)
+            .HasForeignKey(x => x.SessionId)
+            .OnDelete(DeleteBehavior.NoAction);
 
+        builder.HasOne(x => x.Employee)
+            .WithMany()
+            .HasForeignKey(x => x.EmployeeId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasOne(x => x.Promotion)
+            .WithMany()
+            .HasForeignKey(x => x.PromotionId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasMany(x => x.Orders)
+            .WithOne()
+            .HasForeignKey(x => x.InvoiceId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasIndex(x => new { x.CustomerId, x.InvoiceDate });
     }
 }

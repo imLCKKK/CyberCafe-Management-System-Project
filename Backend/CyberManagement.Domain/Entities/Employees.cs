@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,8 +6,8 @@ namespace CyberManagement.Domain.Entities
 {
     public class Employees
     {
-        public int EmployeeId { get; set; }
-        public int RoleId { get; set; }
+        public long EmployeeId { get; set; }
+        public long RoleId { get; set; }
         public string FullName { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;

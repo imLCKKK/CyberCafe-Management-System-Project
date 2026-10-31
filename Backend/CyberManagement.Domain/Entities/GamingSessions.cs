@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,9 +6,9 @@ namespace CyberManagement.Domain.Entities
 {
     public class GamingSessions
     {
-        public int SessionId { get; set; }
-        public int ComputerId { get; set; }
-        public int CustomerId { get; set; }
+        public long SessionId { get; set; }
+        public long ComputerId { get; set; }
+        public long CustomerId { get; set; }
 
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }

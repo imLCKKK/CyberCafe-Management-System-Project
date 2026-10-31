@@ -1,4 +1,4 @@
-﻿using CyberManagement.Application.DTOs;
+using CyberManagement.Application.DTOs;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -7,9 +7,10 @@ namespace CyberManagement.Application.Interfaces.Services
 {
     public interface IInvoiceService
     {
-        Task<InvoiceDTOs?> GetByIdAsync(int id);
+        Task<SessionStatementDTO?> GetSessionStatementAsync(long sessionId);
+        Task<InvoiceDTOs?> GetByIdAsync(long id);
 
-        Task<InvoiceDTOs?> GetByOrderIdAsync(int orderId);
+        Task<InvoiceDTOs?> GetByOrderIdAsync(long orderId);
 
         Task<IEnumerable<InvoiceDTOs>> GetAllAsync(); 
     }

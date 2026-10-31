@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,14 +6,14 @@ namespace CyberManagement.Application.DTOs
 {
     public class OrderItemDto
     {
-        public int ProductId { get; set; }
+        public long ProductId { get; set; }
         public int Quantity { get; set; }
     }
 
     public class CreateOrderRequest
     {
-        public int? CustomerId { get; set; }
-        public int? SessionId { get; set; }
+        public long? CustomerId { get; set; }
+        public long? SessionId { get; set; }
         public List<OrderItemDto> Items { get; set; } = new();
     }
 }

@@ -1,26 +1,21 @@
-﻿using CyberManagement.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿namespace CyberManagement.Infrastructure.Persistance.Configuration;
 
-namespace CyberManagement.Infrastructure.Persistance.Configuration
+public class CategoryConfiguration : IEntityTypeConfiguration<Category>
 {
-    public class CategoryConfiguration : IEntityTypeConfiguration<Category>
+    public void Configure(EntityTypeBuilder<Category> builder)
     {
-        public void Configure(EntityTypeBuilder<Category> builder)
-        {
-            builder.ToTable("Categories");
-            builder.HasKey(c => c.CategoryId);
-            builder.Property(c => c.CategoryName)
-                .IsRequired()
-                .HasMaxLength(150);
+        builder.ToTable("Categories");
+        builder.HasKey(x => x.CategoryId);
 
-            builder.HasMany(c => c.Products)
-                .WithOne(p => p.Category)
-                .HasForeignKey(p => p.CategoryId)
-                .OnDelete(DeleteBehavior.Cascade);
-        }
+        builder.Property(x => x.CategoryName)
+            .IsRequired()
+            .HasMaxLength(150);
+
+        builder.Property(x => x.IsActive).HasDefaultValue(true);
+
+        builder.HasMany(x => x.Products)
+            .WithOne(x => x.Category)
+            .HasForeignKey(x => x.CategoryId)
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }
