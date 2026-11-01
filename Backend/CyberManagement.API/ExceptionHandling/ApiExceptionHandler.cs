@@ -1,5 +1,6 @@
 using CyberManagement.Application.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
+using System.ComponentModel.DataAnnotations;
 
 namespace CyberManagement.API.ExceptionHandling;
 
@@ -15,6 +16,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         {
             EntityNotFoundException => StatusCodes.Status404NotFound,
             BusinessRuleException => StatusCodes.Status409Conflict,
+            ValidationException => StatusCodes.Status400BadRequest,
             ArgumentException => StatusCodes.Status400BadRequest,
             UnauthorizedAccessException => context.User.Identity?.IsAuthenticated == true
                 ? StatusCodes.Status403Forbidden : StatusCodes.Status401Unauthorized,

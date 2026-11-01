@@ -1,4 +1,5 @@
 ﻿using CyberManagement.Application.DTOs;
+using CyberManagement.Application.Exceptions;
 using CyberManagement.Application.Interfaces;
 using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Application.Interfaces.Services;
@@ -70,7 +71,7 @@ public class InventoryService : IInventoryService
             var product = await _inventoryRepository.GetProductForUpdateAsync(normalizedRequest.ProductId, cancellationToken);
             if(product is null)
             {
-                throw new KeyNotFoundException($"Không tìm thấy sản phẩm với ID {normalizedRequest.ProductId}.");
+                throw new EntityNotFoundException($"Không tìm thấy sản phẩm với ID {normalizedRequest.ProductId}.");
             }
 
             var before = product.Stock;
@@ -79,7 +80,7 @@ public class InventoryService : IInventoryService
 
             if(after < 0|| after > int.MaxValue)
             {
-                throw new InvalidOperationException($"Số lượng tồn kho sau khi cập nhật ({after}) không hợp lệ.");
+                throw new BusinessRuleException($"Số lượng tồn kho sau khi cập nhật ({after}) không hợp lệ.");
             }
 
             product.Stock = (int)after;
@@ -148,7 +149,7 @@ public class InventoryService : IInventoryService
             
             if(product is null)
             {
-                throw new KeyNotFoundException($"Không tìm thấy sản phẩm với ID {productId}.");
+                throw new EntityNotFoundException($"Không tìm thấy sản phẩm với ID {productId}.");
             }
 
             // Chỉ đổi trạng thái bán, không thay đổi tồn hoặc giá.
