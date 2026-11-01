@@ -82,3 +82,5 @@ Nếu muốn dùng script tiện ích Windows (tự cài dependency nếu thiế
 * Thành viên 3: Nguyễn Quốc Minh
 * Thành viên 4: Hoàng Ngọc Đại
 * Thành viên 5: Lê Vũ Huy Trường
+
+test
