@@ -1,15 +1,23 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
+    <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
   <ItemGroup>
-    <ProjectReference Include="../../CyberManagement.Application/CyberManagement.Application.csproj" />
-    <!-- Biên dịch trực tiếp mã HTTP để kiểm tra API độc lập khi Infrastructure còn lỗi cũ. -->
-    <Compile Include="../../CyberManagement.API/Controller/*.cs" Link="Api/Controller/%(Filename)%(Extension)" />
-    <Compile Include="../../CyberManagement.API/Security/*.cs" Link="Api/Security/%(Filename)%(Extension)" />
-    <Compile Include="../../CyberManagement.API/ExceptionHandling/*.cs" Link="Api/ExceptionHandling/%(Filename)%(Extension)" />
-    <Compile Include="../../CyberManagement.API/ApiDependencyInjection.cs" Link="Api/ApiDependencyInjection.cs" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.14" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CyberManagement.API\CyberManagement.API.csproj" />
+  </ItemGroup>
+
 </Project>

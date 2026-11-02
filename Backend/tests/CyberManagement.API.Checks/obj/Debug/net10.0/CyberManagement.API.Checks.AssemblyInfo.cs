@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CyberManagement.API.Checks")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+63ec75247853e67958f1504bd6601625e3bf0a9d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ef318bd774e20d0e9f359e7f2a2b904406926ba8")]
 [assembly: System.Reflection.AssemblyProductAttribute("CyberManagement.API.Checks")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CyberManagement.API.Checks")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
