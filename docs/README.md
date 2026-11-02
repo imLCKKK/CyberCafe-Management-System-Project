@@ -16,3 +16,7 @@ Các báo cáo này ghi kết quả ở thời điểm nêu trong tên file, kh�
 - [Kế hoạch 4 sprint](../planning/team-delivery-plan.md) và [quy trình làm nhóm](../planning/team-workflow.md) nằm trong `planning/`.
 - [Hướng dẫn AI](../codex/PROJECT_GUIDE.md), [review](../codex/REVIEW_GUIDE.md) và [55 Task Jira](../codex/SPRINT_TASKS.md) nằm trong `codex/`.
 - [Hướng dẫn demo admin](../frontend/ADMIN_DEMO.md) nằm cạnh frontend.
+
+## Contract nghiệp vụ
+
+- [SCRUM-12: kho, hóa đơn và voucher](contracts/inventory-invoice-voucher.md): contract do Trường chốt từ code Truong, giao điểm triển khai và phụ thuộc từ các module liên quan.
