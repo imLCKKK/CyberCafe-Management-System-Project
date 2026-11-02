@@ -35,6 +35,8 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<OrderItemCancelRequest> OrderItemCancelRequests
         => Set<OrderItemCancelRequest>();
+    public DbSet<PromotionUsage> PromotionUsages => Set<PromotionUsage>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

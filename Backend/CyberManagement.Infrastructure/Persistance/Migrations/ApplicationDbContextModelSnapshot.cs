@@ -387,11 +387,26 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
                     b.Property<long?>("EmployeeId")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTime?>("InvoiceDate")
-                        .HasColumnType("datetime2");
+                    b.Property<decimal>("GrossAmount")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("OrderId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
 
                     b.Property<long?>("PromotionId")
                         .HasColumnType("bigint");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
 
                     b.Property<long?>("SessionId")
                         .HasColumnType("bigint");
@@ -405,23 +420,29 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
 
-                    b.Property<decimal>("TotalAmount")
-                        .HasPrecision(18)
-                        .HasColumnType("decimal(18,0)");
-
                     b.HasKey("InvoiceId");
 
                     b.HasIndex("EmployeeId");
 
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasFilter("[OrderId] IS NOT NULL");
+
                     b.HasIndex("PromotionId");
 
-                    b.HasIndex("SessionId");
+                    b.HasIndex("SessionId")
+                        .IsUnique()
+                        .HasFilter("[SessionId] IS NOT NULL");
 
-                    b.HasIndex("CustomerId", "InvoiceDate");
+                    b.HasIndex("CustomerId", "IssuedAt");
 
                     b.ToTable("Invoices", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Invoices_Amounts", "[SubTotal] >= 0\nAND [Discount] >= 0\nAND [Discount] <= [SubTotal]\nAND [TotalAmount] = [SubTotal] - [Discount]");
+                            t.HasCheckConstraint("CK_Invoices_Amounts", "[SubTotal] >= 0\r\nAND [Discount] >= 0\r\nAND [Discount] <= [SubTotal]\r\nAND [GrossAmount] = [SubTotal] - [Discount]\r\nAND [RefundAmount] >= 0\r\nAND [RefundAmount] <= [GrossAmount]\r\nAND [PaidAmount] >= 0\r\nAND [PaidAmount] <= [GrossAmount] - [RefundAmount]");
+
+                            t.HasCheckConstraint("CK_Invoices_Source", "([OrderId] IS NOT NULL AND [SessionId] IS NULL)\r\nOR\r\n([OrderId] IS NULL AND [SessionId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Invoices_Status", "[Status] IN ('Pending', 'Paid', 'Cancelled')");
                         });
                 });
 
@@ -478,10 +499,13 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
                     b.Property<long?>("CustomerId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("EmployeeId")
-                        .HasColumnType("bigint");
+                    b.Property<decimal>("DiscountAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)")
+                        .HasDefaultValue(0m);
 
-                    b.Property<long?>("InvoiceId")
+                    b.Property<long?>("EmployeeId")
                         .HasColumnType("bigint");
 
                     b.Property<DateTime>("OrderTime")
@@ -499,11 +523,21 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
 
+                    b.Property<string>("VoucherCodeSnapshot")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("VoucherDiscountTypeSnapshot")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal?>("VoucherDiscountValueSnapshot")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.HasKey("OrderId");
 
                     b.HasIndex("EmployeeId");
-
-                    b.HasIndex("InvoiceId");
 
                     b.HasIndex("SessionId");
 
@@ -511,7 +545,11 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
 
                     b.ToTable("Orders", null, t =>
                         {
+                            t.HasCheckConstraint("CK_Orders_DiscountAmount", "[DiscountAmount] >= 0");
+
                             t.HasCheckConstraint("CK_Orders_TotalAmount", "[TotalAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_Orders_VoucherSnapshot", "(\r\n    [VoucherCodeSnapshot] IS NULL\r\n    AND [VoucherDiscountTypeSnapshot] IS NULL\r\n    AND [VoucherDiscountValueSnapshot] IS NULL\r\n    AND [DiscountAmount] = 0\r\n)\r\nOR\r\n(\r\n    [VoucherCodeSnapshot] IS NOT NULL\r\n    AND LEN(LTRIM(RTRIM([VoucherCodeSnapshot]))) > 0\r\n    AND [VoucherDiscountTypeSnapshot] IS NOT NULL\r\n    AND [VoucherDiscountValueSnapshot] IS NOT NULL\r\n    AND\r\n    (\r\n        (\r\n            [VoucherDiscountTypeSnapshot] = 'Percent'\r\n            AND [VoucherDiscountValueSnapshot] > 0\r\n            AND [VoucherDiscountValueSnapshot] <= 100\r\n        )\r\n        OR\r\n        (\r\n            [VoucherDiscountTypeSnapshot] = 'Fixed'\r\n            AND [VoucherDiscountValueSnapshot] > 0\r\n            AND [VoucherDiscountValueSnapshot]\r\n                = ROUND([VoucherDiscountValueSnapshot], 0)\r\n        )\r\n    )\r\n)");
                         });
                 });
 
@@ -539,6 +577,12 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
 
                     b.Property<long?>("ConfirmedByAccountId")
                         .HasColumnType("bigint");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)")
+                        .HasDefaultValue(0m);
 
                     b.Property<long>("OrderId")
                         .HasColumnType("bigint");
@@ -568,6 +612,8 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
 
                     b.ToTable("OrderDetails", null, t =>
                         {
+                            t.HasCheckConstraint("CK_OrderDetails_Discount", "[DiscountAmount] >= 0\r\nAND [DiscountAmount] <= [UnitPrice] * [Quantity]");
+
                             t.HasCheckConstraint("CK_OrderDetails_Status", "[Status] IN ('Pending', 'Confirmed', 'Cancelled')");
 
                             t.HasCheckConstraint("CK_OrderDetails_Values", "[Quantity] > 0 AND [UnitPrice] >= 0");
@@ -745,6 +791,45 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CyberManagement.Domain.Entities.PromotionUsage", b =>
+                {
+                    b.Property<long>("PromotionUsageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("PromotionUsageId"));
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("OrderId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("PromotionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("ReleasedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("UsedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("PromotionUsageId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique();
+
+                    b.HasIndex("PromotionId", "CustomerId")
+                        .HasFilter("[ReleasedAt] IS NULL");
+
+                    b.ToTable("PromotionUsages", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PromotionUsages_ReleasedAt", "[ReleasedAt] IS NULL OR [ReleasedAt] >= [UsedAt]");
+                        });
+                });
+
             modelBuilder.Entity("CyberManagement.Domain.Entities.Promotions", b =>
                 {
                     b.Property<long>("PromotionId")
@@ -753,32 +838,66 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("PromotionId"));
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .UseCollation("Latin1_General_100_CI_AS");
+
                     b.Property<string>("DiscountType")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
 
                     b.Property<decimal>("DiscountValue")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("datetime2");
+                    b.Property<DateTimeOffset>("EndDate")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
+
+                    b.Property<decimal?>("MaxDiscountAmount")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
+                    b.Property<decimal>("MinOrderAmount")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
+                    b.Property<int?>("PerCustomerUsageLimit")
+                        .HasColumnType("int");
 
                     b.Property<string>("PromotionName")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("datetime2");
+                    b.Property<DateTimeOffset>("StartDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int?>("TotalUsageLimit")
+                        .HasColumnType("int");
 
                     b.HasKey("PromotionId");
 
-                    b.ToTable("Promotions", (string)null);
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Promotions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Promotions_Amounts", "[MinOrderAmount] >= 0\r\nAND (\r\n    [MaxDiscountAmount] IS NULL\r\n    OR [MaxDiscountAmount] > 0\r\n)");
+
+                            t.HasCheckConstraint("CK_Promotions_Code", "LEN(LTRIM(RTRIM([Code]))) > 0");
+
+                            t.HasCheckConstraint("CK_Promotions_Dates", "[StartDate] < [EndDate]");
+
+                            t.HasCheckConstraint("CK_Promotions_Discount", "([DiscountType] = 'Percent'\r\n    AND [DiscountValue] > 0\r\n    AND [DiscountValue] <= 100)\r\nOR\r\n([DiscountType] = 'Fixed'\r\n    AND [DiscountValue] > 0\r\n    AND [DiscountValue] = ROUND([DiscountValue], 0))");
+
+                            t.HasCheckConstraint("CK_Promotions_UsageLimits", "([TotalUsageLimit] IS NULL OR [TotalUsageLimit] > 0)\r\nAND\r\n([PerCustomerUsageLimit] IS NULL\r\n    OR [PerCustomerUsageLimit] > 0)");
+                        });
                 });
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.Role", b =>
@@ -951,6 +1070,11 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
                         .HasForeignKey("EmployeeId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("CyberManagement.Domain.Entities.Order", "Order")
+                        .WithOne()
+                        .HasForeignKey("CyberManagement.Domain.Entities.Invoice", "OrderId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("CyberManagement.Domain.Entities.Promotions", "Promotion")
                         .WithMany()
                         .HasForeignKey("PromotionId")
@@ -964,6 +1088,8 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
                     b.Navigation("Customer");
 
                     b.Navigation("Employee");
+
+                    b.Navigation("Order");
 
                     b.Navigation("Promotion");
 
@@ -991,11 +1117,6 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
                     b.HasOne("CyberManagement.Domain.Entities.Employees", null)
                         .WithMany()
                         .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("CyberManagement.Domain.Entities.Invoice", null)
-                        .WithMany("Orders")
-                        .HasForeignKey("InvoiceId")
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("CyberManagement.Domain.Entities.GamingSessions", null)
@@ -1093,6 +1214,33 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
                     b.Navigation("Category");
                 });
 
+            modelBuilder.Entity("CyberManagement.Domain.Entities.PromotionUsage", b =>
+                {
+                    b.HasOne("CyberManagement.Domain.Entities.Customers", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("CyberManagement.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("CyberManagement.Domain.Entities.Promotions", "Promotion")
+                        .WithMany()
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Promotion");
+                });
+
             modelBuilder.Entity("CyberManagement.Domain.Entities.WalletTransactions", b =>
                 {
                     b.HasOne("CyberManagement.Domain.Entities.Customers", "Customer")
@@ -1161,8 +1309,6 @@ namespace CyberManagement.Infrastructure.Persistance.Migrations
             modelBuilder.Entity("CyberManagement.Domain.Entities.Invoice", b =>
                 {
                     b.Navigation("InvoiceDetails");
-
-                    b.Navigation("Orders");
 
                     b.Navigation("Payments");
                 });

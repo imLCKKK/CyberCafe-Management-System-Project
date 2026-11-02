@@ -10,7 +10,6 @@ namespace CyberManagement.Application.DTOs
         public long? CustomerId { get; set; }
         public long? SessionId { get; set; }
         public long? EmployeeId { get; set; }
-        public long? InvoiceId { get; set; }
 
         public DateTime OrderTime { get; set; }
         public string Status { get; set; } = string.Empty;

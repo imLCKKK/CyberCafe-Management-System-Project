@@ -4,9 +4,9 @@ using CyberManagement.Domain.Entities;
 namespace CyberManagement.Application.Services;
 
 // Ánh xạ dữ liệu đọc cho bảng kê, không phụ thuộc service xử lý đơn.
-internal static class OrderReadMapper
+public static class OrderReadMapper
 {
-    internal static string StatusOf(Order order)
+    public static string StatusOf(Order order)
     {
         var items = order.OrderDetails;
         if (items.Count == 0) return "Pending";
@@ -32,7 +32,8 @@ internal static class OrderReadMapper
     public static OrderDTOs Map(Order order) => new()
     {
         OrderId = order.OrderId, CustomerId = order.CustomerId, SessionId = order.SessionId,
-        EmployeeId = order.EmployeeId, InvoiceId = order.InvoiceId, OrderTime = order.OrderTime,
+        EmployeeId = order.EmployeeId,
+        OrderTime = order.OrderTime,
         Status = StatusOf(order), TotalAmount = order.TotalAmount,
         Items = order.OrderDetails.Select(i => new OrderDetailsDTOs
         {

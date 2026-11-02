@@ -7,11 +7,10 @@ namespace CyberManagement.Application.Interfaces.Services
 {
     public interface IInvoiceService
     {
-        Task<SessionStatementDTO?> GetSessionStatementAsync(long sessionId);
-        Task<InvoiceDTOs?> GetByIdAsync(long id);
+        // Kiểm tra quyền Admin/Staff và lấy danh sách hóa đơn.
+        Task<IReadOnlyList<InvoiceResponse>> GetAdminInvoicesAsync(CancellationToken cancellationToken = default);
 
-        Task<InvoiceDTOs?> GetByOrderIdAsync(long orderId);
-
-        Task<IEnumerable<InvoiceDTOs>> GetAllAsync(); 
+        // Lấy hóa đơn của khách đang đăng nhập, không nhận ID từ client.
+        Task<IReadOnlyList<InvoiceResponse>> GetMyInvoicesAsync(CancellationToken cancellationToken = default);
     }
 }

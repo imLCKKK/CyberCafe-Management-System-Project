@@ -20,6 +20,11 @@ namespace CyberManagement.Domain.Entities
         public virtual ICollection<OrderItemCancelRequest> CancellationRequests { get; set; }
             = new List<OrderItemCancelRequest>();
 
+        // Phần tiền giảm được phân bổ cho toàn bộ dòng món này,
+        // không phải tiền giảm trên một sản phẩm.
+        public decimal DiscountAmount { get; set; }
+
+
         public virtual Order Order { get; set; } = null!;
         public virtual Product Product { get; set; } = null!;
     }

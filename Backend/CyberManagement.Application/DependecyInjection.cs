@@ -11,7 +11,7 @@ namespace CyberManagement.Application
     {
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
-            //services.AddScoped<IInvoiceService, InvoiceService>();
+            services.AddScoped<IInvoiceService, InvoiceService>();
             services.AddScoped<IInventoryService, InventoryService>();
             return services;
         }

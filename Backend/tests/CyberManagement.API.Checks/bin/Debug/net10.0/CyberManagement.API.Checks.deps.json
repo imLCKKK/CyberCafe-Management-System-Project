@@ -1,0 +1,55 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "CyberManagement.API.Checks/1.0.0": {
+        "dependencies": {
+          "CyberManagement.Application": "1.0.0"
+        },
+        "runtime": {
+          "CyberManagement.API.Checks.dll": {}
+        }
+      },
+      "CyberManagement.Application/1.0.0": {
+        "dependencies": {
+          "CyberManagement.Domain": "1.0.0"
+        },
+        "runtime": {
+          "CyberManagement.Application.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "CyberManagement.Domain/1.0.0": {
+        "runtime": {
+          "CyberManagement.Domain.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "CyberManagement.API.Checks/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "CyberManagement.Application/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "CyberManagement.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

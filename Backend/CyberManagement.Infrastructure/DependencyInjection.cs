@@ -25,7 +25,7 @@ namespace CyberManagement.Infrastructure
             services.AddScoped<IInventoryRepository, InventoryRepository>();
             services.AddScoped<IInventoryTransactionRepository, InventoryTransactionRepository>();
             services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
-
+            services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 
 
 

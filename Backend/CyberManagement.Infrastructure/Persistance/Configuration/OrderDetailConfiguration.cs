@@ -1,4 +1,6 @@
-﻿namespace CyberManagement.Infrastructure.Persistance.Configuration;
+﻿using Microsoft.EntityFrameworkCore.Metadata.Internal;
+
+namespace CyberManagement.Infrastructure.Persistance.Configuration;
 
 public class OrderDetailConfiguration
     : IEntityTypeConfiguration<OrderDetail>
@@ -14,7 +16,17 @@ public class OrderDetailConfiguration
             t.HasCheckConstraint(
                 "CK_OrderDetails_Status",
                 "[Status] IN ('Pending', 'Confirmed', 'Cancelled')");
+            t.HasCheckConstraint(
+                "CK_OrderDetails_Discount",
+                """
+                [DiscountAmount] >= 0
+                AND [DiscountAmount] <= [UnitPrice] * [Quantity]
+                """);
         });
+
+        builder.Property(x => x.DiscountAmount)
+            .HasPrecision(18, 0)
+            .HasDefaultValue(0m);
 
         builder.HasKey(x => x.OrderDetailId);
         builder.Property(x => x.UnitPrice).HasPrecision(18, 0);
@@ -33,5 +45,6 @@ public class OrderDetailConfiguration
             .WithMany(x => x.OrderDetails)
             .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.NoAction);
+
     }
 }
