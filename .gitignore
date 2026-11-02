@@ -204,3 +204,15 @@ dist
 AGENTS.md
 
 .vs/
+
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+TestResults/
+*.log
+
+# Cấu hình local / bí mật
+appsettings.Development.json
+appsettings.Local.json
+*.pfx
