@@ -1,0 +1,147 @@
+warning: in the working copy of 'backend/CyberCafe.Api/Program.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/vite.config.js', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/backend/CyberCafe.Api/Program.cs b/backend/CyberCafe.Api/Program.cs[m
+[1mindex 81377f2..d41d651 100644[m
+[1m--- a/backend/CyberCafe.Api/Program.cs[m
+[1m+++ b/backend/CyberCafe.Api/Program.cs[m
+[36m@@ -1,17 +1,112 @@[m
+[32m+[m[32musing System.Globalization;[m
+[32m+[m[32musing System.Security.Claims;[m
+[32m+[m[32musing System.Text.Json.Serialization;[m
+ using CyberCafe.Api.Data;[m
+[32m+[m[32musing CyberCafe.Api.Features;[m
+[32m+[m[32musing Microsoft.AspNetCore.Authentication;[m
+[32m+[m[32musing Microsoft.AspNetCore.Authentication.Cookies;[m
+ using Microsoft.EntityFrameworkCore;[m
+ [m
+ var builder = WebApplication.CreateBuilder(args);[m
+[32m+[m
+ builder.Services.AddOpenApi();[m
+[32m+[m[32mbuilder.Services.AddProblemDetails();[m
+[32m+[m
+[32m+[m[32m// Enum (TopUpStatus, WalletTransactionType, CollectionMethod...) trả về dạng chữ, khớp DB và frontend,[m
+[32m+[m[32m// thay vì số 0/1/2.[m
+[32m+[m[32mbuilder.Services.ConfigureHttpJsonOptions(options =>[m
+[32m+[m[32m    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));[m
+[32m+[m
+[32m+[m[32m// Không có connection string thì API vẫn chạy /health (giữ hành vi cũ), nhưng không có endpoint nghiệp vụ.[m
+ var connectionString = builder.Configuration.GetConnectionString("CyberCafe");[m
+[31m-if (!string.IsNullOrWhiteSpace(connectionString))[m
+[32m+[m[32mvar hasDatabase = !string.IsNullOrWhiteSpace(connectionString);[m
+[32m+[m[32mif (hasDatabase)[m
+ {[m
+     builder.Services.AddDbContext<CyberCafeDbContext>(options => options.UseSqlServer(connectionString));[m
+ }[m
+ [m
+[32m+[m[32m// TẠM THỜI — thuộc phạm vi của Đại (S1-D-1): cookie auth tối thiểu để endpoint của Minh chạy được.[m
+[32m+[m[32m// Hợp đồng Minh cần: ClaimTypes.NameIdentifier = accountId, ClaimTypes.Role = Admin | Staff | Customer.[m
+[32m+[m[32m// Khi Đại đưa auth thật lên, thay khối này (và khối /dev bên dưới) bằng cấu hình của Đại.[m
+[32m+[m[32mbuilder.Services[m
+[32m+[m[32m    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)[m
+[32m+[m[32m    .AddCookie(options =>[m
+[32m+[m[32m    {[m
+[32m+[m[32m        options.Cookie.Name = "cybercafe.auth";[m
+[32m+[m[32m        options.Cookie.HttpOnly = true;[m
+[32m+[m[32m        options.Cookie.SameSite = SameSiteMode.Lax;[m
+[32m+[m[32m        // Demo chạy HTTP trên LAN nên không ép Secure; bật Always khi có HTTPS.[m
+[32m+[m[32m        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;[m
+[32m+[m[32m        options.ExpireTimeSpan = TimeSpan.FromHours(8);[m
+[32m+[m[32m        options.SlidingExpiration = true;[m
+[32m+[m[32m        // API trả 401/403 thay vì redirect sang trang đăng nhập.[m
+[32m+[m[32m        options.Events.OnRedirectToLogin = context =>[m
+[32m+[m[32m        {[m
+[32m+[m[32m            context.Response.StatusCode = StatusCodes.Status401Unauthorized;[m
+[32m+[m[32m            return Task.CompletedTask;[m
+[32m+[m[32m        };[m
+[32m+[m[32m        options.Events.OnRedirectToAccessDenied = context =>[m
+[32m+[m[32m        {[m
+[32m+[m[32m            context.Response.StatusCode = StatusCodes.Status403Forbidden;[m
+[32m+[m[32m            return Task.CompletedTask;[m
+[32m+[m[32m        };[m
+[32m+[m[32m    });[m
+[32m+[m[32mbuilder.Services.AddAuthorization();[m
+[32m+[m
+ var app = builder.Build();[m
+[32m+[m
+[32m+[m[32mif (!app.Environment.IsDevelopment()) app.UseExceptionHandler();[m
+[32m+[m
+[32m+[m[32mapp.UseAuthentication();[m
+[32m+[m[32mapp.UseAuthorization();[m
+[32m+[m
+ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));[m
+[31m-if (app.Environment.IsDevelopment()) app.MapOpenApi();[m
+[32m+[m
+[32m+[m[32mif (hasDatabase)[m
+[32m+[m[32m{[m
+[32m+[m[32m    app.MapCustomerEndpoints();[m
+[32m+[m[32m    app.MapClientProfileEndpoint();[m
+[32m+[m[32m}[m
+[32m+[m[32melse[m
+[32m+[m[32m{[m
+[32m+[m[32m    app.Logger.LogWarning([m
+[32m+[m[32m        "Chưa cấu hình ConnectionStrings:CyberCafe: chỉ /health hoạt động, các endpoint nghiệp vụ không được đăng ký.");[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mif (app.Environment.IsDevelopment())[m
+[32m+[m[32m{[m
+[32m+[m[32m    app.MapOpenApi();[m
+[32m+[m
+[32m+[m[32m    // CHỈ DÙNG KHI DEV để thử API trước khi có login thật của Đại. Không tồn tại ngoài môi trường Development.[m
+[32m+[m[32m    // Đăng nhập bằng một account CÓ SẴN trong DB (không kiểm tra mật khẩu), vai trò lấy từ DB.[m
+[32m+[m[32m    if (hasDatabase)[m
+[32m+[m[32m    {[m
+[32m+[m[32m        app.MapPost("/dev/sign-in/{accountId:long}", async ([m
+[32m+[m[32m            long accountId, CyberCafeDbContext db, HttpContext http, CancellationToken ct) =>[m
+[32m+[m[32m        {[m
+[32m+[m[32m            var account = await db.Accounts.AsNoTracking()[m
+[32m+[m[32m                .FirstOrDefaultAsync(a => a.Id == accountId && a.IsActive, ct);[m
+[32m+[m[32m            if (account is null) return Results.NotFound();[m
+[32m+[m
+[32m+[m[32m            var claims = new Claim[][m
+[32m+[m[32m            {[m
+[32m+[m[32m                new(ClaimTypes.NameIdentifier, account.Id.ToString(CultureInfo.InvariantCulture)),[m
+[32m+[m[32m                new(ClaimTypes.Name, account.DisplayName),[m
+[32m+[m[32m                new(ClaimTypes.Role, account.Role.ToString()),[m
+[32m+[m[32m            };[m
+[32m+[m[32m            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);[m
+[32m+[m[32m            await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));[m
+[32m+[m[32m            return Results.Ok(new { accountId = account.Id, role = account.Role.ToString() });[m
+[32m+[m[32m        });[m
+[32m+[m
+[32m+[m[32m        app.MapPost("/dev/sign-out", async (HttpContext http) =>[m
+[32m+[m[32m        {[m
+[32m+[m[32m            await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);[m
+[32m+[m[32m            return Results.NoContent();[m
+[32m+[m[32m        });[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[32m+[m
+ app.Run();[m
+ [m
+ public partial class Program;[m
+[1mdiff --git a/frontend/vite.config.js b/frontend/vite.config.js[m
+[1mindex 7439c4d..fecdb3a 100644[m
+[1m--- a/frontend/vite.config.js[m
+[1m+++ b/frontend/vite.config.js[m
+[36m@@ -2,6 +2,8 @@[m [mimport { defineConfig } from 'vite';[m
+ import react from '@vitejs/plugin-react';[m
+ import { createStatsMiddleware } from '../backend/integrations/opgg/statsMiddleware.js';[m
+ [m
+[32m+[m[32mconst apiTarget = process.env.API_URL || 'http://127.0.0.1:5088';[m
+[32m+[m
+ export default defineConfig({[m
+   plugins: [react(), {[m
+     name: 'opgg-stats-backend',[m
+[36m@@ -12,5 +14,12 @@[m [mexport default defineConfig({[m
+     watch: {[m
+       ignored: ['**/.tools/**', '**/Phuc/**'],[m
+     },[m
+[32m+[m[32m    // Chuyển API .NET về cùng origin với web để cookie đăng nhập hoạt động.[m
+[32m+[m[32m    // Chỉ proxy các đường dẫn của API nghiệp vụ; /api/valorant/opgg/* vẫn do adapter OP.GG xử lý.[m
+[32m+[m[32m    proxy: {[m
+[32m+[m[32m      '/api/admin': apiTarget,[m
+[32m+[m[32m      '/api/client': apiTarget,[m
+[32m+[m[32m      '/dev': apiTarget,[m
+[32m+[m[32m    },[m
+   },[m
+ });[m
