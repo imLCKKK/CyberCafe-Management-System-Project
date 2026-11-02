@@ -1,0 +1,12 @@
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\bin\Debug\net10.0\CyberManagement.Domain.deps.json
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\bin\Debug\net10.0\CyberManagement.Domain.dll
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\bin\Debug\net10.0\CyberManagement.Domain.pdb
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\obj\Debug\net10.0\CyberManagement.Domain.GeneratedMSBuildEditorConfig.editorconfig
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\obj\Debug\net10.0\CyberManagement.Domain.AssemblyInfoInputs.cache
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\obj\Debug\net10.0\CyberManagement.Domain.AssemblyInfo.cs
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\obj\Debug\net10.0\CyberManagement.Domain.csproj.CoreCompileInputs.cache
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\obj\Debug\net10.0\CyberManagement.Domain.sourcelink.json
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\obj\Debug\net10.0\CyberManagement.Domain.dll
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\obj\Debug\net10.0\refint\CyberManagement.Domain.dll
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\obj\Debug\net10.0\CyberManagement.Domain.pdb
+E:\HK1-2627\CyberCafe-Management-System-Project\backend\src\CyberManagement.Domain\obj\Debug\net10.0\ref\CyberManagement.Domain.dll
