@@ -1,0 +1,1 @@
+export const theme={colors:{sidebar:'#111C30',sidebarHover:'#1B2942',background:'#F5F7FA',surface:'#FFFFFF',text:'#172033',muted:'#8993A4',border:'#E8EBF0'},font:{family:'Inter, ui-sans-serif, system-ui, sans-serif'}};

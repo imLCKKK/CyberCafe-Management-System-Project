@@ -1,0 +1,33 @@
+import React, { useState } from 'react';
+import { Banknote, CheckCircle2, ReceiptText, WalletCards } from 'lucide-react';
+import { receiptText } from '../../client/invoices/invoiceModel';
+import { useAdminAction } from '../shared/AdminContext';
+import { AdminPage, StatCard, Panel, Table, Toolbar, Filter, Status, Notice, DetailDialog, FormDialog, Row, ExportButton } from '../shared/AdminUI';
+import { allReceipts, collectCashOrder, dateTime, matches, money } from '../shared/adminModel';
+import { DonutChart } from '../shared/Charts';
+
+export function InvoicesPage() {
+  const { db, commit, notice, error, clear, setNotice, setError } = useAdminAction();
+  const [query, setQuery] = useState(''), [payment, setPayment] = useState('all'), [selected, setSelected] = useState(null), [collecting, setCollecting] = useState(null);
+  const receipts = allReceipts(db);
+  const rows = receipts.filter((row) => matches(query, `PC${row.id}`, row.account?.display_name, row.account?.phone, row.computer?.code) && (payment === 'all' || (payment === 'due' ? row.cashDue > 0 : row.cashDue === 0)));
+  const sum = (key) => rows.reduce((total, row) => total + row[key], 0);
+  const detail = receipts.find((row) => row.id === selected);
+  function download(row) {
+    try { const url = URL.createObjectURL(new Blob(['\uFEFF' + receiptText(row, db, row.account)], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `TRAM-PC${row.id}.txt`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch { setError('Không thể tải bảng kê, hãy kiểm tra quyền trình duyệt.'); }
+  }
+  return <AdminPage title="Hóa đơn & thanh toán" description="Đối chiếu chi phí theo phiên và xác nhận các khoản tiền mặt đã thu.">
+    <Notice notice={notice} error={error} clear={clear}/>
+    <div className="cafe-stats"><StatCard label="Tổng ghi nhận" value={money(sum('total'))} icon={ReceiptText}/><StatCard label="Đã trả bằng ví" value={money(sum('walletPaid'))} icon={WalletCards}/><StatCard label="Đã thu tiền mặt" value={money(sum('cashPaid'))} icon={CheckCircle2}/><StatCard label="Tiền mặt chờ thu" value={money(sum('cashDue'))} icon={Banknote}/></div>
+    <Panel title="Bảng kê phiên chơi" description="Các số tổng hợp áp dụng theo bộ lọc hiện tại." actions={<ExportButton filename="bang-ke-phien.csv" headers={['Mã', 'Khách hàng', 'Máy', 'Bắt đầu', 'Tổng', 'Ví đã trả', 'Tiền mặt đã thu', 'Tiền mặt chờ thu']} rows={rows.map((row) => [row.id, row.account?.display_name, row.computer?.code, dateTime(row.session.started_at), row.total, row.walletPaid, row.cashPaid, row.cashDue])} onError={setError}/>}>
+      <Toolbar query={query} onQuery={setQuery} placeholder="Tìm mã phiên, máy, tên khách, số điện thoại…" onReset={() => { setQuery(''); setPayment('all'); }}><Filter label="Trạng thái thanh toán" value={payment} onChange={setPayment} options={ [['all', 'Tất cả thanh toán'], ['due', 'Tiền mặt chờ thu'], ['paid', 'Đã thanh toán']] }/></Toolbar>
+      <Table rows={rows} resetKey={query + payment} columns={[{ key: 'id', label: 'Bảng kê', render: (row) => <><button className="admin-link" onClick={() => setSelected(row.id)}>#PC{row.id}</button><small>{row.computer?.code} · {dateTime(row.session.started_at)}</small></> }, { key: 'customer', label: 'Khách hàng', render: (row) => <>{row.account?.display_name}<small>{row.account?.phone}</small></> }, { key: 'total', label: 'Tổng ghi nhận', sortValue: (row) => row.total, render: (row) => <><strong>{money(row.total)}</strong><small>{row.session.status === 'Active' ? 'Tạm tính · Đang chơi' : 'Phiên đã kết thúc'}</small></> }, { key: 'paid', label: 'Đã trả / Chờ thu', render: (row) => <>{money(row.paidTotal)}<small className={row.cashDue > 0 ? 'admin-low-stock' : ''}>Còn thu: {money(row.cashDue)}</small></> }, { key: 'actions', label: 'Thao tác', render: (row) => <div className="admin-actions"><button className="cafe-button" onClick={() => setSelected(row.id)}>Chi tiết / Thu tiền</button><button className="cafe-button" onClick={() => download(row)}>Tải TXT</button></div> }]}/>
+    </Panel>
+    <div style={{ marginTop: 22 }}><Panel title="Cơ cấu thanh toán" description="Tổng đã trả và khoản tiền mặt còn chờ thu trong kết quả lọc."><DonutChart label="tổng ghi nhận" currency data={[{ name: 'Ví đã trả', value: sum('walletPaid') }, { name: 'Tiền mặt đã thu', value: sum('cashPaid') }, { name: 'Tiền mặt chờ thu', value: sum('cashDue') }]}/></Panel></div>
+    {detail && <DetailDialog title={`Bảng kê #PC${detail.id}`} onClose={() => setSelected(null)}><Row label="Khách hàng">{detail.account?.display_name} · {detail.account?.phone}</Row><Row label="Máy / Bắt đầu">{detail.computer?.code} · {dateTime(detail.session.started_at)}</Row><Row label="Tiền máy đã ghi nhận">{money(detail.session.charged_amount)}</Row><Row label="Tiền món sau hoàn / hủy">{money(detail.food)}</Row><Row label="Tổng ghi nhận"><span className="admin-total">{money(detail.total)}</span></Row><Row label="Đã trả bằng ví">{money(detail.walletPaid)}</Row><Row label="Đã thu tiền mặt">{money(detail.cashPaid)}</Row><Row label="Tiền mặt chờ thu">{money(detail.cashDue)}</Row><Row label="Đã hoàn ví">{money(detail.refunds)}</Row>
+      <h3 className="admin-section-title">Đơn món trong phiên</h3>{detail.orderDetails.map((order) => <div className="admin-detail-line" key={order.id}><div><strong>#GM{order.id} · {money(order.net)}</strong><small>{order.items.map((item) => `${item.quantity} × ${db.products.find((product) => product.id === item.product_id)?.name}`).join(', ')}</small><small>{order.cash ? (order.cashDue > 0 ? 'Tiền mặt chờ thu' : order.cashPaid > 0 ? 'Tiền mặt đã thu' : 'Không phải thu') : 'Đã trả bằng ví'}</small></div>{order.cashDue > 0 && <button className="cafe-button primary" disabled={order.items.some((item) => item.status === 'Pending')} title="Xác nhận các món ở mục Order trước khi thu" onClick={() => setCollecting(order)}>Thu {money(order.cashDue)}</button>}</div>)}
+      <p className="admin-note-box">Khoản đã thanh toán bằng ví không thu lại. Đơn tiền mặt phải xác nhận các món ở mục Order trước khi thu. Bảng kê không phải hóa đơn thuế.</p><button className="cafe-button" onClick={() => download(detail)}>Tải bảng kê TXT</button>
+    </DetailDialog>}
+    {collecting && <FormDialog title={`Thu tiền mặt #GM${collecting.id}`} description={`Chỉ xác nhận khi đã thực nhận ${money(collecting.cashDue)}. Số dư ví không thay đổi.`} submit="Đã nhận đủ tiền mặt" onClose={() => setCollecting(null)} onSave={() => { commit((data) => collectCashOrder(data, collecting.id)); setNotice('Đã ghi nhận thu tiền và cập nhật bảng kê.'); }}/>}
+  </AdminPage>;
+}

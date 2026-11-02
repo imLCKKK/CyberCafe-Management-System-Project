@@ -1,0 +1,68 @@
+.tournaments-page { color: #edf0eb; color-scheme: dark; padding: 26px 30px 32px; max-width: 1640px; margin: auto; font-size: 13px; line-height: 1.5; }
+.tournaments-page * { box-sizing: border-box; }
+.tournaments-page button, .tournaments-page input, .tournaments-page select { font: inherit; }
+.tournaments-page button, .tournaments-page a { cursor: pointer; }
+.tournaments-page :is(button, a, input, select):focus-visible { outline: 2px solid #b8ed62; outline-offset: 3px; }
+.tournaments-page button:disabled { opacity: .45; cursor: not-allowed; }
+.tour-heading, .tour-section-heading, .tour-toolbar, .tour-pagination, .tour-meta, .tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.tour-eyebrow { color: #b8ed62; font-size: 10px; letter-spacing: 2px; font-weight: 600; }
+.tour-heading h1 { margin: 6px 0; font-size: 30px; letter-spacing: -.8px; }
+.tour-heading p, .tour-muted { color: #a1acad; }
+.tour-heading p { margin: 0; }
+.tour-demo { color: #a1acad; font-size: 11px; margin-bottom: 20px; }
+.tour-select, .tour-search { background: #191f21; color: #edf0eb; border: 1px solid #37413d; border-radius: 8px; padding: 10px 12px; }
+.tour-select { max-width: 100%; }
+.tour-hero { position: relative; overflow: hidden; padding: 30px; margin: 26px 0 20px; border: 1px solid #3b4930; border-radius: 14px; background: radial-gradient(ellipse at 92% 50%, #a8db4720, transparent 60%), #1b2320; }
+.tour-hero-copy { position: relative; z-index: 1; }
+.tour-hero h2 { font-size: clamp(25px, 3vw, 38px); margin: 18px 0 10px; letter-spacing: -.7px; }
+.tour-hero-art { position: absolute; right: 6%; top: 10%; color: #b8ed62; opacity: .13; transform: rotate(-12deg); }
+.tour-status { display: inline-flex; align-items: center; gap: 7px; background: #b8ed6214; color: #c1ed82; padding: 5px 10px; border-radius: 20px; font-size: 11px; }
+.tour-meta { justify-content: flex-start; flex-wrap: wrap; color: #bac5bc; margin: 14px 0 25px; }
+.tour-meta span, .tour-button, .tour-link { display: inline-flex; align-items: center; gap: 8px; }
+.tour-button { border: 1px solid #394437; border-radius: 8px; background: #263026; color: #d8e6cf; padding: 10px 15px; justify-content: center; min-height: 40px; font-weight: 600 !important; }
+.tour-button.primary { background: #b8ed62; border-color: #b8ed62; color: #1b2910; }
+.tour-button:hover:not(:disabled) { filter: brightness(1.1); }
+.tour-actions { justify-content: flex-start; flex-wrap: wrap; }
+.tour-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
+.tour-fact { padding: 18px 20px; border: 1px solid #2c3435; border-radius: 10px; background: #191f21; }
+.tour-fact span { display: block; color: #a1acad; font-size: 11px; }
+.tour-fact strong { display: block; font-size: 20px; font-weight: 600; margin-top: 5px; }
+.tour-panel { border: 1px solid #2c3435; border-radius: 12px; background: #191f21; overflow: hidden; }
+.tour-section-heading { padding: 22px 22px 8px; }
+.tour-section-heading h2 { margin: 0; font-size: 17px; }
+.tour-section-heading p { color: #a1acad; font-size: 11px; margin: 6px 0; }
+.tour-toolbar { padding: 16px 22px 20px; justify-content: flex-start; flex-wrap: wrap; }
+.tour-search { display: flex; align-items: center; gap: 10px; flex: 1; max-width: 350px; min-width: 200px; }
+.tour-search input { width: 100%; min-width: 0; border: 0; background: none; color: inherit; }
+.tour-table-wrap { overflow-x: auto; }
+.tour-table { border-collapse: collapse; width: 100%; text-align: left; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tour-table th { background: #151b1c; color: #a9b3b0; font-size: 11px; font-weight: 500; }
+.tour-table th, .tour-table td { padding: 17px 18px; border-bottom: 1px solid #2b3333; }
+.tour-table th button { display: inline-flex; gap: 6px; align-items: center; background: none; border: 0; color: inherit; padding: 0; }
+.tour-table tbody tr:hover { background: #b8ed6205; }
+.tour-player { display: flex; align-items: center; gap: 12px; }
+.tour-avatar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: #b8ed6212; color: #b8ed62; font-weight: 700; }
+.tour-player strong { display: block; font-weight: 600; }
+.tour-player small, .tour-sync small { display: block; color: #98a4a2; font-size: 10px; margin-top: 3px; }
+.tour-sync small { max-width: 250px; white-space: normal; }
+.tour-me { font-size: 9px; color: #b8ed62; margin-left: 6px; }
+.tour-metric { font-weight: 600; font-size: 14px; }
+.tour-metric.missing { color: #798483; }
+.tour-link { color: #b8ed62; text-decoration: none; font-size: 11px; }
+.tour-link:hover { text-decoration: underline; }
+.tour-pagination { padding: 16px 22px; color: #a1acad; font-size: 11px; flex-wrap: wrap; }
+.tour-pagination div { display: flex; gap: 8px; align-items: center; }
+.tour-empty { text-align: center; padding: 44px 22px; color: #9faaa6; }
+.tour-empty svg { color: #b8ed62; }
+.tour-empty h3 { color: #edf0eb; margin: 14px 0 6px; }
+.tour-note { display: flex; align-items: flex-start; gap: 10px; color: #a5afa7; background: #b8ed6208; border: 1px solid #b8ed6218; border-radius: 9px; padding: 14px 16px; margin: 18px 0; font-size: 12px; }
+.tour-note svg { flex-shrink: 0; margin-top: 2px; }
+.tour-note p { margin: 0; }
+.tour-error { color: #ffc1ad; border-color: #a4543b; background: #412a25; }
+.tour-notice { color: #c5ed9b; }
+.tour-form { display: grid; gap: 16px; }
+.tour-form label { display: grid; gap: 7px; }
+.tour-form input, .tour-form select { width: 100%; background: #141a1c; color: #edf0eb; border: 1px solid #3a4440; padding: 11px 12px; border-radius: 7px; font: inherit; }
+.tour-form small { color: #a1acad; }
+@media (max-width: 800px) { .tournaments-page { padding: 20px 16px; } .tour-heading { align-items: flex-start; flex-direction: column; } .tour-hero { padding: 24px; } .tour-facts { gap: 8px; } .tour-fact { padding: 14px 12px; } .tour-fact strong { font-size: 16px; } .tour-section-heading { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 480px) { .tour-facts { grid-template-columns: 1fr; } .tour-fact { display: flex; align-items: center; justify-content: space-between; } .tour-fact strong { margin: 0; } .tour-hero-art { right: -80px; } }
