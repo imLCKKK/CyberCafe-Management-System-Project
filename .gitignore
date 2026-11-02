@@ -212,7 +212,6 @@ AGENTS.md
 TestResults/
 *.log
 
-# Cấu hình local / bí mật
 appsettings.Development.json
 appsettings.Local.json
 *.pfx
