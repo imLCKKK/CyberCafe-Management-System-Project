@@ -119,9 +119,29 @@ public sealed class CyberCafeDbContext(DbContextOptions<CyberCafeDbContext> opti
         });
         model.Entity<Product>(e =>
         {
-            e.ToTable("products", t => t.HasCheckConstraint("CK_products_price", "[current_price] >= 0"));
+            e.ToTable("products", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_products_price",
+                    "[current_price] >= 0");
+
+                // Database không cho phép tồn âm.
+                table.HasCheckConstraint(
+                    "CK_products_stock",
+                    "[stock_quantity] >= 0");
+            });
+
             e.Property(x => x.Name).HasMaxLength(120);
+
             Money(e.Property(x => x.CurrentPrice));
+
+            // Phát hiện xung đột khi cập nhật tồn.
+            e.Property(x => x.StockQuantity)
+                .HasDefaultValue(0)
+                .IsConcurrencyToken();
+
+            e.Property(x => x.IsActive)
+                .HasDefaultValue(true);
         });
         model.Entity<Order>(e =>
         {

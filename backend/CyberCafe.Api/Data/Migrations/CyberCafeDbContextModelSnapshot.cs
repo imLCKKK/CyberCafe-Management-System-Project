@@ -533,11 +533,24 @@ namespace CyberCafe.Api.Data.Migrations
                         .HasColumnType("decimal(18,0)")
                         .HasColumnName("current_price");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("nvarchar(120)")
                         .HasColumnName("name");
+
+                    b.Property<int>("StockQuantity")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("stock_quantity");
 
                     b.HasKey("Id");
 
@@ -546,6 +559,8 @@ namespace CyberCafe.Api.Data.Migrations
                     b.ToTable("products", null, t =>
                         {
                             t.HasCheckConstraint("CK_products_price", "[current_price] >= 0");
+
+                            t.HasCheckConstraint("CK_products_stock", "[stock_quantity] >= 0");
                         });
                 });
 

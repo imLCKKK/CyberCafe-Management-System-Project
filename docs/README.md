@@ -16,3 +16,7 @@ Các báo cáo này ghi kết quả ở thời điểm nêu trong tên file, kh�
 - [Kế hoạch 4 sprint](../planning/team-delivery-plan.md) và [quy trình làm nhóm](../planning/team-workflow.md) nằm trong `planning/`.
 - [Hướng dẫn AI](../codex/PROJECT_GUIDE.md), [review](../codex/REVIEW_GUIDE.md) và [55 Task Jira](../codex/SPRINT_TASKS.md) nằm trong `codex/`.
 - [Hướng dẫn demo admin](../frontend/ADMIN_DEMO.md) nằm cạnh frontend.
+
+## Tích hợp và kiểm thử
+
+- [SCRUM-13: DB thử, seed và luồng đọc kho](scrum-13-inventory-setup.md): hướng dẫn chạy, bằng chứng hiện có và phần auth/UI còn chờ tích hợp.

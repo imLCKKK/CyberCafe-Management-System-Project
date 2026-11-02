@@ -107,6 +107,12 @@ public class Product
     public long CategoryId { get; set; }
     public string Name { get; set; } = "";
     public decimal CurrentPrice { get; set; }
+
+    // Số lượng tồn hiện tại.
+    public int StockQuantity { get; set; }
+
+    // Cho phép hoặc ngừng bán.
+    public bool IsActive { get; set; } = true;
 }
 
 public class Order
