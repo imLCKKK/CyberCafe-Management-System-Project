@@ -1,5 +1,5 @@
 import { CURRENT_CUSTOMER_ID } from '../home/mockData.js';
-export { opggUrl } from '../../../../backend/integrations/opgg/shared.js';
+export { opggUrl } from '../../../../Backend/integrations/opgg/shared.js';
 
 export const roles = ['Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex'];
 export const statColumns = [['winRate', 'Tỷ lệ thắng', '%'], ['headshotRate', 'Headshot', '%'], ['damagePerRound', 'Damage / round', ''], ['kda', 'KDA', '']];

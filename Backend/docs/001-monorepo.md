@@ -3,6 +3,8 @@ Ctr + Shift + V để xem dưới dạng md
 
 # 001 – Định danh dùng chung & Ma trận quyền (SCRUM-2)
 
+Cập nhật nền 02/11/2026: Trưởng nhóm chọn DB mới 35 bảng và backend CyberManagement. Các lệnh dưới đây chạy từ `Backend/`; lệnh từ repository root và chế độ kiểm tra SQL nằm trong [Backend README](../README.md). Không dùng InitialCreate mới để nâng cấp DB CyberCafe 19 bảng. Override development được ignore; signing key và mật khẩu ở User Secrets/biến môi trường.
+
 Tài liệu này chốt định danh, vai trò, ma trận quyền và quy tắc khóa. Mọi module (Inventory, Session, Tournament, Invoice...) dùng chung các quy ước dưới đây.
 
 Luồng Identity tuân theo Clean Architecture: API nhận request, phát JWT và ánh xạ HTTP; Application xử lý đăng nhập/khóa tài khoản, xác thực dữ liệu qua request validators, seed vai trò-quyền và định nghĩa DTO/interface; Infrastructure triển khai repository EF Core và password hashing.

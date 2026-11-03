@@ -68,7 +68,9 @@ public sealed class IdentitySeeder(
         await repository.SaveChangesAsync(cancellationToken);
 
         var existingAssignments = await repository.GetRolePermissionsAsync(cancellationToken);
-        var seededRoleIds = roles.Values.Select(role => role.RoleId).ToHashSet();
+        var seededRoleIds = RolePermissionCatalog.Roles
+            .Select(roleSeed => roles[roleSeed.Name].RoleId)
+            .ToHashSet();
         var desiredAssignments = RolePermissionCatalog.Roles
             .SelectMany(roleSeed => roleSeed.Permissions.Select(permissionName =>
                 (RoleId: roles[roleSeed.Name].RoleId, PermissionId: permissions[permissionName].PermissionId)))

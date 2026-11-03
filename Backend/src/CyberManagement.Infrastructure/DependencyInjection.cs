@@ -15,6 +15,11 @@ public static class DependencyInjection
         this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "Configure ConnectionStrings:DefaultConnection with User Secrets or an environment variable for the 35-table database.");
+        }
 
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseSqlServer(connectionString, b =>
