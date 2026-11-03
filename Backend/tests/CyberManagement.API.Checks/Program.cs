@@ -42,6 +42,7 @@ builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
+builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
 builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
 builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
 builder.Services
@@ -165,6 +166,11 @@ try
     await CheckStatus("Customer logout succeeds", HttpStatusCode.NoContent,
         await SendWithToken(HttpMethod.Post, "/api/auth/customer/logout", customer.AccessToken));
 
+    var staffTokens = new Dictionary<string, string>
+    {
+        ["Admin"] = admin.AccessToken,
+        ["Waiter"] = waiter.AccessToken
+    };
     foreach (var account in new[]
     {
         (Username: "manager01", Password: "Manager-check-password-2026!", Role: "Manager"),
@@ -175,11 +181,14 @@ try
         var login = await CheckLogin($"{account.Role} login succeeds", account.Username, account.Password);
         if (login.Employee.Role != account.Role)
             throw new InvalidOperationException("Login returned the wrong employee role.");
+        staffTokens[account.Role] = login.AccessToken;
         await CheckStatus($"{account.Role} can read own identity", HttpStatusCode.OK,
             await SendWithToken(HttpMethod.Get, "/api/auth/me", login.AccessToken));
         await CheckStatus($"{account.Role} cannot manage roles", HttpStatusCode.Forbidden,
             await SendWithToken(HttpMethod.Get, "/api/admin/roles", login.AccessToken));
     }
+
+    checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
 
     await CheckStatus("Expired token is rejected", HttpStatusCode.Unauthorized,
         await SendWithToken(HttpMethod.Get, "/api/auth/me",

@@ -365,7 +365,7 @@ PR / trạng thái / blocker:
 | Quyết định | Chịu trách nhiệm |
 | --- | --- |
 | Mapping tài khoản khách/nhân viên và quyền từng endpoint; quy tắc khóa tài khoản | Đại + Minh |
-| Phiên: làm tròn tiền giờ, thời điểm trừ ví, ví hết tiền/restart, điều kiện mở/đóng | Phúc + Minh + Trường |
+| Phiên: làm tròn tiền giờ, thời điểm trừ ví, ví hết tiền/restart, điều kiện mở/đóng; phương án trong [contract SCRUM-7](../Backend/docs/002-computer-session-contract.md), chờ xác nhận liên module | Phúc + Minh + Trường |
 | Nạp tại quầy: thời điểm thu/cộng ví; xử lý trạng thái demo `CreditedUnpaid` khi chuyển dữ liệu | Minh + Trường |
 | Đơn: hủy từng món/cả đơn, thời điểm trừ/hoàn tồn, ví và khoản thu tiền mặt; checkout ZaloPay giữ chỗ/hết hạn, callback trễ và chính sách hoàn gateway | Khang + Minh + Trường |
 | Voucher: phần trăm hợp lệ, làm tròn, thời gian theo Việt Nam, ngưỡng tính trước giảm, giới hạn tổng/theo khách, một hay nhiều mã, hoàn lượt khi hủy; tiền giảm không vượt giá trị đơn | Trường + Khang + Đại |
@@ -374,3 +374,5 @@ PR / trạng thái / blocker:
 | Chứng từ/doanh thu: thời điểm ghi nhận, hoàn tiền, giảm giá, phân biệt nạp ví và doanh thu | Trường + Khang + Phúc |
 
 Credentials ZaloPay và callback HTTPS là **task phụ thuộc S1-M**, không phải lựa chọn cần người dùng xác nhận lại. Kết quả kickoff phải được ghi vào hợp đồng/schema trước khi các module triển khai khác nhau.
+
+Ngày 03/11/2026, người dùng cho phép soạn contract bước 1 của SCRUM-7 (`S1-P-1`). [Contract máy/phiên](../Backend/docs/002-computer-session-contract.md) ghi phương án trạng thái, tiền giờ tính theo giây/làm tròn tổng lên một đồng, thu chênh lệch mỗi 60 giây/khi đóng/trước debit khác, giới hạn hết tiền và phục hồi SQL sau restart; đồng thời mô tả API đọc máy/loại/phòng và sửa trạng thái theo permission. Đây là phương án chờ Minh/Trường xác nhận nguồn tiền/chứng từ và Trưởng nhóm duyệt nghiệp vụ, chưa phải bằng chứng đồng thuận hoặc nghiệm thu. Snapshot giá, liên kết khoản thu–ledger, khóa chống lặp và các ràng buộc phiên/hóa đơn cần được đề xuất migration riêng ở S2; bước 1 không thay code/schema, không triển khai thu tiền. Login frontend còn phụ thuộc `S1-D-2`; API/UI/SQL cần được kiểm chứng sau khi các bước triển khai được duyệt.

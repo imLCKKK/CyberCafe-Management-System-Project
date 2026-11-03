@@ -25,7 +25,7 @@ const browser = spawn(executable, args, { windowsHide: true, stdio: ['ignore', '
 let browserLog = '';
 browser.stderr.on('data', data => { browserLog += data; });
 const suites = process.argv.slice(2);
-const selected = suites.length ? suites : ['routes', 'admin-workflows', 'admin-controls', 'invoices', 'suggestion-checkout', 'client-workflows', 'opgg', 'cross-tab', 'resilience'];
+const selected = suites.length ? suites : ['routes', 'computers-api', 'admin-workflows', 'admin-controls', 'invoices', 'suggestion-checkout', 'client-workflows', 'opgg', 'cross-tab', 'resilience'];
 const results = [];
 try {
   let ready = false;
