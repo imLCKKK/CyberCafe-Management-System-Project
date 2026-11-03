@@ -20,7 +20,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
-var databaseName = $"auth-checks-{Guid.NewGuid():N}";
+var databaseFixture = new AuthCheckDatabase(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"));
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     EnvironmentName = "Development",
@@ -37,8 +37,7 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     ["SeedAccounts:Waiter:Password"] = "Waiter-check-password-2026!",
     ["SeedAccounts:Technician:Password"] = "Technician-check-password-2026!"
 });
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseInMemoryDatabase(databaseName));
+builder.Services.AddDbContext<ApplicationDbContext>(databaseFixture.Configure);
 builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
@@ -50,50 +49,59 @@ builder.Services
     .AddApplicationPart(typeof(AuthController).Assembly);
 
 await using var app = builder.Build();
-await using (var scope = app.Services.CreateAsyncScope())
-{
-    await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>()
-        .Database.EnsureCreatedAsync();
-    var accountPasswords = RolePermissionCatalog.Roles.ToDictionary(
-        role => role.Name,
-        role => app.Configuration[$"SeedAccounts:{role.Name}:Password"],
-        StringComparer.Ordinal);
-    await scope.ServiceProvider.GetRequiredService<IIdentitySeeder>().SeedAsync(
-        new IdentitySeedOptions(true, accountPasswords),
-        CancellationToken.None);
-    var passwordHasher = scope.ServiceProvider.GetRequiredService<ICustomerPasswordHasher>();
-    var activeCustomer = new Customer
-    {
-        FullName = "Test Customer",
-        Phone = "0900000001",
-        Email = "customer@example.test",
-        WalletBalance = 100000,
-        Status = "Active"
-    };
-    activeCustomer.PasswordHash = passwordHasher.HashPassword(activeCustomer, "Customer-check-password-2026!");
-    var lockedCustomer = new Customer
-    {
-        FullName = "Locked Customer",
-        Phone = "0900000002",
-        Status = "Locked"
-    };
-    lockedCustomer.PasswordHash = passwordHasher.HashPassword(
-        lockedCustomer, "Customer-check-password-2026!");
-    var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    database.Customers.AddRange(activeCustomer, lockedCustomer);
-    await database.SaveChangesAsync();
-}
-
-app.UseExceptionHandler();
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-await app.StartAsync();
-
-var client = app.GetTestClient();
+HttpClient client = null!;
 var checks = 0;
+var started = false;
 try
 {
+    await using (var scope = app.Services.CreateAsyncScope())
+    {
+        await databaseFixture.InitializeAsync(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
+        var accountPasswords = RolePermissionCatalog.Roles.ToDictionary(
+            role => role.Name,
+            role => app.Configuration[$"SeedAccounts:{role.Name}:Password"],
+            StringComparer.Ordinal);
+        await scope.ServiceProvider.GetRequiredService<IIdentitySeeder>().SeedAsync(
+            new IdentitySeedOptions(true, accountPasswords),
+            CancellationToken.None);
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<ICustomerPasswordHasher>();
+        var activeCustomer = new Customer
+        {
+            FullName = "Test Customer",
+            Phone = "0900000001",
+            Email = "customer@example.test",
+            WalletBalance = 100000,
+            Status = "Active"
+        };
+        activeCustomer.PasswordHash = passwordHasher.HashPassword(activeCustomer, "Customer-check-password-2026!");
+        var lockedCustomer = new Customer
+        {
+            FullName = "Locked Customer",
+            Phone = "0900000002",
+            Status = "Locked"
+        };
+        lockedCustomer.PasswordHash = passwordHasher.HashPassword(
+            lockedCustomer, "Customer-check-password-2026!");
+        var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        database.Customers.AddRange(activeCustomer, lockedCustomer, new Customer
+        {
+            FullName = "Customer without password",
+            Phone = "0900000003",
+            Status = "Active"
+        });
+        await database.SaveChangesAsync();
+    }
+
+    await CheckSeedIsolationAsync();
+
+    app.UseExceptionHandler();
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.MapControllers();
+    await app.StartAsync();
+    started = true;
+    client = app.GetTestClient();
+
     await CheckStatus("Empty employee username is rejected", HttpStatusCode.BadRequest,
         await client.PostAsJsonAsync("/api/auth/login", new { username = "", password = "password" }));
     await CheckStatus("Employee username over limit is rejected", HttpStatusCode.BadRequest,
@@ -157,12 +165,58 @@ try
     await CheckStatus("Customer logout succeeds", HttpStatusCode.NoContent,
         await SendWithToken(HttpMethod.Post, "/api/auth/customer/logout", customer.AccessToken));
 
-    Console.WriteLine($"{checks} HTTP checks passed.");
+    foreach (var account in new[]
+    {
+        (Username: "manager01", Password: "Manager-check-password-2026!", Role: "Manager"),
+        (Username: "cashier01", Password: "Cashier-check-password-2026!", Role: "Cashier"),
+        (Username: "tech01", Password: "Technician-check-password-2026!", Role: "Technician")
+    })
+    {
+        var login = await CheckLogin($"{account.Role} login succeeds", account.Username, account.Password);
+        if (login.Employee.Role != account.Role)
+            throw new InvalidOperationException("Login returned the wrong employee role.");
+        await CheckStatus($"{account.Role} can read own identity", HttpStatusCode.OK,
+            await SendWithToken(HttpMethod.Get, "/api/auth/me", login.AccessToken));
+        await CheckStatus($"{account.Role} cannot manage roles", HttpStatusCode.Forbidden,
+            await SendWithToken(HttpMethod.Get, "/api/admin/roles", login.AccessToken));
+    }
+
+    await CheckStatus("Expired token is rejected", HttpStatusCode.Unauthorized,
+        await SendWithToken(HttpMethod.Get, "/api/auth/me",
+            MintToken(admin.AccessToken, "CyberManagement", "CyberManagement.Client", DateTime.UtcNow.AddMinutes(-2))));
+    await CheckStatus("Wrong issuer is rejected", HttpStatusCode.Unauthorized,
+        await SendWithToken(HttpMethod.Get, "/api/auth/me",
+            MintToken(admin.AccessToken, "WrongIssuer", "CyberManagement.Client", DateTime.UtcNow.AddMinutes(5))));
+    await CheckStatus("Wrong audience is rejected", HttpStatusCode.Unauthorized,
+        await SendWithToken(HttpMethod.Get, "/api/auth/me",
+            MintToken(admin.AccessToken, "CyberManagement", "WrongAudience", DateTime.UtcNow.AddMinutes(5))));
+    await CheckStatus("Stateless logout retains token until expiry as documented", HttpStatusCode.OK,
+        await SendWithToken(HttpMethod.Get, "/api/auth/me", admin.AccessToken));
+
+    await using (var scope = app.Services.CreateAsyncScope())
+    {
+        var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var technician = await database.Employees.SingleAsync(employee => employee.Username == "tech01");
+        technician.IsActive = false;
+        await database.SaveChangesAsync();
+    }
+    await CheckStatus("Disabled employee cannot log in", HttpStatusCode.Forbidden,
+        await SendLogin("tech01", "Technician-check-password-2026!"));
+
+    Console.WriteLine($"{checks} HTTP and persistence checks passed ({databaseFixture.Provider}).");
 }
 finally
 {
-    client.Dispose();
-    await app.StopAsync();
+    client?.Dispose();
+    try
+    {
+        if (started)
+            await app.StopAsync();
+    }
+    finally
+    {
+        await databaseFixture.CleanupAsync();
+    }
 }
 
 async Task<HttpResponseMessage> SendLogin(string username, string password) =>
@@ -216,4 +270,60 @@ async Task CheckStatus(string name, HttpStatusCode expected, HttpResponseMessage
         checks++;
         Console.WriteLine($"PASS {name}");
     }
+}
+
+async Task CheckSeedIsolationAsync()
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var seeder = scope.ServiceProvider.GetRequiredService<IIdentitySeeder>();
+    var existingRole = new Role { RoleName = "ExistingCustomRole", Description = "Outside seed catalog" };
+    var existingPermission = new Permission { PermissionName = "existing.custom.permission", Description = "Outside seed catalog" };
+    database.AddRange(existingRole, existingPermission);
+    await database.SaveChangesAsync();
+    var productPermission = await database.Permissions.SingleAsync(item => item.PermissionName == "product.view");
+    var adminRole = await database.Roles.SingleAsync(role => role.RoleName == "Admin");
+    database.RolePermissions.AddRange(
+        new RolePermission { RoleId = existingRole.RoleId, PermissionId = productPermission.PermissionId },
+        new RolePermission { RoleId = adminRole.RoleId, PermissionId = existingPermission.PermissionId });
+    await database.SaveChangesAsync();
+
+    var options = new IdentitySeedOptions(true, new Dictionary<string, string?>());
+    await seeder.SeedAsync(options, CancellationToken.None);
+    database.ChangeTracker.Clear();
+    Check("Seed preserves permissions on roles outside its catalog",
+        await database.RolePermissions.AnyAsync(item => item.RoleId == existingRole.RoleId
+            && item.PermissionId == productPermission.PermissionId));
+    Check("Seed still enforces the catalog for managed roles",
+        !await database.RolePermissions.AnyAsync(item => item.RoleId == adminRole.RoleId
+            && item.PermissionId == existingPermission.PermissionId));
+
+    var counts = (await database.Roles.CountAsync(), await database.Permissions.CountAsync(),
+        await database.RolePermissions.CountAsync(), await database.Employees.CountAsync());
+    await seeder.SeedAsync(options, CancellationToken.None);
+    Check("Repeated seed is idempotent",
+        counts == (await database.Roles.CountAsync(), await database.Permissions.CountAsync(),
+            await database.RolePermissions.CountAsync(), await database.Employees.CountAsync()));
+}
+
+void Check(string name, bool passed)
+{
+    if (!passed)
+        throw new InvalidOperationException(name);
+    checks++;
+    Console.WriteLine($"PASS {name}");
+}
+
+string MintToken(string validToken, string issuer, string audience, DateTime expires)
+{
+    var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+    var original = handler.ReadJwtToken(validToken);
+    var claims = original.Claims.Where(claim => claim.Type is not ("exp" or "nbf" or "iat" or "iss" or "aud"));
+    var credentials = new Microsoft.IdentityModel.Tokens.SigningCredentials(
+        new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+            System.Text.Encoding.UTF8.GetBytes(app.Configuration["Authentication:Jwt:SigningKey"]!)),
+        Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256);
+    return handler.WriteToken(new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
+        issuer: issuer, audience: audience, claims: claims,
+        notBefore: DateTime.UtcNow.AddMinutes(-10), expires: expires, signingCredentials: credentials));
 }

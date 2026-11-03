@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { createStatsMiddleware } from '../backend/integrations/opgg/statsMiddleware.js';
+import { createStatsMiddleware } from '../Backend/integrations/opgg/statsMiddleware.js';
 
 export default defineConfig({
   plugins: [react(), {

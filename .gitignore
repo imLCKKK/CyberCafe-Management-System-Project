@@ -201,8 +201,6 @@ dist
 .gemini/
 .opencode/
 
-AGENTS.md
-
 .vs/
 
 [Bb]in/
@@ -215,3 +213,6 @@ TestResults/
 appsettings.Development.json
 appsettings.Local.json
 *.pfx
+
+# Local tools, caches and verification output
+/.tools/

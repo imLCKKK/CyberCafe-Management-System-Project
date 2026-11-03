@@ -32,6 +32,6 @@ và cần mạng; các suite mặc định dùng fixture cho OP.GG.
 
 Các màn hình hiện dùng dữ liệu demo trong localStorage, chưa kết nối API
 nghiệp vụ ASP.NET Core hoặc SQL Server và chưa đồng bộ giữa hai máy. Vite chỉ
-gắn middleware OP.GG từ `../backend/integrations/opgg/`; integration này phục
+gắn middleware OP.GG từ `../Backend/integrations/opgg/`; integration này phục
 vụ tra cứu thống kê game. Không coi việc chạy được frontend là đã hoàn tất
 backend quản lý phòng máy.

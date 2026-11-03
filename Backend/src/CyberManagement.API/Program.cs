@@ -58,6 +58,7 @@ namespace CyberManagement.API
             app.UseAuthentication();
             app.UseAuthorization();
 
+            app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
             app.MapControllers();
 
             await app.RunAsync();
