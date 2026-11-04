@@ -28,7 +28,7 @@ export async function apiRequest(path, { method = 'GET', body, signal, accessTok
     throw new ApiError('Không thể kết nối máy chủ. Vui lòng thử lại.', 0);
   }
 
-  if (response.status === 401 && accessToken && getStaffAccessToken() === accessToken) clearStaffAccessToken();
+  if (response.status === 401 && accessToken && getStaffAccessToken() === accessToken) clearStaffAccessToken('expired');
   let result;
   try {
     result = response.status === 204 ? null : await response.json();

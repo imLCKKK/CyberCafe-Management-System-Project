@@ -7,6 +7,7 @@ const fixture = computerFixture();
 const tokenKey = 'nexora.staff.accessToken';
 const requests = [];
 const interceptionErrors = [];
+const canceledRequests = new Set();
 const waitingLists = [];
 const waitingPatches = [];
 let holdList = false;
@@ -18,6 +19,10 @@ let malformed = false;
 
 async function handleRequest({ requestId, request }) {
   const path = new URL(request.url).pathname;
+  if (path.startsWith('/hubs/realtime/')) {
+    await cdp('Fetch.fulfillRequest', { requestId, responseCode: 503 });
+    return;
+  }
   requests.push({ path, method: request.method, body: request.postData });
   let status = 200;
   let body;
@@ -54,7 +59,10 @@ async function handleRequest({ requestId, request }) {
 }
 const onMessage = ({ data }) => {
   const message = JSON.parse(data);
-  if (message.method === 'Fetch.requestPaused') handleRequest(message.params).catch((error) => interceptionErrors.push(error.message));
+  if (message.method === 'Network.loadingFailed' && message.params.canceled)
+    canceledRequests.add(message.params.requestId);
+  if (message.method === 'Fetch.requestPaused') handleRequest(message.params).catch((error) =>
+    interceptionErrors.push({ message: error.message, networkId: message.params.networkId, url: message.params.request.url }));
 };
 async function waitForNode(predicate) {
   for (let attempt = 0; attempt < 150; attempt++) { if (predicate()) return; await sleep(20); }
@@ -76,9 +84,12 @@ const close = async () => {
 };
 
 try {
-  await cdp('Runtime.enable'); await cdp('Page.enable');
+  await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Network.enable');
   socket.addEventListener('message', onMessage);
-  await cdp('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
+  await cdp('Fetch.enable', { patterns: [
+    { urlPattern: '*/api/*', requestStage: 'Request' },
+    { urlPattern: '*/hubs/realtime/*', requestStage: 'Request' },
+  ] });
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await go('/client/home');
   await evaluate(`sessionStorage.removeItem(${JSON.stringify(tokenKey)}); localStorage.setItem('net-cafe.admin.computers.v1', JSON.stringify([{ComputerId:1,ComputerName:'LOCAL-DEMO-SHOULD-NOT-APPEAR',RoomId:1,ComputerTypeId:1,Status:'Available'}]));`);
@@ -181,15 +192,16 @@ try {
     await cdp('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     identityStatus = 200;
     fixture.computers = computerFixture().computers;
-    await evaluate(`sessionStorage.setItem(${JSON.stringify(tokenKey)}, 'browser-test-token')`);
-    await click('Tải lại'); await ready();
+    await evaluate(`(async () => { (await import('/src/shared/staffSession.js')).setStaffAccessToken('browser-test-token'); })()`);
+    await ready();
     assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'), `Overflow at ${width}`);
     await open('API-PC-01');
     assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'), `Modal overflow at ${width}`);
     await screenshot(`computers-api-${width}.png`);
     await close();
   }
-  assert.deepEqual(interceptionErrors, []);
+  assert.deepEqual(interceptionErrors.filter((error) =>
+    !(error.message.includes('Invalid InterceptionId') && canceledRequests.has(error.networkId))), []);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ passed: true, source: 'HTTP fixtures (not SQL)', checks: [
     'login required/loading/no demo fallback', 'API rooms/types/search/list/nullable specs',

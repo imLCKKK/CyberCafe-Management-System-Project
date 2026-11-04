@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { apiRequest, ApiError } from '../src/shared/apiClient.js';
-import { STAFF_TOKEN_KEY, getStaffAccessToken, setStaffAccessToken } from '../src/shared/staffSession.js';
+import { STAFF_TOKEN_KEY, getStaffAccessToken, setStaffAccessToken, clearStaffAccessToken, subscribeStaffSession } from '../src/shared/staffSession.js';
 import { getComputerData, updateComputerStatus } from '../src/admin/computers/computerApi.js';
 import { computerFixture } from './computer-fixture.mjs';
 
@@ -98,6 +98,17 @@ test('an older failed request cannot delete a new login token', async () => {
   };
   await assert.rejects(apiRequest('/auth/me'), ApiError);
   assert.equal(globalThis.sessionStorage.getItem(STAFF_TOKEN_KEY), 'new-token');
+});
+
+test('session subscribers observe login/logout and can unsubscribe', () => {
+  const tokens = [];
+  const unsubscribe = subscribeStaffSession(() => tokens.push(getStaffAccessToken()));
+  setStaffAccessToken('first-session');
+  setStaffAccessToken('second-session');
+  clearStaffAccessToken();
+  unsubscribe();
+  setStaffAccessToken('later-session');
+  assert.deepEqual(tokens, ['first-session', 'second-session', null]);
 });
 
 test('ProblemDetails conflicts surface; internal server details stay hidden', async () => {

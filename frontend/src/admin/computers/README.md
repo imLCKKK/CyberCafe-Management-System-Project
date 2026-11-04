@@ -5,6 +5,7 @@
 ## Kết nối API
 
 - Mặc định browser gọi `/api`. Vite dev/preview chuyển `/api/auth/*` và `/api/admin/*` đến `http://127.0.0.1:5088`; đặt `API_PROXY_TARGET` trong môi trường hoặc `frontend/.env.local` nếu API chạy địa chỉ khác.
+- SignalR cập nhật máy qua `/hubs/realtime`, nhận event/reconnect rồi đọc lại API; Vite proxy hỗ trợ WebSocket. Cấu hình và hook dùng chung theo [hướng dẫn realtime](../../shared/realtime/README.md).
 - OP.GG vẫn dùng middleware `/api/valorant/opgg/stats`, không đi qua proxy .NET.
 - Build production cần reverse proxy cho `/api/auth/*`, `/api/admin/*`, hoặc cấu hình `VITE_API_BASE_URL` gồm tiền tố `/api` khi build. API khác origin cần cấu hình CORS phù hợp ở host, không tự thêm trong task này.
 - Các endpoint, JSON, permission và giới hạn trạng thái theo [contract backend](../../../../Backend/docs/002-computer-session-contract.md).
@@ -15,7 +16,7 @@ Người dùng yêu cầu giữ login cho `S1-D-2`; `/admin/auth` vẫn là plac
 
 Phần login gọi `apiRequest('/auth/login', { method: 'POST', body: { username, password }, accessToken: null })`, sau thành công gọi `setStaffAccessToken(result.accessToken)` rồi điều hướng về `/admin/computers`. Token lưu trong sessionStorage khóa `nexora.staff.accessToken`; không lưu mật khẩu hoặc dùng dữ liệu localStorage để tự cấp quyền. Logout phải xóa token bằng `clearStaffAccessToken()` sau khi xử lý theo contract auth.
 
-Trang máy gọi `/auth/me` để lấy permission, sau đó mới đọc danh sách. Thiếu token/hết hạn yêu cầu đăng nhập; `401` xóa đúng token của request, không xóa token mới được cấp trong lúc request cũ đang chờ. `403` hiển thị không đủ quyền. Không dùng form nhập token hoặc token hard-code trong sản phẩm.
+Trang máy gọi `/auth/me` để lấy permission, sau đó mới đọc danh sách. Helper token thông báo thay đổi session cho React; không ghi sessionStorage trực tiếp từ phần login. Thiếu token/hết hạn yêu cầu đăng nhập; `401` xóa đúng token của request, không xóa token mới được cấp trong lúc request cũ đang chờ. `403` hiển thị không đủ quyền. Không dùng form nhập token hoặc token hard-code trong sản phẩm.
 
 ## Hành vi và kiểm tra
 
