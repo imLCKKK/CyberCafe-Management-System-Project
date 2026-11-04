@@ -1,32 +1,57 @@
-import React, { useEffect, useState } from 'react';
-import { Check, Clock3, Eye, EyeOff, KeyRound, LockKeyhole, Monitor, Phone, Save, ShieldCheck, ShoppingBag, UserRound } from 'lucide-react';
-import { useClientDemo } from '../shared/ClientDemoContext';
-import { Badge, DemoStrip, Feedback, PageHeading } from '../shared/ClientUI';
-import { DEMO_PASSWORD } from '../shared/demoData';
-import { dateTime, minutesLabel, money, preparePasswordChange, renameAccount } from '../shared/demoModel';
+import React from 'react';
+import { Check, Mail, Phone, ShieldCheck, UserRound, WalletCards } from 'lucide-react';
+import { PageHeading } from '../shared/ClientUI';
+import { dateTime, money } from '../shared/demoModel';
+import { useClientProfile } from './useClientProfile';
 
+// Hồ sơ khách đọc từ API/SQL theo tài khoản đang đăng nhập (S1-M-1).
+// Đổi tên, đổi mật khẩu và lịch sử phiên chơi chưa có API nên tạm không hiển thị, không dùng dữ liệu mẫu thay thế.
 export function AccountPage() {
-  const { db, account, customer, session, computer, commit, warning } = useClientDemo();
-  const [name, setName] = useState(account.display_name);
-  const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
-  const [showPassword, setShowPassword] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
-  useEffect(() => { setName(account.display_name); }, [account.display_name]);
-  const sessions = db.gaming_sessions.filter((r) => r.customer_id === customer.id).sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
-  const playedMinutes = sessions.reduce((sum, r) => sum + Math.max(0, Math.floor((new Date(r.ended_at || new Date()) - new Date(r.started_at)) / 60000)), 0);
-  const initials = account.display_name.split(' ').filter(Boolean).slice(-2).map((part) => part[0]).join('');
-  async function changePassword(e) {
-    e.preventDefault(); setBusy(true); setError('');
-    try { const action = await preparePasswordChange(db, passwords.current, passwords.next, passwords.confirm); commit(action); setPasswords({ current: '', next: '', confirm: '' }); setNotice('Đã đổi mật khẩu cho tài khoản demo.'); } catch (err) { setError(err.message); } finally { setBusy(false); }
+  const { status, profile, error, reload } = useClientProfile();
+
+  const heading = (chip) => <PageHeading eyebrow="YOUR SPACE, YOUR IDENTITY" title={<>Tài khoản của <span>bạn.</span></>} description="Thông tin người chơi tại TRAM.">{chip}</PageHeading>;
+  if (status === 'loading') {
+    return <div className="cafe-home client-module account-page">{heading()}<p className="home-muted" role="status">Đang tải hồ sơ...</p></div>;
   }
-  return <div className="cafe-home client-module account-page"><DemoStrip/><PageHeading eyebrow="YOUR SPACE, YOUR IDENTITY" title={<>Tài khoản của <span>bạn.</span></>} description="Thông tin người chơi, bảo mật và những phiên chơi tại TRAM."><span className="client-heading-chip"><ShieldCheck size={16}/>{account.is_active ? 'Tài khoản đang hoạt động' : 'Tài khoản đã khóa'}</span></PageHeading><Feedback notice={notice} error={error} onClear={() => setNotice('')}/>
-    <div className="account-layout"><aside><section className="home-panel account-profile"><div className="account-avatar">{initials}<span><Check size={12}/></span></div><h2>{account.display_name}</h2><p>Người chơi TRAM</p><div className="account-id">ID #{String(customer.id).padStart(6, '0')}</div><div className="account-summary-line"><Phone size={15}/><span>{account.phone}</span><LockKeyhole size={12}/></div><div className="account-summary-line"><ShieldCheck size={15}/><span>{account.is_active ? 'Đang hoạt động' : 'Đã khóa'}</span><span className="client-live-dot"/></div><div className="account-member-since">Đồng hành cùng TRAM từ<br/><strong>{dateTime(account.created_at).split(' ')[1] || dateTime(account.created_at)}</strong></div></section><section className="home-panel account-session"><div className="client-panel-heading"><h2><Monitor size={17}/> Phiên hiện tại</h2></div><div className="client-panel-body">{session ? <><Badge status="Active"/><h3>{computer?.code}</h3><p><Clock3 size={14}/>{minutesLabel(session.started_at)}</p><div className="home-detail-row"><span>Đơn giá</span><strong>{money(session.hourly_rate_snapshot)} / giờ</strong></div><div className="home-detail-row"><span>Đã ghi nhận</span><strong>{money(session.charged_amount)}</strong></div></> : <p className="client-muted">Bạn chưa có phiên chơi.</p>}</div></section></aside>
-    <div className="account-main"><div className="client-stat-grid three"><div className="client-stat"><span className="client-icon-tile"><Monitor size={19}/></span><div><span>Phiên đã chơi</span><strong>{sessions.length}<small> phiên</small></strong></div></div><div className="client-stat"><span className="client-icon-tile neutral"><Clock3 size={19}/></span><div><span>Thời gian chơi</span><strong>{Math.floor(playedMinutes / 60)}<small> giờ {playedMinutes % 60} phút</small></strong></div></div><div className="client-stat"><span className="client-icon-tile neutral"><ShoppingBag size={19}/></span><div><span>Đơn món</span><strong>{db.orders.filter((r) => r.customer_id === customer.id).length}<small> đơn</small></strong></div></div></div>
-    <section className="home-panel"><div className="client-panel-heading"><h2><UserRound size={18}/> Thông tin cá nhân</h2><span className="client-muted">Hồ sơ người chơi</span></div><form className="client-panel-body" onSubmit={(e) => { e.preventDefault(); try { commit((data) => renameAccount(data, name)); setError(''); setNotice('Đã lưu tên hiển thị.'); } catch (err) { setError(err.message); } }}><div className="home-form-grid"><label className="home-field">Tên hiển thị<input maxLength={100} required value={name} onChange={(e) => setName(e.target.value)} autoComplete="name"/></label><label className="home-field">Số điện thoại / Tên đăng nhập<div className="client-readonly-field"><input value={account.phone} readOnly autoComplete="username"/><LockKeyhole size={14}/></div></label></div><p className="home-fine-print">Số điện thoại là tên đăng nhập của bạn. Liên hệ nhân viên nếu cần điều chỉnh thông tin này.</p><button className="home-button" disabled={name.trim() === account.display_name || !account.is_active || Boolean(warning)} type="submit"><Save size={16}/> Lưu thay đổi</button></form></section>
-    <section className="home-panel"><div className="client-panel-heading"><h2><KeyRound size={18}/> Bảo mật tài khoản</h2><button type="button" className="home-text-button" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={16}/> : <Eye size={16}/>} {showPassword ? 'Ẩn' : 'Hiện'} mật khẩu</button></div><form className="client-panel-body" onSubmit={changePassword}>{account.must_change_password && <div className="home-alert">Bạn cần đổi mật khẩu lần đầu trước khi sử dụng các dịch vụ.</div>}<label className="home-field">Mật khẩu hiện tại<input type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={passwords.current} onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}/></label><div className="home-form-grid"><label className="home-field">Mật khẩu mới<input type={showPassword ? 'text' : 'password'} autoComplete="new-password" minLength={8} maxLength={128} required value={passwords.next} onChange={(e) => setPasswords({ ...passwords, next: e.target.value })}/></label><label className="home-field">Nhập lại mật khẩu mới<input type={showPassword ? 'text' : 'password'} autoComplete="new-password" minLength={8} maxLength={128} required value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}/></label></div><p className="home-fine-print">Tối thiểu 8 ký tự. Mật khẩu ban đầu của bản mẫu: <code>{DEMO_PASSWORD}</code>. Khôi phục bản mẫu để đặt lại khi cần thử lại.</p><button className="home-button" disabled={busy || !account.is_active || Boolean(warning)} type="submit"><LockKeyhole size={16}/>{busy ? 'Đang lưu…' : 'Đổi mật khẩu'}</button></form></section>
-    <section className="home-panel"><div className="client-panel-heading"><h2><Clock3 size={18}/> Lịch sử phiên chơi</h2></div><div className="home-table-wrap"><table className="home-table client-data-table"><thead><tr><th>Máy / Phiên</th><th>Bắt đầu</th><th>Thời lượng</th><th>Trạng thái</th></tr></thead><tbody>{sessions.map((row) => <tr key={row.id}><td><strong>{db.computers.find((r) => r.id === row.computer_id)?.code}</strong><small className="client-table-sub">Phiên #{row.id}</small></td><td className="home-date">{dateTime(row.started_at)}</td><td>{minutesLabel(row.started_at, row.ended_at || new Date())}</td><td><Badge status={row.status}/></td></tr>)}</tbody></table></div></section>
-    </div></div>
+  if (status === 'error') {
+    return <div className="cafe-home client-module account-page">{heading()}
+      <div className="home-alert" role="alert">{error}</div>
+      <button className="home-button primary" onClick={reload}>Thử lại</button>
+    </div>;
+  }
+
+  const active = profile.status === 'Active';
+  const initials = profile.fullName.split(' ').filter(Boolean).slice(-2).map((part) => part[0]).join('');
+  return <div className="cafe-home client-module account-page">
+    {heading(<span className="client-heading-chip"><ShieldCheck size={16}/>{active ? 'Tài khoản đang hoạt động' : 'Tài khoản đã khóa'}</span>)}
+    <div className="account-layout">
+      <aside>
+        <section className="home-panel account-profile">
+          <div className="account-avatar">{initials}<span><Check size={12}/></span></div>
+          <h2>{profile.fullName}</h2>
+          <p>Người chơi TRAM</p>
+          <div className="account-id">ID #{String(profile.customerId).padStart(6, '0')}</div>
+          <div className="account-summary-line"><Phone size={15}/><span>{profile.phone}</span></div>
+          {profile.email && <div className="account-summary-line"><Mail size={15}/><span>{profile.email}</span></div>}
+          <div className="account-summary-line"><ShieldCheck size={15}/><span>{active ? 'Đang hoạt động' : 'Đã khóa'}</span><span className="client-live-dot"/></div>
+          <div className="account-member-since">Đồng hành cùng TRAM từ<br/><strong>{dateTime(profile.createdAt).split(' ')[1] || dateTime(profile.createdAt)}</strong></div>
+        </section>
+      </aside>
+      <div className="account-main">
+        <div className="client-stat-grid three">
+          <div className="client-stat"><span className="client-icon-tile"><WalletCards size={19}/></span><div><span>Số dư ví</span><strong>{money(profile.walletBalance)}</strong></div></div>
+        </div>
+        <section className="home-panel">
+          <div className="client-panel-heading"><h2><UserRound size={18}/> Thông tin cá nhân</h2><span className="client-muted">Hồ sơ người chơi</span></div>
+          <div className="client-panel-body">
+            <div className="home-detail-row"><span>Họ tên</span><strong>{profile.fullName}</strong></div>
+            <div className="home-detail-row"><span>Số điện thoại / Tên đăng nhập</span><strong>{profile.phone}</strong></div>
+            <div className="home-detail-row"><span>Email</span><strong>{profile.email || '—'}</strong></div>
+            <div className="home-detail-row"><span>Phiên chơi</span><strong>{profile.hasActiveSession ? 'Đang có phiên chơi' : 'Chưa có phiên'}</strong></div>
+            <p className="home-fine-print">Liên hệ nhân viên nếu cần điều chỉnh thông tin cá nhân.</p>
+          </div>
+        </section>
+      </div>
+    </div>
   </div>;
 }
