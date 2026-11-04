@@ -1,7 +1,7 @@
 # Client demo theo DBML
 
 Trang chủ, Gọi món, Ví, Hóa đơn và Tài khoản dùng chung `ClientDemoProvider`.
-Mock data ở `demoData.js` dùng tên bảng/cột theo `backend/database/schema.dbml` tại gốc repository.
+Mock data ở `demoData.js` giữ cấu trúc DBML 19 bảng của bản demo cũ. Backend đích hiện là CyberManagement/DB mới 35 bảng; trước khi nối API, đối chiếu mapping EmployeeId/CustomerId và tên trường theo [hướng dẫn backend](../../../../Backend/README.md). Cấu trúc demo này không phải schema EF hiện hành.
 Các ảnh minh họa món được tách khỏi dữ liệu bảng trong `productArt`.
 
 - Dữ liệu lưu trong localStorage `tram.client.dbml.demo.v2`; khôi phục bản mẫu từ thanh demo.

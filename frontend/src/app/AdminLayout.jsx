@@ -11,10 +11,12 @@ import {
   UserCog, 
   BarChart3, 
   Menu, 
-  ChevronRight 
+  ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import './layout.css';
 import { AdminProvider } from '../admin/shared/AdminContext';
+import { useAuth } from '../shared/auth/AuthContext';
 
 const menu = [
   ['/admin/dashboard', 'Tổng quan', LayoutDashboard],
@@ -35,6 +37,20 @@ export function AdminLayout() {
 
 function AdminShell() {
   const [collapsed, setCollapsed] = useState(false);
+  const { principal, signOut } = useAuth();
+  const visibleMenu = principal?.type === 'employee'
+    ? menu.filter(([path]) => {
+      const permissions = {
+        '/admin/computers': ['computer.view'], '/admin/customers': ['customer.view'], '/admin/orders': ['order.view'],
+        '/admin/products': ['product.view'], '/admin/inventory': ['stockreceipt.view'],
+        '/admin/invoices': ['invoice.view'], '/admin/tournaments': ['tournament.view'], '/admin/staff': ['employee.view'],
+        '/admin/reports': ['report.view'],
+      }[path];
+      return !permissions || permissions.some((permission) => principal.permissions.includes(permission));
+    })
+    : menu;
+  const displayName = principal?.type === 'employee' ? principal.username : 'Bản demo';
+  const displayRole = principal?.type === 'employee' ? principal.role : 'Chưa đăng nhập';
 
   return (
     <div className={`admin-shell ${collapsed ? 'collapsed' : ''}`}>
@@ -52,7 +68,7 @@ function AdminShell() {
 
         <nav className="nav">
           {!collapsed && <div className="nav-label">QUẢN LÝ</div>}
-          {menu.map(([to, label, Icon]) => (
+          {visibleMenu.map(([to, label, Icon]) => (
             <NavLink 
               key={to} 
               to={to} 
@@ -71,11 +87,12 @@ function AdminShell() {
             <div className="user">
               <div className="avatar">A</div>
               <div>
-                <b>Admin</b>
-                <small>Quản trị viên</small>
+                <b>{displayName}</b>
+                <small>{displayRole}</small>
               </div>
             </div>
           )}
+          {principal?.type === 'employee' && <button className="admin-logout" aria-label="Đăng xuất" title="Đăng xuất" onClick={() => void signOut()}><LogOut size={18}/></button>}
           <button aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} aria-expanded={!collapsed} onClick={() => setCollapsed(v => !v)}>
             <Menu size={19} />
           </button>

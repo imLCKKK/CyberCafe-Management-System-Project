@@ -6,15 +6,17 @@
   "scripts": {
     "test:frontend": "node tests/run.mjs",
     "test:frontend:render": "node src/admin/shared/render-smoke.mjs && node src/client/home/render-smoke.mjs && node src/client/tournaments/render-smoke.mjs",
-    "test:frontend:models": "node --test ../backend/integrations/opgg/opgg.test.js src/admin/shared/adminModel.test.js src/client/shared/demoModel.test.js src/client/home/homeModel.test.js src/client/ordering/recommendation.test.js src/client/invoices/invoiceModel.test.js src/client/tournaments/tournamentModel.test.js",
+    "test:frontend:models": "node --test ../Backend/integrations/opgg/opgg.test.js src/admin/shared/adminModel.test.js src/client/shared/demoModel.test.js src/client/home/homeModel.test.js src/client/ordering/recommendation.test.js src/client/invoices/invoiceModel.test.js src/client/tournaments/tournamentModel.test.js",
+    "test:auth": "node --test src/shared/auth/api.test.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "stats:server": "node ../backend/integrations/opgg/index.js",
-    "test:opgg": "node --test --test-isolation=none ../backend/integrations/opgg/opgg.test.js src/client/tournaments/tournamentModel.test.js",
+    "stats:server": "node ../Backend/integrations/opgg/index.js",
+    "test:opgg": "node --test --test-isolation=none ../Backend/integrations/opgg/opgg.test.js src/client/tournaments/tournamentModel.test.js",
     "test:client": "node --test src/client/shared/demoModel.test.js src/client/ordering/recommendation.test.js src/client/invoices/invoiceModel.test.js",
     "test:admin": "node --test src/admin/shared/adminModel.test.js",
-    "test:admin:render": "node src/admin/shared/render-smoke.mjs"
+    "test:admin:render": "node src/admin/shared/render-smoke.mjs",
+    "test:inventory:sql": "node tests/run.mjs inventory-sql"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

@@ -4,14 +4,15 @@ import { renderToString } from 'react-dom/server';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 
-// Render all menu routes through Vite, including their real shared providers.
+// Render through real feature providers with a test-only principal; SSR does not run auth effects.
 // Browser interactions and chart amounts are checked separately.
 globalThis.localStorage = { getItem: () => null };
 globalThis.window = { addEventListener() {}, removeEventListener() {} };
 const originalError = console.error;
 const warnings = [];
 console.error = (...args) => { if (!String(args[0]).includes('useLayoutEffect does nothing on the server')) warnings.push(String(args[0])); };
-const server = await createServer({ root: fileURLToPath(new URL('../../../', import.meta.url)), server: { middlewareMode: true }, appType: 'custom', ssr: { noExternal: ['react-router-dom', 'react-router'], resolve: { conditions: ['module', 'module-sync', 'node', 'development'] } } });
+const frontendRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const server = await createServer({ root: frontendRoot, optimizeDeps: { noDiscovery: true }, resolve: { alias: [{ find: /^(?:\.\.\/)+shared\/auth\/AuthContext(?:\.jsx)?$|^\.\/AuthContext(?:\.jsx)?$/, replacement: fileURLToPath(new URL('../../../tests/auth-render-context.jsx', import.meta.url)) }] }, server: { middlewareMode: true }, appType: 'custom', ssr: { noExternal: ['react-router-dom', 'react-router'], resolve: { conditions: ['module', 'module-sync', 'node', 'development'] } } });
 try {
   const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
   const { AppRoutes } = await server.ssrLoadModule('/src/app/routes.jsx');

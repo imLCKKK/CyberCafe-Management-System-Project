@@ -1,0 +1,445 @@
+// Generated from the CyberManagement SQL Server EF model; do not edit manually.
+Table dbo.AuditLogs {
+  LogId int [not null, pk, increment]
+  Action nvarchar(255) [not null]
+  CreatedAt datetime2 [not null]
+  EmployeeId int [null]
+  EntityId int [not null]
+  EntityType nvarchar(50) [not null]
+  indexes {
+    (EmployeeId) [name: 'IX_AuditLogs_EmployeeId']
+  }
+}
+Table dbo.Categories {
+  CategoryId int [not null, pk, increment]
+  CategoryName nvarchar(150) [not null]
+  IsActive bit [not null]
+  indexes {
+  }
+}
+Table dbo.ComputerMaintenance {
+  MaintenanceId int [not null, pk, increment]
+  ComputerId int [not null]
+  Description nvarchar(255) [null]
+  EmployeeId int [not null]
+  EndTime datetime2 [null]
+  StartTime datetime2 [not null]
+  Status nvarchar(50) [not null]
+  indexes {
+    (ComputerId) [name: 'IX_ComputerMaintenance_ComputerId']
+    (EmployeeId) [name: 'IX_ComputerMaintenance_EmployeeId']
+  }
+}
+Table dbo.ComputerRooms {
+  RoomId int [not null, pk, increment]
+  Description nvarchar(255) [null]
+  Floor int [not null]
+  RoomName nvarchar(100) [not null]
+  indexes {
+  }
+}
+Table dbo.Computers {
+  ComputerId int [not null, pk, increment]
+  ComputerName nvarchar(100) [not null]
+  ComputerTypeId int [not null]
+  RoomId int [not null]
+  Status nvarchar(50) [not null]
+  indexes {
+    (ComputerTypeId) [name: 'IX_Computers_ComputerTypeId']
+    (RoomId, ComputerName) [name: 'IX_Computers_RoomId_ComputerName', unique]
+  }
+}
+Table dbo.ComputerTypes {
+  ComputerTypeId int [not null, pk, increment]
+  CPU nvarchar(100) [null]
+  Description nvarchar(255) [null]
+  GPU nvarchar(100) [null]
+  PricePerHour decimal(12,2) [not null]
+  RAM nvarchar(50) [null]
+  TypeName nvarchar(100) [not null]
+  indexes {
+  }
+}
+Table dbo.Customers {
+  CustomerId int [not null, pk, increment]
+  CreatedAt datetime2 [not null]
+  Email nvarchar(150) [null]
+  FullName nvarchar(150) [not null]
+  PasswordHash nvarchar(255) [null]
+  Phone nvarchar(20) [not null]
+  Status nvarchar(50) [not null]
+  WalletBalance decimal(12,2) [not null]
+  indexes {
+    (Phone) [name: 'IX_Customers_Phone', unique]
+  }
+}
+Table dbo.CustomerStatusHistory {
+  HistoryId int [not null, pk, increment]
+  ChangedAt datetime2 [not null]
+  ChangedBy int [not null]
+  CustomerId int [not null]
+  NewStatus nvarchar(50) [not null]
+  OldStatus nvarchar(50) [null]
+  Reason nvarchar(255) [null]
+  indexes {
+    (ChangedBy) [name: 'IX_CustomerStatusHistory_ChangedBy']
+    (CustomerId) [name: 'IX_CustomerStatusHistory_CustomerId']
+  }
+}
+Table dbo.Employees {
+  EmployeeId int [not null, pk, increment]
+  CreatedAt datetime2 [not null]
+  FullName nvarchar(150) [not null]
+  IsActive bit [not null]
+  PasswordHash nvarchar(255) [not null]
+  Phone nvarchar(20) [null]
+  RoleId int [not null]
+  Username nvarchar(50) [not null]
+  indexes {
+    (RoleId) [name: 'IX_Employees_RoleId']
+    (Username) [name: 'IX_Employees_Username', unique]
+  }
+}
+Table dbo.GameRanks {
+  RankId int [not null, pk, increment]
+  GameId int [not null]
+  RankName nvarchar(50) [not null]
+  RankOrder int [not null]
+  indexes {
+    (GameId, RankName) [name: 'IX_GameRanks_GameId_RankName', unique]
+  }
+}
+Table dbo.Games {
+  GameId int [not null, pk, increment]
+  GameName nvarchar(100) [not null]
+  IsActive bit [not null]
+  TeamSize int [not null]
+  indexes {
+  }
+}
+Table dbo.GamingSessions {
+  GamingSessionId int [not null, pk, increment]
+  ComputerId int [not null]
+  CustomerId int [not null]
+  EndTime datetime2 [null]
+  LastChargedAt datetime2 [null]
+  StartTime datetime2 [not null]
+  Status nvarchar(50) [not null]
+  TotalCost decimal(12,2) [not null]
+  indexes {
+    (ComputerId) [name: 'IX_GamingSessions_ComputerId']
+    (CustomerId) [name: 'IX_GamingSessions_CustomerId']
+  }
+}
+Table dbo.InventoryTransactions {
+  InvTransId int [not null, pk, increment]
+  CreatedAt datetime2 [not null]
+  EmployeeId int [not null]
+  OrderId int [null]
+  ProductId int [not null]
+  Quantity int [not null]
+  ReceiptId int [null]
+  ReferenceType nvarchar(50) [not null]
+  Type nvarchar(50) [not null]
+  indexes {
+    (EmployeeId) [name: 'IX_InventoryTransactions_EmployeeId']
+    (OrderId) [name: 'IX_InventoryTransactions_OrderId']
+    (ProductId) [name: 'IX_InventoryTransactions_ProductId']
+    (ReceiptId) [name: 'IX_InventoryTransactions_ReceiptId']
+  }
+}
+Table dbo.InvoiceDetails {
+  InvoiceDetailId int [not null, pk, increment]
+  Amount decimal(12,2) [not null]
+  Description nvarchar(255) [not null]
+  InvoiceId int [not null]
+  ItemType nvarchar(50) [not null]
+  Quantity int [not null]
+  UnitPrice decimal(12,2) [not null]
+  indexes {
+    (InvoiceId) [name: 'IX_InvoiceDetails_InvoiceId']
+  }
+}
+Table dbo.InvoiceOrders {
+  InvoiceId int [not null]
+  OrderId int [not null]
+  indexes {
+    (InvoiceId, OrderId) [pk]
+    (OrderId) [name: 'IX_InvoiceOrders_OrderId']
+  }
+}
+Table dbo.Invoices {
+  InvoiceId int [not null, pk, increment]
+  CustomerId int [not null]
+  Discount decimal(12,2) [not null]
+  EmployeeId int [not null]
+  GamingSessionId int [null]
+  InvoiceDate datetime2 [not null]
+  PromotionId int [null]
+  Status nvarchar(50) [not null]
+  Subtotal decimal(12,2) [not null]
+  TotalAmount decimal(12,2) [not null]
+  indexes {
+    (CustomerId) [name: 'IX_Invoices_CustomerId']
+    (EmployeeId) [name: 'IX_Invoices_EmployeeId']
+    (GamingSessionId) [name: 'IX_Invoices_GamingSessionId']
+    (PromotionId) [name: 'IX_Invoices_PromotionId']
+  }
+}
+Table dbo.OrderDetails {
+  OrderDetailId int [not null, pk, increment]
+  OrderId int [not null]
+  ProductId int [not null]
+  Quantity int [not null]
+  UnitPrice decimal(12,2) [not null]
+  indexes {
+    (OrderId) [name: 'IX_OrderDetails_OrderId']
+    (ProductId) [name: 'IX_OrderDetails_ProductId']
+  }
+}
+Table dbo.Orders {
+  OrderId int [not null, pk, increment]
+  CustomerId int [not null]
+  EmployeeId int [not null]
+  GamingSessionId int [null]
+  OrderTime datetime2 [not null]
+  Status nvarchar(50) [not null]
+  TotalAmount decimal(12,2) [not null]
+  indexes {
+    (CustomerId) [name: 'IX_Orders_CustomerId']
+    (EmployeeId) [name: 'IX_Orders_EmployeeId']
+    (GamingSessionId) [name: 'IX_Orders_GamingSessionId']
+  }
+}
+Table dbo.OrderStatusHistory {
+  HistoryId int [not null, pk, increment]
+  ChangedAt datetime2 [not null]
+  ChangedBy int [not null]
+  NewStatus nvarchar(50) [not null]
+  OldStatus nvarchar(50) [null]
+  OrderId int [not null]
+  indexes {
+    (ChangedBy) [name: 'IX_OrderStatusHistory_ChangedBy']
+    (OrderId) [name: 'IX_OrderStatusHistory_OrderId']
+  }
+}
+Table dbo.Payments {
+  PaymentId int [not null, pk, increment]
+  Amount decimal(12,2) [not null]
+  InvoiceId int [not null]
+  Method nvarchar(50) [not null]
+  PaymentTime datetime2 [not null]
+  Status nvarchar(50) [not null]
+  WalletTransactionId int [null]
+  indexes {
+    (InvoiceId) [name: 'IX_Payments_InvoiceId']
+    (WalletTransactionId) [name: 'IX_Payments_WalletTransactionId']
+  }
+}
+Table dbo.Permissions {
+  PermissionId int [not null, pk, increment]
+  Description nvarchar(255) [null]
+  PermissionName nvarchar(100) [not null]
+  indexes {
+    (PermissionName) [name: 'IX_Permissions_PermissionName', unique]
+  }
+}
+Table dbo.Products {
+  ProductId int [not null, pk, increment]
+  CategoryId int [not null]
+  IsActive bit [not null]
+  Price decimal(12,2) [not null]
+  ProductName nvarchar(150) [not null]
+  Stock int [not null]
+  indexes {
+    (CategoryId) [name: 'IX_Products_CategoryId']
+  }
+}
+Table dbo.Promotions {
+  PromotionId int [not null, pk, increment]
+  DiscountType nvarchar(50) [not null]
+  DiscountValue decimal(12,2) [not null]
+  EndDate datetime2 [not null]
+  IsActive bit [not null]
+  PromoName nvarchar(150) [not null]
+  StartDate datetime2 [not null]
+  indexes {
+  }
+}
+Table dbo.RolePermissions {
+  RoleId int [not null]
+  PermissionId int [not null]
+  indexes {
+    (RoleId, PermissionId) [pk]
+    (PermissionId) [name: 'IX_RolePermissions_PermissionId']
+  }
+}
+Table dbo.Roles {
+  RoleId int [not null, pk, increment]
+  Description nvarchar(255) [null]
+  RoleName nvarchar(100) [not null]
+  indexes {
+    (RoleName) [name: 'IX_Roles_RoleName', unique]
+  }
+}
+Table dbo.SessionCharges {
+  ChargeId int [not null, pk, increment]
+  Amount decimal(12,2) [not null]
+  EndTime datetime2 [not null]
+  GamingSessionId int [not null]
+  StartTime datetime2 [not null]
+  indexes {
+    (GamingSessionId) [name: 'IX_SessionCharges_GamingSessionId']
+  }
+}
+Table dbo.Shifts {
+  ShiftId int [not null, pk, increment]
+  EmployeeId int [not null]
+  EndTime datetime2 [null]
+  StartTime datetime2 [not null]
+  indexes {
+    (EmployeeId) [name: 'IX_Shifts_EmployeeId']
+  }
+}
+Table dbo.StockReceiptDetails {
+  ReceiptDetailId int [not null, pk, increment]
+  ProductId int [not null]
+  Quantity int [not null]
+  ReceiptId int [not null]
+  UnitCost decimal(12,2) [not null]
+  indexes {
+    (ProductId) [name: 'IX_StockReceiptDetails_ProductId']
+    (ReceiptId) [name: 'IX_StockReceiptDetails_ReceiptId']
+  }
+}
+Table dbo.StockReceipts {
+  ReceiptId int [not null, pk, increment]
+  EmployeeId int [not null]
+  ReceiptDate datetime2 [not null]
+  SupplierId int [not null]
+  TotalAmount decimal(12,2) [not null]
+  indexes {
+    (EmployeeId) [name: 'IX_StockReceipts_EmployeeId']
+    (SupplierId) [name: 'IX_StockReceipts_SupplierId']
+  }
+}
+Table dbo.Suppliers {
+  SupplierId int [not null, pk, increment]
+  Address nvarchar(255) [null]
+  Email nvarchar(150) [null]
+  Phone nvarchar(20) [null]
+  SupplierName nvarchar(150) [not null]
+  indexes {
+  }
+}
+Table dbo.TeamMembers {
+  TeamId int [not null]
+  RegistrationId int [not null]
+  AssignedRole nvarchar(50) [null]
+  indexes {
+    (TeamId, RegistrationId) [pk]
+    (RegistrationId) [name: 'IX_TeamMembers_RegistrationId', unique]
+  }
+}
+Table dbo.Teams {
+  TeamId int [not null, pk, increment]
+  AvgSkillScore decimal(6,2) [null]
+  TeamName nvarchar(100) [not null]
+  TournamentId int [not null]
+  indexes {
+    (TournamentId) [name: 'IX_Teams_TournamentId']
+  }
+}
+Table dbo.TournamentRegistrations {
+  RegistrationId int [not null, pk, increment]
+  CustomerId int [not null]
+  HoursPlayed int [not null]
+  PreferredRole nvarchar(50) [null]
+  RankId int [not null]
+  RegisteredAt datetime2 [not null]
+  SkillScore decimal(6,2) [null]
+  Status nvarchar(50) [not null]
+  TournamentId int [not null]
+  WinRate decimal(5,2) [not null]
+  indexes {
+    (CustomerId) [name: 'IX_TournamentRegistrations_CustomerId']
+    (RankId) [name: 'IX_TournamentRegistrations_RankId']
+    (TournamentId, CustomerId) [name: 'IX_TournamentRegistrations_TournamentId_CustomerId', unique]
+  }
+}
+Table dbo.Tournaments {
+  TournamentId int [not null, pk, increment]
+  CreatedBy int [not null]
+  EntryFee decimal(12,2) [not null]
+  GameId int [not null]
+  RegistrationEnd datetime2 [not null]
+  RegistrationStart datetime2 [not null]
+  StartTime datetime2 [not null]
+  Status nvarchar(50) [not null]
+  TournamentName nvarchar(150) [not null]
+  indexes {
+    (CreatedBy) [name: 'IX_Tournaments_CreatedBy']
+    (GameId) [name: 'IX_Tournaments_GameId']
+  }
+}
+Table dbo.WalletTransactions {
+  TransactionId int [not null, pk, increment]
+  Amount decimal(12,2) [not null]
+  BalanceAfter decimal(12,2) [not null]
+  CreatedAt datetime2 [not null]
+  CustomerId int [not null]
+  Description nvarchar(255) [null]
+  Type nvarchar(50) [not null]
+  indexes {
+    (CustomerId) [name: 'IX_WalletTransactions_CustomerId']
+  }
+}
+Ref: dbo.AuditLogs.(EmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.ComputerMaintenance.(ComputerId) > dbo.Computers.(ComputerId)
+Ref: dbo.ComputerMaintenance.(EmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.Computers.(RoomId) > dbo.ComputerRooms.(RoomId)
+Ref: dbo.Computers.(ComputerTypeId) > dbo.ComputerTypes.(ComputerTypeId)
+Ref: dbo.CustomerStatusHistory.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.CustomerStatusHistory.(ChangedBy) > dbo.Employees.(EmployeeId)
+Ref: dbo.Employees.(RoleId) > dbo.Roles.(RoleId)
+Ref: dbo.GameRanks.(GameId) > dbo.Games.(GameId)
+Ref: dbo.GamingSessions.(ComputerId) > dbo.Computers.(ComputerId)
+Ref: dbo.GamingSessions.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.InventoryTransactions.(EmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.InventoryTransactions.(OrderId) > dbo.Orders.(OrderId)
+Ref: dbo.InventoryTransactions.(ProductId) > dbo.Products.(ProductId)
+Ref: dbo.InventoryTransactions.(ReceiptId) > dbo.StockReceipts.(ReceiptId)
+Ref: dbo.InvoiceDetails.(InvoiceId) > dbo.Invoices.(InvoiceId)
+Ref: dbo.InvoiceOrders.(InvoiceId) > dbo.Invoices.(InvoiceId)
+Ref: dbo.InvoiceOrders.(OrderId) > dbo.Orders.(OrderId)
+Ref: dbo.Invoices.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.Invoices.(EmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.Invoices.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
+Ref: dbo.Invoices.(PromotionId) > dbo.Promotions.(PromotionId)
+Ref: dbo.OrderDetails.(OrderId) > dbo.Orders.(OrderId)
+Ref: dbo.OrderDetails.(ProductId) > dbo.Products.(ProductId)
+Ref: dbo.Orders.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.Orders.(EmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.Orders.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
+Ref: dbo.OrderStatusHistory.(ChangedBy) > dbo.Employees.(EmployeeId)
+Ref: dbo.OrderStatusHistory.(OrderId) > dbo.Orders.(OrderId)
+Ref: dbo.Payments.(InvoiceId) > dbo.Invoices.(InvoiceId)
+Ref: dbo.Payments.(WalletTransactionId) > dbo.WalletTransactions.(TransactionId)
+Ref: dbo.Products.(CategoryId) > dbo.Categories.(CategoryId)
+Ref: dbo.RolePermissions.(PermissionId) > dbo.Permissions.(PermissionId)
+Ref: dbo.RolePermissions.(RoleId) > dbo.Roles.(RoleId)
+Ref: dbo.SessionCharges.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
+Ref: dbo.Shifts.(EmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.StockReceiptDetails.(ProductId) > dbo.Products.(ProductId)
+Ref: dbo.StockReceiptDetails.(ReceiptId) > dbo.StockReceipts.(ReceiptId)
+Ref: dbo.StockReceipts.(EmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.StockReceipts.(SupplierId) > dbo.Suppliers.(SupplierId)
+Ref: dbo.TeamMembers.(TeamId) > dbo.Teams.(TeamId)
+Ref: dbo.TeamMembers.(RegistrationId) > dbo.TournamentRegistrations.(RegistrationId)
+Ref: dbo.Teams.(TournamentId) > dbo.Tournaments.(TournamentId)
+Ref: dbo.TournamentRegistrations.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.TournamentRegistrations.(RankId) > dbo.GameRanks.(RankId)
+Ref: dbo.TournamentRegistrations.(TournamentId) > dbo.Tournaments.(TournamentId)
+Ref: dbo.Tournaments.(CreatedBy) > dbo.Employees.(EmployeeId)
+Ref: dbo.Tournaments.(GameId) > dbo.Games.(GameId)
+Ref: dbo.WalletTransactions.(CustomerId) > dbo.Customers.(CustomerId)
