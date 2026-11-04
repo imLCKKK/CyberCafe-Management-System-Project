@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using CyberManagement.API;
 using CyberManagement.API.Controller;
+using CyberManagement.API.Realtime;
 using CyberManagement.Application;
 using CyberManagement.Application.DTOs.Identity;
 using CyberManagement.Application.Interfaces.Repositories;
@@ -19,6 +20,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+
+if (args.Contains("--realtime-host", StringComparer.Ordinal))
+{
+    await RealtimeIntegrationHost.RunAsync();
+    return;
+}
 
 var databaseFixture = new AuthCheckDatabase(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"));
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -37,11 +44,17 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     ["SeedAccounts:Waiter:Password"] = "Waiter-check-password-2026!",
     ["SeedAccounts:Technician:Password"] = "Technician-check-password-2026!"
 });
-builder.Services.AddDbContext<ApplicationDbContext>(databaseFixture.Configure);
+var realtimeSaveFailure = new RealtimeSaveFailure();
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+{
+    databaseFixture.Configure(options);
+    options.AddInterceptors(realtimeSaveFailure);
+});
 builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
+builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
 builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
 builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
 builder.Services
@@ -98,6 +111,7 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
+    app.MapHub<RealtimeHub>(RealtimeHub.Endpoint, options => options.CloseOnAuthenticationExpiration = true);
     await app.StartAsync();
     started = true;
     client = app.GetTestClient();
@@ -165,6 +179,11 @@ try
     await CheckStatus("Customer logout succeeds", HttpStatusCode.NoContent,
         await SendWithToken(HttpMethod.Post, "/api/auth/customer/logout", customer.AccessToken));
 
+    var staffTokens = new Dictionary<string, string>
+    {
+        ["Admin"] = admin.AccessToken,
+        ["Waiter"] = waiter.AccessToken
+    };
     foreach (var account in new[]
     {
         (Username: "manager01", Password: "Manager-check-password-2026!", Role: "Manager"),
@@ -175,11 +194,15 @@ try
         var login = await CheckLogin($"{account.Role} login succeeds", account.Username, account.Password);
         if (login.Employee.Role != account.Role)
             throw new InvalidOperationException("Login returned the wrong employee role.");
+        staffTokens[account.Role] = login.AccessToken;
         await CheckStatus($"{account.Role} can read own identity", HttpStatusCode.OK,
             await SendWithToken(HttpMethod.Get, "/api/auth/me", login.AccessToken));
         await CheckStatus($"{account.Role} cannot manage roles", HttpStatusCode.Forbidden,
             await SendWithToken(HttpMethod.Get, "/api/admin/roles", login.AccessToken));
     }
+
+    checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
+    checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
 
     await CheckStatus("Expired token is rejected", HttpStatusCode.Unauthorized,
         await SendWithToken(HttpMethod.Get, "/api/auth/me",

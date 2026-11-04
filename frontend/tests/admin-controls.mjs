@@ -1,35 +1,15 @@
 import assert from 'node:assert/strict';
-import { cdp, evaluate, until, errors, socket, go, click, input, press } from './cdp.mjs';
+import { cdp, evaluate, until, errors, socket, go, click, input } from './cdp.mjs';
 try {
   await cdp('Runtime.enable'); await cdp('Page.enable');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 900, deviceScaleFactor: 1, mobile: false });
-  await go('/admin/computers'); await evaluate('localStorage.clear()'); await go('/admin/computers');
-  await click('Thêm máy tính');
-  await input('dialog input[name=ComputerName]', 'PC-RETEST');
-  await click('Thêm máy', 'dialog button');
-  await until("!document.querySelector('dialog[open]')");
-  await input('[aria-label="Tìm kiếm tên máy"]', 'PC-RETEST');
-  await until("document.querySelectorAll('.cafe-station').length === 1");
-  await evaluate("document.querySelector('.cafe-station').click()");
-  await until("Boolean(document.querySelector('dialog[open] .cafe-computer-detail'))");
-  await click('Chuyển bảo trì', 'dialog button');
-  await until("!document.querySelector('dialog[open]')");
   await go('/admin/computers');
-  await input('[aria-label="Tìm kiếm tên máy"]', 'PC-RETEST');
-  await until("document.querySelector('.cafe-station')?.classList.contains('maintenance')");
-  await evaluate("document.querySelector('[aria-label=\"Dạng bảng\"]').click()");
-  await click('Chi tiết', 'tbody button');
-  await until("Boolean(document.querySelector('dialog[open] .cafe-computer-detail'))");
-  await click('Hoàn tất bảo trì', 'dialog button');
-  await until("!document.querySelector('dialog[open]')");
-  await click('Thêm máy tính'); await input('dialog input[name=ComputerName]', 'pc-retest');
-  await click('Thêm máy', 'dialog button');
-  await until("document.querySelector('dialog [role=alert]')?.textContent.includes('đã tồn tại')");
-  await press('Escape');
-  await input('[aria-label="Tìm kiếm tên máy"]', 'no-result');
-  await until("Boolean(document.querySelector('.cafe-empty'))");
-  await click('Đặt lại bộ lọc');
-  await until("document.querySelectorAll('tbody tr').length === 51");
+  await evaluate("sessionStorage.removeItem('nexora.staff.accessToken')");
+  await go('/admin/computers');
+  await until("document.body.innerText.includes('Vui lòng đăng nhập nhân viên')");
+  assert.equal(await evaluate("document.querySelectorAll('.cafe-station').length"), 0);
+  assert.equal(await evaluate("Boolean(document.querySelector('dialog input[name=ComputerName]'))"), false);
+  // API-backed computer interactions are covered by the computers-api suite.
   // Search/reset, sorting and pagination use the actual shared table component.
   for (const route of ['customers', 'products', 'inventory', 'orders', 'invoices', 'staff', 'tournaments']) {
     await go(`/admin/${route}`);
@@ -60,5 +40,5 @@ try {
   assert.equal(await evaluate("Boolean(document.querySelector('.admin-chart'))"), false);
   await click('7 ngày'); await until("Boolean(document.querySelector('.admin-chart'))");
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ passed: true, checks: ['computer create/maintenance/persistence/list view/duplicate/empty reset', 'seven admin module search/reset/sort/pagination', 'invalid report range and recovery', 'mobile controls'] }));
+  console.log(JSON.stringify({ passed: true, checks: ['computers require staff login without demo fallback', 'seven admin module search/reset/sort/pagination', 'invalid report range and recovery', 'mobile controls'] }));
 } finally { socket.close(); }

@@ -26,6 +26,7 @@ public static class DependencyInjection
                 b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
+        services.AddScoped<IComputerRepository, ComputerRepository>();
         services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
         services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
 

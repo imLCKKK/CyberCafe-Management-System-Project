@@ -51,7 +51,7 @@ export function StatCard({
 export function StatusBadge({ status, foodAlert = false }) {
   return (
     <span className={`cafe-badge ${foodAlert ? "food" : status.toLowerCase()}`}>
-      {foodAlert ? "Gọi món" : statusLabels[status]}
+      {foodAlert ? "Gọi món" : Object.hasOwn(statusLabels, status) ? statusLabels[status] : status}
     </span>
   );
 }
@@ -61,7 +61,7 @@ export function Station({ computer, foodAlert, onClick, type, room }) {
       type="button"
       className={`cafe-station ${computer.Status.toLowerCase()} ${foodAlert ? "has-food" : ""}`}
       onClick={onClick}
-      aria-label={`${computer.ComputerName}, ${statusLabels[computer.Status]}${foodAlert ? ", có yêu cầu gọi món" : ""}`}
+      aria-label={`${computer.ComputerName}, ${Object.hasOwn(statusLabels, computer.Status) ? statusLabels[computer.Status] : computer.Status}${foodAlert ? ", có yêu cầu gọi món" : ""}`}
     >
       <div className="cafe-station-top">
         <span>{type}</span>
