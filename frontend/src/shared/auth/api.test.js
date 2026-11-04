@@ -4,9 +4,11 @@ import {
   AUTH_EXPIRED_EVENT,
   apiRequest,
   clearStoredSession,
+  clearVerifiedSession,
   getCurrentPrincipal,
   loginCustomer,
   loginEmployee,
+  markSessionVerified,
   readStoredSession,
   storeSession,
 } from './api.js';
@@ -21,6 +23,7 @@ let dispatchedEvent;
 beforeEach(() => {
   storage.clear();
   dispatchedEvent = null;
+  clearVerifiedSession();
   globalThis.localStorage = {
     getItem: (key) => storage.get(key) ?? null,
     setItem: (key, value) => storage.set(key, value),
@@ -88,8 +91,38 @@ test('clearStoredSession xóa access token đã lưu', () => {
   assert.equal(readStoredSession(), null);
 });
 
+test('API client không gửi token mới trước khi phiên được xác minh', async () => {
+  const waiterSession = { accessToken: 'waiter-token', accountType: 'employee' };
+  storeSession(waiterSession);
+  assert.equal(markSessionVerified(waiterSession), true);
+  storeSession({ accessToken: 'customer-token', accountType: 'customer' });
+  let requestCount = 0;
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    return Response.json({ ok: true });
+  };
+
+  await assert.rejects(apiRequest('/orders'), { code: 'AUTH_SESSION_UNVERIFIED' });
+  assert.equal(requestCount, 0);
+});
+
+test('phản hồi muộn của token cũ không xóa phiên mới hơn', async () => {
+  const oldSession = { accessToken: 'waiter-token', accountType: 'employee' };
+  storeSession(oldSession);
+  globalThis.fetch = async () => {
+    storeSession({ accessToken: 'customer-token', accountType: 'customer' });
+    return Response.json({ message: 'Expired.' }, { status: 401 });
+  };
+
+  await assert.rejects(getCurrentPrincipal('employee', oldSession), { status: 401 });
+  assert.equal(readStoredSession().accessToken, 'customer-token');
+  assert.equal(dispatchedEvent, null);
+});
+
 test('request API dùng chung tự gắn bearer token đã lưu', async () => {
-  storeSession({ accessToken: 'staff-token', accountType: 'employee' });
+  const session = { accessToken: 'staff-token', accountType: 'employee' };
+  storeSession(session);
+  assert.equal(markSessionVerified(session), true);
   globalThis.fetch = async (url, options) => {
     lastRequest = { url, options };
     return Response.json({ ok: true });

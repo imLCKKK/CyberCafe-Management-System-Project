@@ -47,6 +47,7 @@ const adminPage=(title,owner)=><div className="page"><div className="placeholder
 function AuthArea({ accountType, children }) {
   const { principal, loading } = useAuth();
   if (loading) return <div className="auth-loading" aria-label="Đang kiểm tra phiên"/>;
+  if (!principal) return <Navigate to={accountType === 'customer' ? '/client/auth' : '/admin/auth'} replace/>;
   if (principal && principal.type !== accountType) return <Navigate to={getPrincipalDestination(principal)} replace/>;
   return children;
 }
@@ -56,7 +57,7 @@ function PermissionRoute({ permission, children }) {
   if (loading) return <div className="auth-loading" aria-label="Đang kiểm tra phiên"/>;
   if (principal?.type === 'employee' && permission) {
     const required = Array.isArray(permission) ? permission : [permission];
-    if (!required.some((item) => principal.permissions.includes(item))) return <Navigate to="/admin/dashboard" replace/>;
+    if (!required.some((item) => principal.permissions.includes(item))) return <Navigate to={getPrincipalDestination(principal)} replace/>;
   }
   return children;
 }

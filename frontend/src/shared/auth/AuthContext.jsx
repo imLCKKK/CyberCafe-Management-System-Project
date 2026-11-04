@@ -1,12 +1,15 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AUTH_EXPIRED_EVENT,
   AUTH_STORAGE_KEY,
-  clearStoredSession,
+  clearStoredSessionIfMatches,
+  clearVerifiedSession,
   getCurrentPrincipal,
+  isSessionVerified,
   loginCustomer,
   loginEmployee,
+  markSessionVerified,
   logout as logoutRequest,
   readStoredSession,
   storeSession,
@@ -42,47 +45,79 @@ export function AuthProvider({ children }) {
   const [principal, setPrincipal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expiresAtUtc, setExpiresAtUtc] = useState(null);
+  const verificationVersion = useRef(0);
+
+  function isStoredSession(session) {
+    const stored = readStoredSession();
+    return stored?.accessToken === session?.accessToken && stored?.accountType === session?.accountType;
+  }
+
+  async function verifySession(session, { redirectOnFailure = true, throwOnFailure = false } = {}) {
+    const version = ++verificationVersion.current;
+    clearVerifiedSession();
+    setPrincipal(null);
+    setExpiresAtUtc(null);
+    setLoading(true);
+    try {
+      const identity = await getCurrentPrincipal(session.accountType, session);
+      if (version !== verificationVersion.current || !isStoredSession(session)) return null;
+      if (!markSessionVerified(session)) return null;
+      const current = identityType(session.accountType, identity);
+      setPrincipal(current);
+      setExpiresAtUtc(session.expiresAtUtc || null);
+      return current;
+    } catch (error) {
+      if (version !== verificationVersion.current) return null;
+      clearStoredSessionIfMatches(session);
+      clearVerifiedSession(session);
+      setPrincipal(null);
+      setExpiresAtUtc(null);
+      if (throwOnFailure) throw error;
+      if (redirectOnFailure) {
+        navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
+          replace: true,
+          state: { sessionExpired: true },
+        });
+      }
+      return null;
+    } finally {
+      if (version === verificationVersion.current && (!readStoredSession() || isStoredSession(session))) {
+        setLoading(false);
+      }
+    }
+  }
 
   useEffect(() => {
-    let active = true;
     const session = readStoredSession();
     if (!session) {
+      clearVerifiedSession();
       setLoading(false);
-      return () => { active = false; };
+      return undefined;
     }
     if (session.expiresAtUtc && new Date(session.expiresAtUtc).getTime() <= Date.now()) {
-      clearStoredSession();
-      setLoading(false);
-      navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
-        replace: true,
-        state: { sessionExpired: true },
-      });
-      return () => { active = false; };
+      if (clearStoredSessionIfMatches(session)) {
+        clearVerifiedSession(session);
+        setLoading(false);
+        navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
+          replace: true,
+          state: { sessionExpired: true },
+        });
+      }
+      return undefined;
     }
 
-    getCurrentPrincipal(session.accountType)
-      .then((identity) => {
-        if (active) {
-          setPrincipal(identityType(session.accountType, identity));
-          setExpiresAtUtc(session.expiresAtUtc || null);
-        }
-      })
-      .catch(() => {
-        clearStoredSession();
-        if (active) {
-          setPrincipal(null);
-          setExpiresAtUtc(null);
-        }
-      })
-      .finally(() => { if (active) setLoading(false); });
-
-    return () => { active = false; };
+    void verifySession(session);
+    return () => { verificationVersion.current += 1; };
   }, []);
 
   useEffect(() => {
     const onExpired = (event) => {
       const expiredType = principal?.type || event.detail?.accountType || readStoredSession()?.accountType;
+      verificationVersion.current += 1;
+      clearVerifiedSession();
       setPrincipal(null);
+      setExpiresAtUtc(null);
+      setLoading(false);
       if (expiredType) navigate(expiredType === 'customer' ? '/client/auth' : '/admin/auth', {
         replace: true,
         state: { sessionExpired: true },
@@ -94,22 +129,30 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!expiresAtUtc) return undefined;
+    const session = readStoredSession();
+    if (!isSessionVerified(session)) return undefined;
     const delay = new Date(expiresAtUtc).getTime() - Date.now();
     if (delay <= 0) {
-      const session = readStoredSession();
-      clearStoredSession();
+      if (!clearStoredSessionIfMatches(session)) return undefined;
+      verificationVersion.current += 1;
+      clearVerifiedSession(session);
       setPrincipal(null);
-      navigate(session?.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
+      setExpiresAtUtc(null);
+      setLoading(false);
+      navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
         replace: true,
         state: { sessionExpired: true },
       });
       return undefined;
     }
     const timer = window.setTimeout(() => {
-      const session = readStoredSession();
-      clearStoredSession();
+      if (!clearStoredSessionIfMatches(session)) return;
+      verificationVersion.current += 1;
+      clearVerifiedSession(session);
       setPrincipal(null);
-      navigate(session?.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
+      setExpiresAtUtc(null);
+      setLoading(false);
+      navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
         replace: true,
         state: { sessionExpired: true },
       });
@@ -119,10 +162,25 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const onStorage = (event) => {
-      if (event.key !== AUTH_STORAGE_KEY || event.newValue) return;
-      const accountType = principal?.type;
+      if (event.key !== AUTH_STORAGE_KEY) return;
+      const session = readStoredSession();
+      if (session && isSessionVerified(session)) return;
+      if (session) {
+        void verifySession(session);
+        return;
+      }
+      verificationVersion.current += 1;
+      clearVerifiedSession();
+      let oldAccountType;
+      try {
+        oldAccountType = JSON.parse(event.oldValue || 'null')?.accountType;
+      } catch {
+        oldAccountType = null;
+      }
+      const accountType = principal?.type || oldAccountType;
       setPrincipal(null);
       setExpiresAtUtc(null);
+      setLoading(false);
       if (accountType) navigate(accountType === 'customer' ? '/client/auth' : '/admin/auth', { replace: true });
     };
     window.addEventListener('storage', onStorage);
@@ -135,30 +193,27 @@ export function AuthProvider({ children }) {
       : await loginEmployee(credentials);
     const session = { accessToken: result.accessToken, accountType, expiresAtUtc: result.expiresAtUtc };
     storeSession(session);
-    setExpiresAtUtc(result.expiresAtUtc || null);
-    try {
-      const identity = await getCurrentPrincipal(accountType);
-      const current = identityType(accountType, identity);
-      setPrincipal(current);
-      return current;
-    } catch (error) {
-      clearStoredSession();
-      setExpiresAtUtc(null);
-      throw error;
-    }
+    const current = await verifySession(session, { redirectOnFailure: false, throwOnFailure: true });
+    if (!current) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.');
+    return current;
   }
 
   async function signOut() {
     const session = readStoredSession();
+    if (!session || !isSessionVerified(session) || principal?.type !== session.accountType) return;
     try {
       if (session) await logoutRequest(session.accountType);
     } catch {
       // The local JWT must be removed even when the API is unavailable.
     } finally {
-      clearStoredSession();
-      setPrincipal(null);
-      setExpiresAtUtc(null);
-      navigate(session?.accountType === 'customer' ? '/client/auth' : '/admin/auth', { replace: true });
+      if (session && clearStoredSessionIfMatches(session)) {
+        verificationVersion.current += 1;
+        clearVerifiedSession(session);
+        setPrincipal(null);
+        setExpiresAtUtc(null);
+        setLoading(false);
+        navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', { replace: true });
+      }
     }
   }
 

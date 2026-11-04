@@ -7,12 +7,20 @@ const client = ['home', 'ordering', 'wallet', 'invoices', 'account', 'tournament
 const results = [];
 try {
   await cdp('Runtime.enable'); await cdp('Page.enable');
-  await go('/client/home');
-  await evaluate('localStorage.clear()');
+  await go('/admin/auth', 'document.querySelector(".auth-form")');
+  await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    window.fetch = async url => {
+      const path = new URL(url, location.href).pathname;
+      if (path === '/api/auth/me') return Response.json({ employeeId: 4, username: 'test-admin', role: 'Admin', permissions: ['order.view', 'computer.view', 'customer.view', 'product.view', 'stockreceipt.view', 'invoice.view', 'tournament.view', 'employee.view', 'report.view', 'promotion.manage'] });
+      if (path === '/api/auth/customer/me') return Response.json({ customerId: 7, phone: '0900000007', fullName: 'Test customer' });
+      return Response.json({ message: 'Unexpected request.' }, { status: 500 });
+    };
+  })()` });
   for (const width of [1440, 1024, 768, 390, 320]) {
     await cdp('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     for (const [area, routes] of [['admin', admin], ['client', client]]) {
       for (const route of routes) {
+        await evaluate(`localStorage.setItem("cybermanagement.auth.v1", JSON.stringify({ accessToken: "${area}-browser-test-token", accountType: "${area === 'admin' ? 'employee' : 'customer'}" }))`);
         await go(`/${area}/${route}`);
         const result = await evaluate(`({ route: location.pathname, width: innerWidth, scrollWidth: document.documentElement.scrollWidth, heading: document.querySelector('.cafe-heading h1, .home-heading h1, .tour-heading h1')?.textContent, activeLinks: document.querySelectorAll('nav a[aria-current="page"]').length, invalid: /NaN|Invalid Date|CHƯA TRIỂN KHAI/.test(document.body.innerText), brokenImages: [...document.images].filter(img => img.complete && !img.naturalWidth).map(img => img.src), unnamedButtons: [...document.querySelectorAll('button')].filter(el => !el.textContent.trim() && !el.getAttribute('aria-label') && !el.getAttribute('title')).length })`);
         results.push(result);
@@ -27,8 +35,11 @@ try {
     }
   }
   for (const [route, target] of [['/', '/client/home'], ['/admin', '/admin/dashboard'], ['/client', '/client/home'], ['/unknown', '/client/home']]) {
+    const accountType = route === '/admin' ? 'employee' : 'customer';
+    await evaluate(`localStorage.setItem("cybermanagement.auth.v1", JSON.stringify({ accessToken: "${accountType}-browser-test-token", accountType: "${accountType}" }))`);
     await go(route); await until(`location.pathname === ${JSON.stringify(target)}`);
   }
+  await evaluate('localStorage.clear()');
   for (const [route, heading] of [['/admin/auth', 'Đăng nhập nhân viên'], ['/client/auth', 'Đăng nhập tài khoản']]) {
     await go(route, 'document.querySelector(".auth-form")');
     assert.equal(await evaluate('document.querySelector(".auth-heading h1")?.textContent'), heading, `Auth page: ${route}`);
@@ -71,8 +82,16 @@ try {
   await until('location.pathname === "/admin/orders"');
   assert.equal(await evaluate('document.querySelectorAll(".nav-item").length'), 2, 'Only dashboard and permitted order navigation are shown');
   await evaluate('history.pushState({}, "", "/admin/customers"); dispatchEvent(new PopStateEvent("popstate"))');
-  await until('location.pathname === "/admin/dashboard"');
-  assert.equal(await evaluate('location.pathname'), '/admin/dashboard', 'A route without permission returns to dashboard');
+  await until('location.pathname === "/admin/orders"');
+  assert.equal(await evaluate('location.pathname'), '/admin/orders', 'A route without permission returns to an accessible page');
+  await evaluate('history.pushState({}, "", "/admin/reports"); dispatchEvent(new PopStateEvent("popstate"))');
+  await until('location.pathname === "/admin/orders"');
+  await evaluate('history.pushState({}, "", "/admin/dashboard"); dispatchEvent(new PopStateEvent("popstate"))');
+  await until('Boolean(document.querySelector(".cafe-page")) && location.pathname === "/admin/dashboard"');
+  const dashboardText = await evaluate('document.querySelector(".cafe-page").innerText');
+  assert.equal(dashboardText.includes('Doanh thu'), false, 'Dashboard revenue metrics are hidden without report.view');
+  assert.equal(dashboardText.includes('tiền mặt đơn món chờ thu'), false, 'Cash due is hidden without report.view');
+  assert.equal(await evaluate('[...document.querySelectorAll(".cafe-order-info small")].some(element => element.textContent.includes(" · "))'), false, 'Recent order totals are hidden without report.view');
   await evaluate('localStorage.clear()');
   await evaluate('localStorage.setItem("cybermanagement.auth.v1", JSON.stringify({ accessToken: "expired-token", accountType: "employee", expiresAtUtc: "2000-01-01T00:00:00.000Z" }))');
   await go('/admin/auth', 'document.querySelector(".auth-form")');
@@ -80,6 +99,7 @@ try {
   assert.match(await evaluate('document.querySelector(".auth-notice").textContent'), /hết hạn/i, 'Expired stored session is reported');
   await evaluate('localStorage.clear()');
   await go('/client/auth', 'document.querySelector(".auth-form")');
+  await evaluate('localStorage.setItem("cybermanagement.auth.v1", JSON.stringify({ accessToken: "employee-browser-test-token", accountType: "employee" }))');
   await go('/admin/promotions', 'document.querySelector(".placeholder")');
   assert.ok(await evaluate("document.body.innerText.includes('CHƯA TRIỂN KHAI')"), 'Promotion placeholder remains documented');
   assert.deepEqual(errors, []);
