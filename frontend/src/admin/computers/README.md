@@ -44,3 +44,25 @@ npm.cmd --prefix frontend run test:frontend -- computers-api auth-area
 Kiểm chứng tích hợp ngày 05/11/2026 trên SCRUM-7 `c0aae97` + dev `e14a362` + bản sửa chưa commit: build production, 21 kiểm tra auth/API client/proxy, ba script render và browser suites `computers-api`, `auth-area` đạt. Browser xác minh cả hết phiên từ GET/PATCH, `/me`, timer và reload; thông báo hết phiên không bị route guard ghi đè. Dùng dependency đã có, không cài thêm package. Backend/schema không đổi; chưa chạy UI–API–SQL thật và không coi 138 checks SQL Server của lần trước là kết quả chạy mới.
 
 Các lượt đầu gặp Chrome bị ngắt trong sandbox, giả định login cũ trong test và request lặp/hủy ở StrictMode; đã xử lý test và chạy lại ngoài sandbox. Test cũng phát hiện mất thông báo hết phiên do cập nhật principal và điều hướng khác lượt render; AuthContext đã sửa và các ca hết phiên chạy lại đạt. Cache Vite cho browser được tách khỏi render/proxy tests. Render Home/Tournaments còn cảnh báo SSR useLayoutEffect đã có từ trước.
+
+## Kiểm chứng UI–API–SQL thật (06/11/2026)
+
+Từ repository root, với .NET 10, Node.js 22+, dependency hiện có và Chrome/Edge:
+
+```powershell
+dotnet restore Backend/tests/CyberManagement.API.Checks
+# Dùng SQL Server thử mà tài khoản có quyền tạo/xóa DB; không ghi credential vào repo.
+$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Database=master;Integrated Security=True;TrustServerCertificate=True;Encrypt=True'
+node frontend/tests/run-computers-live.mjs
+```
+
+Runner build test host, tạo DB `CyberManagement_AuthChecks_<guid>` riêng qua fixture hiện có, áp 4 migration/35 bảng nghiệp vụ, seed tài khoản và một máy. API dùng Kestrel, JWT, service và repository thật. Runner đặt proxy Vite trỏ đúng host và tự dọn DB sau khi test thành công hoặc thất bại; không migrate/seed DB được ghi trong connection string. Có thể đặt `DOTNET_EXE`/`CHROME_PATH` nếu công cụ không nằm trong đường dẫn chuẩn. Không đưa suite này vào bộ fixture mặc định; thiếu cấu hình SQL thì dừng, không fallback InMemory.
+
+Hai luồng đã chạy đạt, exit 0:
+
+- Admin đăng nhập bằng form → GET máy/phòng/loại → bấm đổi `Available` sang `Maintenance` → PATCH 200 → đọc SQL độc lập → reload xác minh `/auth/me`/GET mới và UI vẫn bảo trì.
+- Waiter đăng nhập bằng form → có `computer.view`, thiếu `computer.status.update`, không có nút sửa → cố tình gửi PATCH hợp lệ qua API client → 403 → toàn bộ cột của các bản ghi Computers trong SQL không đổi → reload vẫn bảo trì.
+
+Không chặn request bằng CDP Fetch hoặc thay `window.fetch`; tài khoản chỉ seed vào DB thử, JWT nhận qua login thật. Endpoint đọc SQL kiểm chứng nằm riêng trong test assembly, yêu cầu Admin, dùng DbContext mới và raw SQL; API production không có endpoint này. Bằng chứng browser gồm log và ảnh `computers-live-admin-reload.png`, `computers-live-readonly-denied.png` trong `.tools/frontend-retest/<lượt chạy>/`; không lưu token/password vào artifacts.
+
+Hồi quy cùng ngày: 138 HTTP/persistence checks SQL Server đạt và DB thử đã dọn. Các lượt đầu sửa import test host và cú pháp selector; lượt cuối đạt cả hai luồng. Build backend có 4 cảnh báo NU1900 do không tải được dữ liệu vulnerability NuGet. Kiểm chứng chỉ bao phủ máy trên một browser/API/SQL local; chưa chứng minh phiên/thu tiền hoặc SignalR hai máy LAN.

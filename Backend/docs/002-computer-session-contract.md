@@ -2,14 +2,14 @@
 
 Ngày soạn: 03/11/2026. Task tham chiếu: `S1-P-1 — Implement-Computer-Queries-Session-Rules` trong [backlog](../../codex/SPRINT_TASKS.md). Nền đối chiếu: nhánh `dev`, commit `a975f8d`, CyberManagement/SQL Server 35 bảng.
 
-**Trạng thái:** người dùng đã cho phép bước 1 (soạn contract), bước 2 (backend), `APPROVE SQL CHECK`, bước 3 (frontend) và cài dependency bằng npm ci theo lockfile hiện có. API máy đã được kiểm chứng trên SQL Server thử riêng; frontend đã qua build, render, proxy và browser test với HTTP fixtures. Người dùng chọn giữ login cho `S1-D-2`, nên chưa nghiệm thu luồng người dùng UI–API–SQL thật. Các quy tắc phiên/tiền vẫn chờ Minh/Trường xác nhận nguồn tiền/chứng từ. Không thay schema hoặc triển khai thu tiền; kiểm thử SQL chỉ áp migration hiện có vào DB thử rồi dọn đúng DB đó.
+**Trạng thái cập nhật 06/11/2026:** login `S1-D-2` đã tích hợp ở `903e055`. Đã kiểm chứng Chrome → API thật → SQL Server: login, đọc máy/phòng/loại, đổi trạng thái, reload giữ dữ liệu; tài khoản chỉ xem gọi PATCH trả 403 và truy vấn SQL độc lập xác nhận bản ghi không đổi. Bộ hồi quy có 138 checks SQL đạt. Trưởng nhóm điều phối và chốt phương án tiền giờ/chứng từ; không chờ từng owner xác nhận mới bàn giao code SCRUM-7. Các điểm giao nhau cụ thể được ghi ở mục 5; chưa coi phương án S2 là đã triển khai hoặc nghiệm thu. Không đổi schema/thu tiền; test chỉ áp 4 migration hiện có lên DB thử ngẫu nhiên gồm 35 bảng nghiệp vụ và tự dọn đúng DB đó.
 
 ## 1. Phạm vi và nền hiện tại
 
 - SCRUM-7 chốt quy tắc, cung cấp danh sách máy/loại máy/phòng và lưu trạng thái máy qua API; nối riêng màn hình admin máy.
 - CRUD máy/loại máy, hồ sơ bảo trì, mở/đóng phiên và thu tiền thực tế thuộc `S2-P-1`; SignalR thuộc `S1-P-2`; hoàn thiện hết tiền/restart thuộc `S3-P-1`. Quy tắc các phần này được mô tả trước để các owner dùng cùng contract.
 - Entity hiện có: [Computer](../src/CyberManagement.Domain/Entities/Computer.cs), [ComputerType](../src/CyberManagement.Domain/Entities/ComputerType.cs), [GamingSession](../src/CyberManagement.Domain/Entities/GamingSession.cs), [SessionCharge](../src/CyberManagement.Domain/Entities/SessionCharge.cs), [WalletTransaction](../src/CyberManagement.Domain/Entities/WalletTransaction.cs), [Invoice](../src/CyberManagement.Domain/Entities/Invoice.cs), [Payment](../src/CyberManagement.Domain/Entities/Payment.cs).
-- Tại baseline trên chưa có API nghiệp vụ máy/phiên hoặc thao tác ví dùng chung. Bước 2 bổ sung API máy; bước 3 chuyển riêng admin máy từ localStorage sang API. Phiên/ví chưa triển khai; login frontend còn placeholder theo quyết định giữ `S1-D-2`. Không lấy số dư, khách hay phiên mẫu để ghép với ID máy SQL.
+- Tại baseline trên chưa có API nghiệp vụ máy/phiên hoặc thao tác ví dùng chung. Bước 2 bổ sung API máy; bước 3 chuyển riêng admin máy từ localStorage sang API. Login chung đã tích hợp từ `S1-D-2`; phiên/ví chưa triển khai trong nhánh này. Không lấy số dư, khách hay phiên mẫu để ghép với ID máy SQL.
 - Dùng `ComputerId`, `ComputerTypeId`, `RoomId`, `GamingSessionId`, `CustomerId`, `EmployeeId` kiểu `int` từ SQL. Quyền/JWT theo [contract identity](001-monorepo.md), không tạo principal hoặc quyền riêng.
 
 ## 2. Trạng thái và điều kiện chuyển
@@ -87,9 +87,19 @@ Khi đóng có thu bổ sung, khoản thu cuối, kết thúc phiên, trạng th
 
 Các thiếu hụt schema hiện đã xác minh: `GamingSession` chưa có snapshot giá/người mở/lý do đóng; `SessionCharge` chưa liên kết ledger hoặc có khóa chống lặp; `WalletTransaction` chưa có định danh nguồn/khóa nghiệp vụ; chưa có ràng buộc duy nhất phiên chưa đóng theo máy/khách hay hóa đơn tiền giờ theo phiên. **Chỉ ghi yêu cầu dữ liệu tại đây; tên cột, cơ chế khóa và migration cần đề xuất/duyệt riêng ở S2 cùng Minh/Trường.** SCRUM-7 không thay schema hoặc coi các bảo đảm tiền này đã được thực thi.
 
+### Đối chiếu SCRUM-12 ngày 06/11/2026
+
+Đã đối chiếu [contract kho/chứng từ](../../docs/contracts/inventory-invoice-voucher.md) tại `dev 95f33fc`. Trưởng nhóm điều phối/chốt chung; các yêu cầu xác nhận owner trong phương án ban đầu bên trên là đầu việc phối hợp S2, không phải điều kiện chặn bàn giao API/UI máy. Có ba điểm cụ thể cần thống nhất trước triển khai tiền/chứng từ:
+
+- **Payment từng lần thu:** bảng mục 5 hiện mô tả nguyên tử `SessionCharge`/ledger/ví và liên kết Payment khi kết thúc, chưa quy định tạo Payment mỗi lần thu. SCRUM-12 mục 6.2 yêu cầu debit/ledger/Payment Succeeded cùng transaction, có `SessionChargeId`, `WalletTransactionId` và `InvoiceId` nullable trước phát hành. Cần bổ sung Payment vào transaction mỗi khoản thu; khi đóng chỉ liên kết các khoản đã có, không tạo lại khoản thu hoặc debit lần hai.
+- **Actor tự đóng:** SCRUM-7 đề xuất người mở phiên làm actor; SCRUM-12 mục 6.3.1 yêu cầu `invoice.create` và `employeeId` từ principal đã xác thực, đồng thời đưa employeeId vào RequestHash. Worker tự đóng không có principal tương tác, và người mở có thể bị khóa/mất quyền. Cần chốt quyền/actor hệ thống và giữ cùng actor/operationKey qua retry, không giả ID nhân viên hoặc bỏ kiểm tra quyền.
+- **Phạm vi hóa đơn/đối soát:** SCRUM-7 đề xuất một hóa đơn tiền giờ theo phiên và đẳng thức tổng phí = tổng hóa đơn tiền giờ; SCRUM-12 mục 3.3/6.3.1 cho phép gộp món và phát hành bổ sung cho nguồn chưa lên hóa đơn. Nếu dùng hóa đơn gộp, phải đối soát riêng các dòng `SessionChargeId`, không so tổng phí với toàn bộ TotalAmount. Cần chốt một hóa đơn mỗi phiên hay nhiều lần phát hành theo nguồn trước thiết kế unique index/migration.
+
+SCRUM-12 mục 6.2.1 đã đề xuất thứ tự khóa `Customer → Computer → GamingSession → SessionCharge → ... → Payment → Invoice`. API đổi trạng thái hiện chỉ khóa máy và kiểm tra phiên/bảo trì, không ghi ví/chứng từ; chưa thấy xung đột trong luồng được kiểm chứng. Writer tiền S2 phải theo thứ tự chung này, không giữ Computer rồi quay lại khóa Customer. Đây là yêu cầu tích hợp tương lai, không phải bằng chứng writer ví đã được kiểm tra.
+
 ## 6. Contract API cho phần máy của SCRUM-7
 
-Các endpoint sau đã có backend ở bước 2, được kiểm chứng trên SQL Server thử riêng và có caller frontend ở bước 3. Luồng người dùng hoàn chỉnh vẫn phụ thuộc login. JSON dùng camelCase, danh sách trả mảng (rỗng là `[]`). Request chỉ sử dụng trạng thái đích/dự kiến; các trường giá, tiền, role, danh tính và thuộc tính máy khác không được dùng để ghi dữ liệu.
+Các endpoint sau đã có backend ở bước 2, được kiểm chứng trên SQL Server thử riêng và có caller frontend ở bước 3. Luồng login chung → UI → API → SQL đã được kiểm chứng ngày 06/11/2026. JSON dùng camelCase, danh sách trả mảng (rỗng là `[]`). Request chỉ sử dụng trạng thái đích/dự kiến; các trường giá, tiền, role, danh tính và thuộc tính máy khác không được dùng để ghi dữ liệu.
 
 | Endpoint | Permission | Response `200` |
 | --- | --- | --- |
@@ -128,7 +138,7 @@ Lỗi nghiệp vụ dùng ProblemDetails theo [ApiExceptionHandler](../src/Cyber
 - Danh sách, phòng, loại, giá và trạng thái trong trang máy đều đọc API. Loading/lỗi/empty có phân biệt; GET lỗi không fallback localStorage; PATCH đang chờ khóa thao tác trùng, chỉ báo lưu thành công sau response.
 - Bỏ hiển thị khách/phiên mẫu và cảnh báo đơn dựa trên ID demo trong trang máy SQL. Chi tiết phiên thật chỉ bổ sung khi có API `session.view`. Không thay nguồn dashboard/reports/Home trong SCRUM-7; giữ store demo cũ cho các màn hình chưa chuyển và không quảng bá chúng là đã đồng bộ SQL.
 - Tạo/sửa tên/phòng/loại máy chưa có API trong task này; UI phải thể hiện chưa hỗ trợ, không tiếp tục lưu localStorage rồi báo thành công trên trang SQL.
-- Login/API client dùng contract của `S1-D-2`. Frontend hiện chưa có luồng này; cần bàn giao từ task phụ thuộc hoặc duyệt mở rộng riêng, không dùng token hard-code/hộp nhập token làm luồng người dùng.
+- Login/API client dùng provider/client chung của `S1-D-2`; browser test thật thao tác form, nhận JWT từ API và xác minh `/auth/me`, không chèn token/identity giả vào UI.
 - Bước backend: kiểm tra quyền từng endpoint; dữ liệu đọc đúng SQL; trạng thái sai/không tìm thấy/phiên mâu thuẫn/bảo trì; hai request cạnh tranh; lưu rồi đọc bằng DbContext mới. Kiểm tra SQL trên DB thử được duyệt; InMemory không chứng minh transaction SQL.
 - Bước frontend: loading/empty/GET lỗi/PATCH lỗi; người chỉ xem không sửa được; lưu rồi reload lấy trạng thái SQL; không xuất hiện dữ liệu mẫu khi lỗi. Build frontend/backend và tự rà theo [REVIEW_GUIDE](../../codex/REVIEW_GUIDE.md).
 - S2/S3 cần kiểm tra công thức tại 0/dưới 1/1/60/120/180/3600 giây, snapshot giá, số dư sát ngưỡng, hết tiền, rollback, double click/retry, nhiều instance, debit khác tranh ví, crash trước/sau commit, restart qua thời điểm hết tiền và đóng lặp không nhân đôi chứng từ.
@@ -139,17 +149,20 @@ Lỗi nghiệp vụ dùng ProblemDetails theo [ApiExceptionHandler](../src/Cyber
 | --- | --- |
 | Soạn contract bước 1 | Đã được người dùng cho phép ngày 03/11/2026 |
 | Backend bước 2 | Đã được phép và triển khai API máy/loại/phòng, lưu trạng thái, DI/policy và kiểm thử; schema giữ nguyên |
-| Công thức, chu kỳ thu, giới hạn hết tiền, tính giờ lúc API dừng | Phương án ở mục 3–4; chờ Phúc/Minh/Trường đối chiếu và Trưởng nhóm duyệt nghiệp vụ |
-| Số dư khả dụng, quy ước ledger, transaction chung và khóa khách đang có phiên | Chờ Minh; các luồng chi ví khác cần cùng contract |
-| Chứng từ, actor tự đóng, doanh thu và yêu cầu migration | Chờ Trường phối hợp Minh/Phúc, Trưởng nhóm duyệt |
+| Công thức, chu kỳ thu, giới hạn hết tiền, tính giờ lúc API dừng | Phương án ở mục 3–4; Trưởng nhóm điều phối/chốt, owner phối hợp S2; không chặn bàn giao máy |
+| Số dư khả dụng, quy ước ledger, transaction chung và khóa khách đang có phiên | Phương án mục 3–5; Trưởng nhóm điều phối Minh/Phúc và các caller ví khi triển khai S2 |
+| Chứng từ, actor tự đóng, doanh thu và yêu cầu migration | Ba điểm giao nhau với SCRUM-12 ở mục 5 được bàn giao cho Trưởng nhóm chốt trước S2 |
 | Kiểm tra backend | Build solution đạt, 0 warning/error; 129 kiểm tra HTTP/persistence đạt trên InMemory và 138 đạt trên SQL Server (gồm auth và máy); 8 request đổi trạng thái đồng thời đều trả 200, không deadlock và trạng thái cuối đúng |
 | Fixture SQL đã được duyệt | Đã tạo DB riêng `CyberManagement_AuthChecks_a128bf9faa18483d932d62edc5bc4bf9`, áp 4 migration hiện có, xác nhận 35 bảng nghiệp vụ, chạy checks và xóa DB thử thành công; exit code 0 |
 | Giới hạn lần chạy SQL | Lần đầu lỗi hỗ trợ mã hóa trong sandbox trước khi tạo DB; chạy lại ngoài sandbox với cùng cấu hình kết nối đã pass. Kết quả cạnh tranh ở đây chỉ bao phủ đổi trạng thái, chưa kiểm chứng nghiệp vụ phiên/tiền hoặc fault injection giữa transaction |
 | Frontend bước 3 | Đã nối danh sách/phòng/loại và lưu trạng thái qua API, xử lý quyền/loading/lỗi/reload, bỏ ghép dữ liệu demo trong trang máy; build production đạt, 10 kiểm tra API client/proxy đạt |
 | Kiểm chứng giao diện | Ba script render đạt; browser suite computers-api và admin-controls đạt; routes đạt 80 lượt trên 5 kích thước, 4 redirect và 3 placeholder đã biết. Đã xem ảnh dialog máy ở 390/320px |
 | Dependency/môi trường frontend | npm ci cài 71 package theo lockfile, package.json/package-lock.json không đổi. Lần đầu npm bị EACCES và Chrome crash trong sandbox; chạy ngoài sandbox thành công. Lỗi selector/đồng bộ đóng dialog trong script test đã sửa, suite máy lần cuối đạt |
-| Giới hạn frontend | Browser dùng HTTP fixtures, chưa chạy luồng UI–API–SQL thật hoặc login thật; login giữ ở S1-D-2. Render còn cảnh báo SSR useLayoutEffect ở Home/Tournaments; ảnh 320px có scrollbar ngang do body min-width 320px hiện có. Không sửa các phần nền ngoài phạm vi |
+| Giới hạn frontend trước 06/11 | Các kết quả browser cũ dùng HTTP fixtures; không dùng chúng làm bằng chứng SQL. Render còn cảnh báo SSR useLayoutEffect ở Home/Tournaments; ảnh 320px có scrollbar ngang do body min-width 320px hiện có |
+| Kiểm chứng thật 06/11/2026 | `node frontend/tests/run-computers-live.mjs` đạt hai luồng Admin/Waiter với Chrome, Kestrel, JWT, repository và SQL thật; GET/PATCH/reload được theo dõi qua Network, SQL được đọc độc lập qua DbContext mới. Không có HTTP interception hoặc InMemory fallback. DB thử 35 bảng/4 migration đã dọn, exit 0 |
+| Hồi quy SQL 06/11/2026 | `dotnet run --project Backend/tests/CyberManagement.API.Checks --no-build --no-restore` với AUTH_CHECKS_SQL_CONNECTION: 138 checks đạt, DB thử đã dọn, exit 0 |
+| Lượt chạy ban đầu 06/11 | Checkout chưa có NuGet assets nên phải restore dependency hiện có; không đổi package. Đã sửa import test host và cú pháp selector của test mới rồi chạy lại đạt. Build có 4 cảnh báo NU1900 do không truy cập được nguồn dữ liệu vulnerability NuGet; không có lỗi biên dịch |
 | Hướng dẫn tích hợp | [Frontend máy và bàn giao login](../../frontend/src/admin/computers/README.md); lệnh checks/cấu hình SQL theo [Backend README](../README.md) |
-| Hai tiêu chí Done của SCRUM-7 | Chưa đánh dấu đạt; còn xác nhận liên module và bằng chứng tích hợp |
+| Bàn giao kỹ thuật SCRUM-7 | Có phương án contract và bằng chứng UI–API–SQL thật; sẵn sàng Trưởng nhóm review. Việc chốt phương án chung/Done do Trưởng nhóm quyết định, không yêu cầu đợi từng owner xác nhận mới bàn giao code |
 
 Kết quả bước 1 là tài liệu contract, không phải báo cáo xác nhận owner đã thống nhất hoặc task đã Done. Các xác nhận sau này phải ghi người, ngày và quyết định thực tế; AI không tự thay mặt Minh/Trường hoặc Trưởng nhóm.
