@@ -1,1 +1,6 @@
-import React from 'react'; export function AuthPage(){return <section className="page"><div className="placeholder"><h2>Client Auth</h2><p>Thành viên A làm tại client/auth.</p></div></section>}
+import React from 'react';
+import { LoginPage } from '../../shared/auth/LoginPage';
+
+export function AuthPage() {
+	return <LoginPage accountType="customer"/>;
+}

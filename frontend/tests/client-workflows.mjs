@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { cdp, evaluate, until, errors, socket, go, click, input, press, screenshot } from './cdp.mjs';
+import { cdp, evaluate, until, errors, socket, go, click, input, press, screenshot, setupWorkflowLogin } from './cdp.mjs';
 const key = 'tram.client.dbml.demo.v2';
 const db = () => evaluate(`JSON.parse(localStorage.getItem('${key}'))`);
 const close = async () => { await press('Escape'); await until("!document.querySelector('dialog[open]')"); };
 try {
   await cdp('Runtime.enable'); await cdp('Page.enable');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-  await go('/client/home'); await evaluate('localStorage.clear()'); await go('/client/home');
+  await setupWorkflowLogin('customer', { resetDemo: true });
   // Verify the Home -> cart handoff as well as ordinary wallet checkout.
   await evaluate("document.querySelector('[aria-label=\"Thêm Mì xào bò vào giỏ\"]').click()");
   await until("document.querySelector('.order-cart .client-count')?.textContent === '1'");
@@ -54,7 +54,7 @@ try {
   await input('input[autocomplete=name]', '   '); await click('Lưu thay đổi');
   await until("document.querySelector('[role=alert]')?.textContent.includes('Tên hiển thị')");
   await input('input[autocomplete=name]', 'Người chơi kiểm thử'); await click('Lưu thay đổi');
-  await until("document.querySelector('.client-user').textContent.includes('Người chơi kiểm thử')");
+  await until("document.querySelector('[role=status]')?.textContent.includes('Đã lưu tên hiển thị')");
   await input('input[autocomplete=current-password]', 'SaiMatKhau');
   await input('input[autocomplete=new-password]', 'Changed@2026');
   await input('.home-form-grid label:last-child input[autocomplete=new-password]', 'Changed@2026');
