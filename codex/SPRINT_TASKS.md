@@ -1,6 +1,6 @@
 # Backlog Jira — 55 Task, chủ yếu 2–3 Task/người/sprint
 
-Cập nhật 31/10/2026. Đã gom 100 việc nhỏ thành **53 Task Jira độc lập**, giữ tiêu chí trong checklist, cộng **2 Task UI giao Phúc theo yêu cầu mới**, tổng cộng **55 Task**. Mỗi thẻ có tên tiếng Anh nối bằng dấu gạch ngang (ví dụ `Build-Admin-Client-Login`), Description tiếng Việt, Dependencies và Done khi để copy lên Jira. Vòng quay vẫn thuộc Task của Khang, không tạo thẻ trùng. Checklist không phải Sub-task và không tạo thêm issue. Phạm vi theo [kế hoạch bàn giao](../planning/team-delivery-plan.md). VNPay trong ví dụ chỉ là mẫu trình bày; cổng của dự án vẫn là **ZaloPay sandbox chính thức**.
+Cập nhật nền backend/DB ngày 02/11/2026; giữ lịch và phân công ngày 31/10/2026. Đã gom 100 việc nhỏ thành **53 Task Jira độc lập**, giữ tiêu chí trong checklist, cộng **2 Task UI giao Phúc theo yêu cầu mới**, tổng cộng **55 Task**. Mỗi thẻ có tên tiếng Anh nối bằng dấu gạch ngang (ví dụ `Build-Admin-Client-Login`), Description tiếng Việt, Dependencies và Done khi để copy lên Jira. Vòng quay vẫn thuộc Task của Khang, không tạo thẻ trùng. Checklist không phải Sub-task và không tạo thêm issue. Phạm vi theo [kế hoạch bàn giao](../planning/team-delivery-plan.md). VNPay trong ví dụ chỉ là mẫu trình bày; cổng của dự án vẫn là **ZaloPay sandbox chính thức**.
 
 **Reviewer duy nhất: Trưởng nhóm**, người yêu cầu lập kế hoạch và trực tiếp duyệt thay đổi. Chưa có tên/account reviewer để ánh xạ Jira; không tự gán cho thành viên khác. Các tên trong “Phối hợp” hỗ trợ nghiệp vụ/tích hợp. Trước khi làm đọc [PROJECT_GUIDE.md](PROJECT_GUIDE.md); khi review dùng [REVIEW_GUIDE.md](REVIEW_GUIDE.md).
 
@@ -34,6 +34,18 @@ Các ngoại lệ 4 Task/người/sprint có lý do bàn giao cụ thể:
 
 Số thẻ không phải ước lượng thời gian. Gom thẻ giảm số lần nghiệm thu riêng, không tự giảm khối lượng code. Phúc vẫn phụ trách ML chia đội; đăng nhập vẫn thuộc Đại ở S1; Trưởng nhóm duyệt cuối.
 
+## Quyết định nền 35 bảng — 02/11/2026
+
+Trưởng nhóm chọn **CyberManagement, database SQL Server mới 35 bảng**. Dùng `Backend/CyberManagement.slnx`; API tại `Backend/src/CyberManagement.API`, entity tại Domain, use case/interface tại Application, DbContext/config tại `Infrastructure/Persistance`, migrations tại `Infrastructure/Migrations`. Giữ đúng chữ hoa `Backend` trong import/lệnh.
+
+Định danh đích: `Employees.EmployeeId` cho staff và `Customers.CustomerId` cho khách, kiểu int; không có bảng Account riêng. Mapping account/customer trong demo phải được chủ module đối chiếu với [hợp đồng auth](../Backend/docs/001-monorepo.md). Giữ transaction và rule nghiệp vụ trong các checklist bên dưới; có 35 entity không chứng minh API/voucher/ví/kho/ML đã hoàn thành.
+
+Giữ đủ 55 Task, tên, owner, sprint và checklist nghiệp vụ. Mỗi owner giữ trọn module xuyên các tầng. Không tạo Task mới cho từng bước sửa review; không tự đổi trạng thái Jira/Done. Những task đã tạo giữ key/lịch sử; cập nhật kỹ thuật cần thiết theo [hướng dẫn backend](../Backend/README.md).
+
+Đích là DB mới: bốn migration hiện có không phải đường nâng cấp tự động từ DB CyberCafe 19 bảng. Không sửa migration đã áp ở DB chung; không chạy reset/xóa DB cũ. Phần chuyển dữ liệu cũ nếu phát sinh cần phạm vi riêng. SQL/DBML mô tả tiếp theo phải theo schema 35 bảng này.
+
+Các task backend dùng nền mới sau khi Trưởng nhóm review/tích hợp; điền link commit/PR thực tế khi có. UI theme/asset và thiết kế contract có thể tiếp tục độc lập. Auth/seed phải kiểm tra SQL, ma trận quyền, role ngoài catalog và seed lặp; frontend giữ OP.GG. EF dùng `--project Backend\src\CyberManagement.Infrastructure --startup-project Backend\src\CyberManagement.API`.
+
 ## Cách nhận việc và review
 
 1. Mỗi tiêu đề có mã dạng **S1-D-1** là một thẻ Jira độc lập. Copy nguyên tên tiếng Anh nối bằng dấu gạch ngang sau dấu “—” vào **Summary**, không đưa mã kế hoạch vào tên Jira. Người phụ trách và reviewer ghi ở đầu nhóm, sprint ghi ở đầu phần; chọn các trường này trên Jira, không lặp lại trong Description. Jira key thực tế chỉ ghi sau khi tạo issue.
@@ -44,7 +56,7 @@ Số thẻ không phải ước lượng thời gian. Gom thẻ giảm số lầ
 6. Workflow: To Do → In Progress → Review → Done, ánh xạ vào board hiện có. Mỗi người tập trung một luồng chính; chỉ tách thêm thẻ khi có kết quả độc lập hoặc blocker riêng cần theo dõi, không tách vì mỗi bước mất một ngày.
 7. Tên Task dùng dạng `Build-Admin-Client-Login` để dùng trực tiếp khi tạo branch từ Jira theo flow của nhóm. Không cần trường Branch riêng trong backlog hoặc Description. Giữ mã kế hoạch để tra phụ thuộc trong tài liệu; ánh xạ với key thật sau khi tạo issue.
 
-**Tình trạng:** mới chuẩn bị backlog trong repo, chưa tạo/sửa issue hay sprint trên Jira. Chưa có xác nhận trạng thái thực hiện từng Task. Nếu nhóm đã tự tạo issue theo bản cũ, dùng dòng “Gom từ mã cũ” để đối chiếu, chuyển checklist/link về thẻ giữ lại rồi xử lý thẻ trùng theo quyết định Trưởng nhóm; không tự xóa issue hoặc lịch sử.
+**Tình trạng:** người dùng đã tạo sprint task; repo chưa có bảng ánh xạ đầy đủ Jira key/trạng thái từng Task. Lần sửa này chỉ cập nhật repo, không thao tác Jira. Chưa có xác nhận trạng thái thực hiện từng Task. Nếu nhóm đã tự tạo issue theo bản cũ, dùng dòng “Gom từ mã cũ” để đối chiếu, chuyển checklist/link về thẻ giữ lại rồi xử lý thẻ trùng theo quyết định Trưởng nhóm; không tự xóa issue hoặc lịch sử.
 
 ### Mẫu Description
 
@@ -92,6 +104,7 @@ Assignee: **Đại**. Reviewer: **Trưởng nhóm**. Phối hợp: Minh; Phúc �
 
 - [ ] **Chốt tài khoản, vai trò và định danh dùng chung.** Có mapping account/customer/staff, ma trận quyền và quy tắc khóa; Minh/Trường đối chiếu hợp đồng để các module dùng cùng ID.
 - [ ] **Xây API đăng nhập, đăng xuất và xác thực.** Tài khoản seed đăng nhập được; mật khẩu sai và request không đủ quyền bị từ chối tại API; logout xử lý theo cơ chế đã chọn.
+- [ ] **Kiểm tra seed và auth trên nền 35 bảng.** Seed lặp không tạo bản ghi thừa, giữ quyền role ngoài catalog; login/quyền chạy trên SQL Server mới. Signing key/mật khẩu cấu hình ngoài Git; build và hướng dẫn chạy được bàn giao.
 
 **Gom từ mã cũ:** `S1-D-01`, `S1-D-02`. Đây là mã tra cứu, không tạo lại các thẻ cũ.
 

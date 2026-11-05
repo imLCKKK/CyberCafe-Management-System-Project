@@ -21,44 +21,22 @@ Mục tiêu là **đủ chức năng cuối S3 ngày 15/11** để bàn giao san
 
 ## 2. Tận dụng code và làm rõ cấu trúc
 
-Khảo sát ban đầu dựa trên main và các remote-tracking ref có sẵn tại máy, chưa fetch/build lại các nhánh cũ. Những nguồn dưới đây là vật liệu để chọn lọc, chưa phải bằng chứng backend đã hoàn chỉnh.
+Quyết định mới ngày 02/11/2026 của Trưởng nhóm: dùng **CyberManagement và DB SQL Server mới 35 bảng**, thay nền CyberCafe 19 bảng trong bản mô tả 31/10. Giữ stack, 55 task, owner và lịch đã chốt; rà ước lượng nếu code/contract bị ảnh hưởng.
 
-| Nguồn | Giữ/tận dụng | Điều kiện |
+| Nguồn | Phần dùng tiếp | Cách phối hợp |
 | --- | --- | --- |
-| React `frontend/src` | Layout, màn hình, CSS, component và các hành vi demo | Chuyển từng luồng sang API; auth/promo còn placeholder phải triển khai |
-| Model/test JavaScript | Mẫu hành vi và hồi quy UI | Quy tắc tiền, tồn, quyền phải được thực thi và kiểm thử ở server |
-| `backend/CyberCafe.Api` | Khung .NET/EF/SQL Server, schema ban đầu 19 bảng và ràng buộc | Hiện mới có health check; bổ sung schema kho/hóa đơn/promo/gateway theo hợp đồng đã chốt |
-| Cached `origin/Truong` | DTO, controller/service sản phẩm, danh mục, đơn, hóa đơn; validation/snapshot giá | Kiểm tra repository, DI và transaction trước khi port từng phần |
-| Cached `origin/Minh` | Ý tưởng dữ liệu kho, nhà cung cấp, hóa đơn, quyền | Backend dùng MySQL và model khác; không nhập nguyên migration vào SQL Server |
-| OP.GG | Giữ adapter và helper đã có, nối vào luồng giải đấu thật | Đã gom vào `backend/integrations/opgg/`, gồm helper `shared.js` |
-| HTML prototype cũ | Chỉ tra cứu lịch sử Git khi cần | Người dùng đã chủ động xóa `cybernet-html/`; giữ quyết định xóa, không tạo lại thư mục prototype |
+| `frontend/` | React/Vite, UI, model demo và tests | Chuyển từng luồng sang API; auth backend không tự nối UI |
+| `Backend/src/CyberManagement.Domain` | 35 entity | Owner đối chiếu ID Employee/Customer kiểu int và rule module |
+| `Backend/src/CyberManagement.Application` | Auth/use case/interface/validation | Thêm nghiệp vụ theo Task, không dùng EF/HTTP |
+| `Backend/src/CyberManagement.Infrastructure` | ApplicationDbContext, config, migrations, repositories/hash | Trường điều phối migration, từng owner viết phần của mình |
+| `Backend/src/CyberManagement.API` | Controller/JWT, DI, HTTP host chung | Thêm endpoint theo Task; không tạo backend riêng |
+| `Backend/integrations/opgg` | Adapter Node và helper frontend | Giữ endpoint/import/test khi đổi backend .NET |
 
-Chọn `backend/CyberCafe.Api` làm backend tích hợp chính. Không nhập nguyên ba backend: account/customer, trạng thái đơn, kiểu ID, thời điểm thu tiền và provider database chưa thống nhất. Chọn lọc theo hành vi cần giữ.
+Solution: `Backend/CyberManagement.slnx`; xem [lệnh chạy/EF](../Backend/README.md) và [kiến trúc](../docs/architecture.md). App hiện có auth/role/health; kho, ví, phiên, voucher, ML và các tích hợp vẫn đối chiếu Task và code thực tế, không nghiệm thu từ số entity.
 
-Cấu trúc đích cho phần triển khai tiếp theo:
+DB mới dùng bốn migration hiện có. Không áp InitialCreate mới vào DB 19 bảng cũ; chưa yêu cầu chuyển/xóa DB cũ. SQL/DBML mô tả khi bổ sung phải theo schema CyberManagement. Giữ dữ liệu cũ riêng nếu có, việc chuyển dữ liệu cần được chốt thành phạm vi cụ thể.
 
-```text
-frontend/
-  package.json, vite.config.js, index.html
-  public/
-  src/
-    app/                  # Router, layout, provider và kết nối realtime chung
-    admin/<feature>/      # Màn hình quản trị
-    client/<feature>/     # Màn hình khách
-    services/             # API client, bổ sung trong S1
-    shared/               # UI và hàm hiển thị dùng chung
-  tests/                  # Browser test
-backend/
-  CyberCafe.Api/
-    Features/<feature>/   # Endpoint, DTO, nghiệp vụ; bổ sung theo sprint
-    Data/                 # Entity, DbContext, configuration, migrations
-  integrations/opgg/      # Adapter Node + helper dùng ở browser/Node
-  database/               # SQL xuất và DBML mô tả schema
-docs/                     # Kiến trúc, hợp đồng, kế hoạch, hướng dẫn
-scripts/                  # Tiện ích chạy trên Windows
-```
-
-Đợt dọn nền ở nhánh `refactor/project-foundation` đã gom source/config/assets/tests frontend vào `frontend/`, API/SQL/OP.GG vào `backend/` và các file `.cmd` vào `scripts/`. `services/`, `Features/` và kết nối realtime là phần cần bổ sung theo sprint, không phải chức năng đã có. Cấu trúc này tham khảo cách tách frontend/backend của BrewLite và giữ stack đã chốt.
+Nền sửa hiện dừng trước commit trên nhánh riêng; chưa tự đưa lên `dev`. Các thành viên lấy đúng `dev` đã được Trưởng nhóm review/tích hợp trước khi phát triển tiếp. Không phục hồi `cybernet-html/` hoặc nhập migration MySQL từ nhánh cũ.
 
 ## 3. Hợp đồng kỹ thuật chung
 
