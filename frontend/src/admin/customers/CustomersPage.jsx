@@ -1,36 +1,155 @@
-import React, { useState } from 'react';
-import { Banknote, Plus, Users, WalletCards, UserCheck } from 'lucide-react';
-import { useAdminAction } from '../shared/AdminContext';
-import { AdminPage, StatCard, Panel, Table, Toolbar, Filter, Status, Notice, FormDialog, DetailDialog, Row, ExportButton } from '../shared/AdminUI';
-import { createTopUp, dateTime, matches, money, processTopUp, toggleAccount } from '../shared/adminModel';
-import PersonForm from '../shared/PersonForm';
-import { DonutChart } from '../shared/Charts';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Plus, UserCheck, Users, WalletCards } from 'lucide-react';
+import { PageHeading, StatCard } from '../computers/components/CafeUI';
+import { DetailDialog, Filter, FormDialog, Notice, Panel, Row, Status, Table, Toolbar } from '../shared/AdminUI';
+import { dateTime, matches, money } from '../shared/adminModel';
+import {
+  changeCustomerStatus, createCustomer, listCustomers, listWalletTransactions, staffTopUp, updateCustomer,
+} from '../../services/customerAdminApi';
+import { walletTypeLabel } from '../../services/walletTypes';
+
+// Khách hàng đọc/ghi qua API + SQL Server (S1-M-1). Không dùng dữ liệu demo: API lỗi thì hiện lỗi và nút thử lại.
+// Quyền do server kiểm tra (customer.*, wallet.*); thiếu quyền sẽ hiện thông báo 403 từ server.
+const methods = [['Cash', 'Tiền mặt'], ['BankTransfer', 'Chuyển khoản đã đối soát']];
 
 export function CustomersPage() {
-  const { db, commit, run, notice, error, clear, setNotice, setError } = useAdminAction();
-  const [query, setQuery] = useState(''), [status, setStatus] = useState('all'), [tab, setTab] = useState('customers');
-  const [editing, setEditing] = useState(undefined), [selected, setSelected] = useState(null), [topUp, setTopUp] = useState(null), [collection, setCollection] = useState(null), [locking, setLocking] = useState(null);
-  const people = db.customers.map((customer) => ({ ...customer, account: db.accounts.find((row) => row.id === customer.account_id) }));
-  const name = (id) => people.find((row) => row.id === id)?.account.display_name || `KH${id}`;
-  const filtered = people.filter((row) => matches(query, row.id, row.account.display_name, row.account.phone) && (status === 'all' || row.account.is_active === (status === 'Active')));
-  const pending = db.top_ups.filter((row) => ['Pending', 'CreditedUnpaid'].includes(row.status));
-  const detail = people.find((row) => row.id === selected);
-  const topUps = [...db.top_ups].sort((a, b) => new Date(b.requested_at) - new Date(a.requested_at));
-  return <AdminPage title="Quản lý khách hàng" description="Hồ sơ, số dư ví và yêu cầu nạp tiền được quản lý tại một nơi." actions={<button className="cafe-button primary" onClick={() => setEditing(null)}><Plus size={16}/>Thêm khách hàng</button>}>
-    <Notice notice={notice} error={error} clear={clear}/>
-    <div className="cafe-stats"><StatCard label="Tổng khách hàng" value={people.length} icon={Users}/><StatCard label="Đang hoạt động" value={people.filter((row) => row.account.is_active).length} icon={UserCheck}/><StatCard label="Tổng số dư ví" value={money(people.reduce((sum, row) => sum + row.wallet_balance, 0))} icon={WalletCards}/><StatCard label="Yêu cầu cần xử lý" value={pending.length} icon={Banknote}/></div>
-    <div className="admin-tabs"><button aria-pressed={tab === 'customers'} onClick={() => setTab('customers')}>Khách hàng</button><button aria-pressed={tab === 'topups'} onClick={() => setTab('topups')}>Nạp ví & thu tiền ({pending.length})</button></div>
-    {tab === 'customers' ? <Panel title="Danh sách khách hàng" description="Chọn khách để xem ví và lịch sử sử dụng." actions={<ExportButton filename="khach-hang.csv" headers={['Mã', 'Họ tên', 'Điện thoại', 'Số dư', 'Trạng thái']} rows={filtered.map((row) => [row.id, row.account.display_name, row.account.phone, row.wallet_balance, row.account.is_active ? 'Hoạt động' : 'Đã khóa'])} onError={setError}/>}>
-      <Toolbar query={query} onQuery={setQuery} placeholder="Tìm tên, số điện thoại, mã khách…" onReset={() => { setQuery(''); setStatus('all'); }}><Filter label="Trạng thái khách" value={status} onChange={setStatus} options={['all', 'Active', 'Inactive'].map((value, index) => [value, ['Tất cả trạng thái', 'Hoạt động', 'Đã khóa'][index]])}/></Toolbar>
-      <Table rows={filtered} resetKey={query + status} columns={[{ key: 'name', label: 'Khách hàng', sortValue: (row) => row.account.display_name, render: (row) => <><button className="admin-link" onClick={() => setSelected(row.id)}>{row.account.display_name}</button><small>#KH{row.id} · {row.account.phone}</small></> }, { key: 'wallet', label: 'Số dư ví', sortValue: (row) => row.wallet_balance, render: (row) => <strong>{money(row.wallet_balance)}</strong> }, { key: 'status', label: 'Trạng thái', render: (row) => <><Status value={row.account.is_active ? 'Active' : 'Inactive'}/>{row.account.must_change_password && <small>Cần đổi mật khẩu lần đầu</small>}</> }, { key: 'actions', label: 'Thao tác', render: (row) => <div className="admin-actions"><button className="cafe-button" onClick={() => setEditing(row.account)}>Sửa</button><button className="cafe-button" onClick={() => setTopUp(row.id)}>Nạp ví</button><button className="cafe-button" onClick={() => setLocking(row.account)}>{row.account.is_active ? 'Khóa' : 'Mở khóa'}</button></div> }]}/>
-    </Panel> : <Panel title="Yêu cầu nạp ví" description="Duyệt nạp cộng ví một lần; xác nhận thu tiền không cộng thêm ví.">
-      <Table rows={topUps} columns={[{ key: 'id', label: 'Mã / Khách', render: (row) => <><strong>#NV{row.id}</strong><small>{name(row.customer_id)}</small></> }, { key: 'amount', label: 'Số tiền', sortValue: (row) => row.amount, render: (row) => money(row.amount) }, { key: 'date', label: 'Thời gian', render: (row) => dateTime(row.requested_at) }, { key: 'status', label: 'Trạng thái', render: (row) => <><Status value={row.status}/>{row.collection_method && <small>{row.collection_method === 'Cash' ? 'Tiền mặt' : 'Chuyển khoản'}</small>}</> }, { key: 'actions', label: 'Xử lý', render: (row) => <div className="admin-actions">{row.status === 'Pending' && <><button className="cafe-button primary" onClick={() => run((data) => processTopUp(data, row.id, 'credit'), 'Đã cộng tiền vào ví khách.')}>Duyệt nạp</button><button className="cafe-button" onClick={() => run((data) => processTopUp(data, row.id, 'reject'), 'Đã từ chối yêu cầu.')}>Từ chối</button></>}{row.status === 'CreditedUnpaid' && <button className="cafe-button primary" onClick={() => setCollection(row)}>Xác nhận đã thu</button>}</div> }]}/>
-    </Panel>}
-    <div className="admin-grid-two admin-grid-equal" style={{ marginTop: 22 }}><Panel title="Trạng thái khách hàng" description="Phân bổ theo tài khoản trong dữ liệu hiện tại."><DonutChart label="khách hàng" data={[{ name: 'Hoạt động', value: people.filter((row) => row.account.is_active).length }, { name: 'Đã khóa', value: people.filter((row) => !row.account.is_active).length }]}/></Panel><Panel title="Cần chú ý" description="Các khoản nạp đã cộng ví nhưng chưa thu tiền."><div className="admin-report-explanation"><h3>{money(pending.filter((row) => row.status === 'CreditedUnpaid').reduce((sum, row) => sum + row.amount, 0))}</h3><p>Thu xong khoản nạp trước khi tạo yêu cầu mới cho cùng khách. Khoản nạp ví là tiền ứng trước, không tính là doanh thu dịch vụ.</p><button className="cafe-button" onClick={() => setTab('topups')}>Xem yêu cầu nạp ví</button></div></Panel></div>
-    {editing !== undefined && <PersonForm account={editing} kind="customer" onClose={() => setEditing(undefined)} onSaved={() => setNotice('Đã lưu thông tin khách hàng.')}/>}
-    {topUp && <FormDialog title={`Nạp ví · ${name(topUp)}`} fields={[{ name: 'amount', label: 'Số tiền muốn nạp (VNĐ)', type: 'number', min: 10000, max: 2000000, step: 1000 }]} initial={{ amount: 100000 }} submit="Tạo yêu cầu nạp" onClose={() => setTopUp(null)} onSave={(form) => { commit((data) => createTopUp(data, topUp, form.amount)); setNotice('Đã tạo yêu cầu. Vào Nạp ví & thu tiền để duyệt.'); setTab('topups'); }}/>}
-    {collection && <FormDialog title={`Thu tiền nạp ví #NV${collection.id}`} description={`Xác nhận đã thực nhận ${money(collection.amount)}. Thao tác không cộng ví thêm lần nữa.`} fields={[{ name: 'method', label: 'Phương thức đã nhận', options: [['Cash', 'Tiền mặt'], ['BankTransfer', 'Chuyển khoản đã đối soát']] }]} initial={{ method: 'Cash' }} submit="Xác nhận đã thu tiền" onClose={() => setCollection(null)} onSave={(form) => { commit((data) => processTopUp(data, collection.id, 'collect', form.method)); setNotice('Đã ghi nhận thu tiền.'); }}/>}
-    {locking && <FormDialog title={`${locking.is_active ? 'Khóa' : 'Mở khóa'} ${locking.display_name}?`} description="Không thể khóa khách đang chơi hoặc quản trị viên hoạt động cuối cùng." submit="Xác nhận" onClose={() => setLocking(null)} onSave={() => { commit((data) => toggleAccount(data, locking.id)); setNotice('Đã cập nhật trạng thái tài khoản.'); }}/>}
-    {detail && <DetailDialog title={detail.account.display_name} onClose={() => setSelected(null)}><Row label="Số điện thoại">{detail.account.phone}</Row><Row label="Số dư ví">{money(detail.wallet_balance)}</Row><Row label="Ngày tạo">{dateTime(detail.account.created_at)}</Row><h3 className="admin-section-title">Lịch sử ví</h3><div className="admin-detail-list">{db.wallet_transactions.filter((row) => row.customer_id === detail.id).sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at)).map((row) => <div className="admin-detail-line" key={row.id}><div>{row.transaction_type}<small>{dateTime(row.recorded_at)} · Số dư {money(row.balance_after)}</small></div><strong>{row.amount > 0 ? '+' : ''}{money(row.amount)}</strong></div>)}</div></DetailDialog>}
-  </AdminPage>;
+  const [state, setState] = useState({ status: 'loading', customers: [], error: '' });
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [notice, setNotice] = useState('');
+  const [dialog, setDialog] = useState(null); // { kind: 'create' | 'edit' | 'lock' | 'topup', customer }
+  const [selectedId, setSelectedId] = useState(null);
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const [history, setHistory] = useState({ status: 'idle', rows: [], error: '' });
+
+  const load = useCallback(async () => {
+    try {
+      setState({ status: 'ready', customers: await listCustomers(), error: '' });
+    } catch (err) {
+      setState({ status: 'error', customers: [], error: err.message });
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (selectedId == null) return undefined;
+    let cancelled = false;
+    setHistory({ status: 'loading', rows: [], error: '' });
+    listWalletTransactions(selectedId)
+      .then((rows) => { if (!cancelled) setHistory({ status: 'ready', rows, error: '' }); })
+      .catch((err) => { if (!cancelled) setHistory({ status: 'error', rows: [], error: err.message }); });
+    return () => { cancelled = true; };
+  }, [selectedId, historyVersion]);
+
+  const customers = state.customers;
+  const filtered = customers.filter((row) =>
+    matches(query, row.customerId, row.fullName, row.phone) && (statusFilter === 'all' || row.status === statusFilter));
+  const selected = customers.find((row) => row.customerId === selectedId);
+  const saved = async (message) => { await load(); setHistoryVersion((v) => v + 1); setNotice(message); };
+
+  const header = <PageHeading eyebrow="NET CAFE / QUẢN TRỊ" title="Quản lý khách hàng" description="Hồ sơ và số dư ví của khách, lưu trong cơ sở dữ liệu.">
+    <button className="cafe-button primary" onClick={() => setDialog({ kind: 'create' })}><Plus size={16}/>Thêm khách hàng</button>
+  </PageHeading>;
+
+  if (state.status === 'loading') {
+    return <section className="cafe-page admin-module">{header}<p role="status">Đang tải danh sách khách hàng...</p></section>;
+  }
+  if (state.status === 'error') {
+    return <section className="cafe-page admin-module">{header}
+      <div className="admin-message error" role="alert">{state.error}</div>
+      <button className="cafe-button primary" onClick={() => { setState({ status: 'loading', customers: [], error: '' }); load(); }}>Thử lại</button>
+    </section>;
+  }
+
+  return <section className="cafe-page admin-module">
+    {header}
+    <Notice notice={notice} clear={() => setNotice('')}/>
+    <div className="cafe-stats">
+      <StatCard label="Tổng khách hàng" value={customers.length} icon={Users}/>
+      <StatCard label="Đang hoạt động" value={customers.filter((row) => row.status === 'Active').length} icon={UserCheck}/>
+      <StatCard label="Tổng số dư ví" value={money(customers.reduce((sum, row) => sum + row.walletBalance, 0))} icon={WalletCards}/>
+    </div>
+    <Panel title="Danh sách khách hàng" description="Chọn khách để xem ví và lịch sử giao dịch.">
+      <Toolbar query={query} onQuery={setQuery} placeholder="Tìm tên, số điện thoại, mã khách…" onReset={() => { setQuery(''); setStatusFilter('all'); }}>
+        <Filter label="Trạng thái khách" value={statusFilter} onChange={setStatusFilter}
+          options={[['all', 'Tất cả trạng thái'], ['Active', 'Hoạt động'], ['Locked', 'Đã khóa']]}/>
+      </Toolbar>
+      <Table rows={filtered} idKey="customerId" resetKey={query + statusFilter} columns={[
+        { key: 'name', label: 'Khách hàng', sortValue: (row) => row.fullName, render: (row) => <>
+          <button className="admin-link" onClick={() => setSelectedId(row.customerId)}>{row.fullName}</button>
+          <small>#KH{row.customerId} · {row.phone}</small></> },
+        { key: 'balance', label: 'Số dư ví', sortValue: (row) => row.walletBalance, render: (row) => money(row.walletBalance) },
+        { key: 'status', label: 'Trạng thái', render: (row) => <Status value={row.status === 'Active' ? 'Active' : 'Inactive'}/> },
+        { key: 'created', label: 'Ngày tạo', render: (row) => dateTime(row.createdAt) },
+        { key: 'actions', label: 'Thao tác', render: (row) => <div className="admin-row-actions">
+          <button className="cafe-button" onClick={() => setDialog({ kind: 'topup', customer: row })}>Nạp ví</button>
+          <button className="cafe-button" onClick={() => setDialog({ kind: 'edit', customer: row })}>Sửa</button>
+          <button className="cafe-button" onClick={() => setDialog({ kind: 'lock', customer: row })}>{row.status === 'Active' ? 'Khóa' : 'Mở khóa'}</button>
+        </div> },
+      ]}/>
+    </Panel>
+
+    {dialog?.kind === 'create' && <FormDialog title="Thêm khách hàng" submit="Tạo khách hàng" onClose={() => setDialog(null)}
+      description="Khách đăng nhập bằng số điện thoại và mật khẩu ban đầu này."
+      fields={[
+        { name: 'fullName', label: 'Họ tên', maxLength: 150 },
+        { name: 'phone', label: 'Số điện thoại', maxLength: 11, help: 'Bắt đầu bằng 0, gồm 10-11 chữ số.' },
+        { name: 'email', label: 'Email (không bắt buộc)', type: 'email', required: false, maxLength: 150 },
+        { name: 'initialPassword', label: 'Mật khẩu ban đầu', type: 'password', help: 'Từ 8 đến 128 ký tự.' },
+      ]}
+      initial={{ fullName: '', phone: '', email: '', initialPassword: '' }}
+      onSave={async (form) => {
+        await createCustomer({ fullName: form.fullName, phone: form.phone, email: form.email || null, initialPassword: form.initialPassword });
+        await saved('Đã tạo khách hàng.');
+      }}/>}
+
+    {dialog?.kind === 'edit' && <FormDialog title={`Sửa hồ sơ · ${dialog.customer.fullName}`} onClose={() => setDialog(null)}
+      fields={[
+        { name: 'fullName', label: 'Họ tên', maxLength: 150 },
+        { name: 'phone', label: 'Số điện thoại', maxLength: 11 },
+        { name: 'email', label: 'Email (không bắt buộc)', type: 'email', required: false, maxLength: 150 },
+      ]}
+      initial={{ fullName: dialog.customer.fullName, phone: dialog.customer.phone, email: dialog.customer.email || '' }}
+      onSave={async (form) => {
+        await updateCustomer(dialog.customer.customerId, { fullName: form.fullName, phone: form.phone, email: form.email || null });
+        await saved('Đã lưu thông tin khách hàng.');
+      }}/>}
+
+    {dialog?.kind === 'lock' && <FormDialog title={`${dialog.customer.status === 'Active' ? 'Khóa' : 'Mở khóa'} ${dialog.customer.fullName}?`}
+      description="Không thể khóa khách đang có phiên chơi. Lý do được lưu vào lịch sử trạng thái." submit="Xác nhận" onClose={() => setDialog(null)}
+      fields={[{ name: 'reason', label: 'Lý do', type: 'textarea', full: true, maxLength: 255 }]} initial={{ reason: '' }}
+      onSave={async (form) => {
+        await changeCustomerStatus(dialog.customer.customerId, dialog.customer.status === 'Active' ? 'Locked' : 'Active', form.reason);
+        await saved('Đã cập nhật trạng thái khách hàng.');
+      }}/>}
+
+    {dialog?.kind === 'topup' && <FormDialog title={`Nạp ví · ${dialog.customer.fullName}`} submit="Xác nhận đã thu tiền và nạp" onClose={() => setDialog(null)}
+      description="Chỉ nạp sau khi đã nhận đủ tiền. Ví được cộng ngay khi xác nhận."
+      fields={[
+        { name: 'amount', label: 'Số tiền (VNĐ)', type: 'number', min: 10000, max: 2000000, step: 1000 },
+        { name: 'method', label: 'Phương thức đã nhận', options: methods },
+      ]}
+      initial={{ amount: 100000, method: 'Cash' }}
+      onSave={async (form) => {
+        await staffTopUp(dialog.customer.customerId, Number(form.amount), form.method);
+        await saved(`Đã nạp ${money(Number(form.amount))} vào ví ${dialog.customer.fullName}.`);
+      }}/>}
+
+    {selected && <DetailDialog title={selected.fullName} onClose={() => setSelectedId(null)}>
+      <Row label="Số điện thoại">{selected.phone}</Row>
+      <Row label="Email">{selected.email || '—'}</Row>
+      <Row label="Trạng thái"><Status value={selected.status === 'Active' ? 'Active' : 'Inactive'}/></Row>
+      <Row label="Số dư ví">{money(selected.walletBalance)}</Row>
+      <Row label="Ngày tạo">{dateTime(selected.createdAt)}</Row>
+      <h3 className="admin-section-title">Lịch sử ví</h3>
+      {history.status === 'loading' && <p role="status">Đang tải lịch sử ví...</p>}
+      {history.status === 'error' && <div className="admin-message error" role="alert">{history.error}</div>}
+      {history.status === 'ready' && (history.rows.length
+        ? <div className="cafe-table-wrap"><table className="cafe-table"><thead><tr><th>Thời gian</th><th>Loại</th><th>Số tiền</th><th>Số dư sau</th></tr></thead>
+          <tbody>{history.rows.map((row) => <tr key={row.id}>
+            <td>{dateTime(row.recorded_at)}</td><td>{walletTypeLabel(row.transaction_type)}</td>
+            <td>{row.amount > 0 ? '+' : '−'}{money(Math.abs(row.amount))}</td><td>{money(row.balance_after)}</td></tr>)}</tbody></table></div>
+        : <p>Chưa có giao dịch ví.</p>)}
+    </DetailDialog>}
+  </section>;
 }

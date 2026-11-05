@@ -23,49 +23,8 @@ try {
   assert.equal((await db()).order_item_cancel_requests.at(-1).status, 'Pending');
   await close();
   await go('/client/home'); assert.ok(await evaluate("document.querySelector('.home-balance').textContent.includes('125.000')"));
-  await go('/client/wallet');
-  await input('.wallet-topup input[type=number]', 9999);
-  assert.equal(await evaluate("document.querySelector('.wallet-topup form').checkValidity()"), false);
-  await input('.wallet-topup input[type=number]', 100500);
-  assert.equal(await evaluate("document.querySelector('.wallet-topup form').checkValidity()"), false);
-  await input('.wallet-topup input[type=number]', 100000);
-  const initialTopUps = (await db()).top_ups.length;
-  await evaluate("document.querySelector('.wallet-topup input[value=zalopay]').click()");
-  assert.ok(await evaluate("document.querySelector('.wallet-qr-panel button').disabled"));
-  assert.equal((await db()).top_ups.length, initialTopUps);
-  await evaluate("document.querySelector('.wallet-topup input[value=cash]').click()");
-  await click('Gửi yêu cầu nạp tiền mặt');
-  await until("document.querySelector('.wallet-topup button[type=submit]').disabled");
-  assert.equal((await db()).customers[0].wallet_balance, 125000);
-  await evaluate("document.querySelector('[aria-label=\"Thông báo\"]').click()");
-  assert.ok(await evaluate("document.querySelector('dialog').textContent.includes('100.000')")); await close();
-  await click('Mô phỏng tại quầy');
-  await evaluate("[...document.querySelectorAll('dialog button')].find(el => el.textContent.includes('Nạp 100.000')).click()");
-  await until("document.querySelector('dialog').textContent.includes('Đánh dấu đã thu tiền')");
-  assert.equal((await db()).customers[0].wallet_balance, 225000);
-  await click('Đánh dấu đã thu tiền', 'dialog button');
-  await until("document.querySelector('dialog').textContent.includes('Không có yêu cầu')");
-  assert.equal((await db()).customers[0].wallet_balance, 225000); await close();
-  await input('[aria-label="Lọc giao dịch"]', 'in');
-  assert.ok(await evaluate("[...document.querySelectorAll('tbody .home-amount')].every(el => el.textContent.startsWith('+'))"));
-  await input('[aria-label="Lọc giao dịch"]', 'out');
-  assert.ok(await evaluate("[...document.querySelectorAll('tbody .home-amount')].every(el => el.textContent.startsWith('−'))"));
-  await go('/client/account');
-  await input('input[autocomplete=name]', '   '); await click('Lưu thay đổi');
-  await until("document.querySelector('[role=alert]')?.textContent.includes('Tên hiển thị')");
-  await input('input[autocomplete=name]', 'Người chơi kiểm thử'); await click('Lưu thay đổi');
-  await until("document.querySelector('.client-user').textContent.includes('Người chơi kiểm thử')");
-  await input('input[autocomplete=current-password]', 'SaiMatKhau');
-  await input('input[autocomplete=new-password]', 'Changed@2026');
-  await input('.home-form-grid label:last-child input[autocomplete=new-password]', 'Changed@2026');
-  await click('Đổi mật khẩu');
-  await until("document.querySelector('[role=alert]')?.textContent.includes('Mật khẩu hiện tại chưa đúng')");
-  await input('input[autocomplete=current-password]', 'Tram@2026'); await click('Đổi mật khẩu');
-  await until("document.querySelector('[role=status]')?.textContent.includes('Đã đổi mật khẩu')");
-  assert.ok(!(JSON.stringify(await db())).includes('Changed@2026'));
-  await go('/client/account');
-  assert.equal((await db()).accounts[0].display_name, 'Người chơi kiểm thử');
-  assert.equal((await db()).customers[0].wallet_balance, 225000);
+  // Trang Ví và Tài khoản đã đọc dữ liệu từ API/SQL nên không còn kiểm tra bằng localStorage demo ở đây:
+  // xem wallet-customers-api.mjs (API giả có kiểm soát) và Backend/tests/CyberManagement.Wallet.Checks (SQL Server thật).
   // Exercise real tournament UI while substituting a deterministic unavailable
   // external provider. No third-party profile is contacted by this suite.
   await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `const realFetch = window.fetch; window.fetch = (url, options) => String(url).includes('/api/valorant/opgg/stats') ? Promise.resolve(new Response(JSON.stringify({ message: 'Dịch vụ thống kê tạm ngừng' }), { status: 503, headers: { 'Content-Type': 'application/json' } })) : realFetch(url, options);` });
@@ -84,5 +43,5 @@ try {
   await go('/client/home'); assert.ok(await evaluate("document.body.textContent.includes('Xem đăng ký của bạn')"));
   await screenshot('client-workflows-complete.png');
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ passed: true, checks: ['Home cart handoff and wallet checkout', 'cancellation without early refund', 'balance sync', 'top-up validation and disabled transfer', 'notification and one-time credit/collection', 'wallet filters', 'profile validation and persistence', 'wrong and correct password', 'tournament registration/validation/filter/Home sync', 'unavailable stats remain missing'] }));
+  console.log(JSON.stringify({ passed: true, checks: ['Home cart handoff and wallet checkout', 'cancellation without early refund', 'balance sync', 'tournament registration/validation/filter/Home sync', 'unavailable stats remain missing'] }));
 } finally { socket.close(); }

@@ -14,23 +14,10 @@ const rowAction = (text, action) => evaluate(`(() => { const row = [...document.
 try {
   await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Page.bringToFront');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor:1, mobile:false });
-  await go('/admin/customers', 'Quản lý khách hàng');
-  await evaluate('localStorage.clear()'); await cdp('Page.reload'); await sleep(400); await until("Boolean(document.querySelector('.admin-module'))");
-  await click('Thêm khách hàng'); await field('display_name', 'Khách kiểm thử'); await field('phone', '0977777788'); await submit();
-  await until("!document.querySelector('dialog[open]')");
-  let saved = await data();
-  const account = saved.accounts.find(row => row.phone === '0977777788');
-  assert.ok(account.password_hash.startsWith('pbkdf2:'));
-  const customer = saved.customers.find(row => row.account_id === account.id);
-  assert.equal(customer.wallet_balance, 0);
-  await rowAction('Khách kiểm thử', 'Nạp ví'); await field('amount', 150000); await submit(); await until("!document.querySelector('dialog[open]')");
-  await click('Duyệt nạp');
-  await until("document.body.textContent.includes('Đã cộng ví · chờ thu')");
-  await click('Xác nhận đã thu'); await field('method', 'BankTransfer'); await submit(); await until("!document.querySelector('dialog[open]')");
-  saved = await data();
-  assert.equal(saved.customers.find(row => row.id === customer.id).wallet_balance, 150000);
-  assert.equal(saved.wallet_transactions.filter(row => row.customer_id === customer.id && row.transaction_type === 'TopUpCredit').length, 1);
+  // Khách hàng/nạp ví đã nối API/SQL: xem wallet-customers-api.mjs. Trang Sản phẩm vẫn dùng dữ liệu demo nên dọn localStorage ở đây.
   await go('/admin/products', 'Quản lý sản phẩm');
+  await evaluate('localStorage.clear()'); await cdp('Page.reload'); await sleep(400); await until("Boolean(document.querySelector('.admin-module'))");
+  let saved;
   await click('Thêm sản phẩm'); await field('name', 'Snack kiểm thử'); await field('current_price', 18000); await field('cost_price', 9000); await submit(); await until("!document.querySelector('dialog[open]')");
   saved = await data(); const product = saved.products.find(row => row.name === 'Snack kiểm thử'); assert.equal(product.stock_quantity, 0);
   await go('/admin/inventory', 'Quản lý kho');
@@ -71,5 +58,5 @@ try {
   assert.ok(csv?.includes('Tiền máy')); assert.ok(csv?.includes('Tổng doanh thu'));
   await screenshot('admin-reports-after-actions.png');
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ passed:true, checks:['customer account and hashed password', 'one-time credit and collection', 'product creation', 'inventory receive and overdraw guard', 'last admin guard and staff creation', 'cash confirm and collection', 'cancel request refund and restock', 'client order paid status sync', 'tournament create/open/register and client sync', 'chart legend and keyboard readout', 'CSV download'] }));
+  console.log(JSON.stringify({ passed:true, checks:['product creation', 'inventory receive and overdraw guard', 'last admin guard and staff creation', 'cash confirm and collection', 'cancel request refund and restock', 'client order paid status sync', 'tournament create/open/register and client sync', 'chart legend and keyboard readout', 'CSV download'] }));
 } finally { socket.close(); }
