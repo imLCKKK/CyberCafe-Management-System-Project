@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createServer as createHttpServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { createServer, preview } from 'vite';
 
-test('Vite forwards auth/admin to the configured backend and keeps OP.GG middleware local', async () => {
+for (const mode of ['legacy-dev', 'auth-dev', 'preview']) {
+test(`Vite ${mode} forwards auth/admin and keeps OP.GG middleware local`, async () => {
   const backendRequests = [];
   const backend = createHttpServer((request, response) => {
     backendRequests.push({ path: request.url, method: request.method, authorization: request.headers.authorization });
@@ -13,15 +14,23 @@ test('Vite forwards auth/admin to the configured backend and keeps OP.GG middlew
   });
   await new Promise((resolve) => backend.listen(0, '127.0.0.1', resolve));
   const previousTarget = process.env.API_PROXY_TARGET;
+  const previousAuthTarget = process.env.VITE_API_PROXY_TARGET;
   let vite;
   try {
     process.env.API_PROXY_TARGET = `http://127.0.0.1:${backend.address().port}`;
-    vite = await createServer({
+    delete process.env.VITE_API_PROXY_TARGET;
+    if (mode !== 'legacy-dev') {
+      process.env.VITE_API_PROXY_TARGET = process.env.API_PROXY_TARGET;
+      process.env.API_PROXY_TARGET = 'http://127.0.0.1:1'; // S1-D-2 setting takes precedence.
+    }
+    const config = {
       root: fileURLToPath(new URL('..', import.meta.url)),
       server: { host: '127.0.0.1', port: 0 },
+      preview: { host: '127.0.0.1', port: 0 },
       optimizeDeps: { noDiscovery: true, include: [] },
-    });
-    await vite.listen();
+    };
+    vite = mode === 'preview' ? await preview(config) : await createServer(config);
+    if (mode !== 'preview') await vite.listen();
     const origin = vite.resolvedUrls.local[0].replace(/\/$/, '');
     for (const [path, method] of [['/api/auth/me', 'GET'], ['/api/admin/computers', 'GET'], ['/api/admin/computers/101/status', 'PATCH']]) {
       const response = await fetch(`${origin}${path}`, { method, headers: { Authorization: 'Bearer proxy-test-token' } });
@@ -36,7 +45,11 @@ test('Vite forwards auth/admin to the configured backend and keeps OP.GG middlew
   } finally {
     if (previousTarget === undefined) delete process.env.API_PROXY_TARGET;
     else process.env.API_PROXY_TARGET = previousTarget;
-    await vite?.close();
+    if (previousAuthTarget === undefined) delete process.env.VITE_API_PROXY_TARGET;
+    else process.env.VITE_API_PROXY_TARGET = previousAuthTarget;
+    if (vite && mode === 'preview') await new Promise(resolve => vite.httpServer.close(resolve));
+    else await vite?.close();
     await new Promise((resolve, reject) => backend.close((error) => error ? reject(error) : resolve()));
   }
 });
+}

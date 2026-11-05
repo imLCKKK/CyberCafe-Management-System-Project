@@ -4,15 +4,19 @@ import { computerFixture } from './computer-fixture.mjs';
 
 // HTTP fixtures verify UI behavior only. Actual SQL persistence/concurrency is covered by API.Checks.
 const fixture = computerFixture();
-const tokenKey = 'nexora.staff.accessToken';
+const tokenKey = 'cybermanagement.auth.v1';
 const requests = [];
 const interceptionErrors = [];
+const canceledRequests = new Set();
 const waitingLists = [];
 const waitingPatches = [];
+const waitingIdentities = [];
+let holdIdentity = false;
 let holdList = false;
 let holdPatch = false;
 let listStatus = 200;
 let identityStatus = 200;
+let expiresInMs = 3600000;
 let patchMode = 'success';
 let malformed = false;
 
@@ -22,13 +26,22 @@ async function handleRequest({ requestId, request }) {
   let status = 200;
   let body;
   const authorization = Object.entries(request.headers).find(([key]) => key.toLowerCase() === 'authorization')?.[1];
-  if (authorization !== 'Bearer browser-test-token') status = 401;
+  if (path === '/api/auth/login' && request.method === 'POST') {
+    const credentials = JSON.parse(request.postData);
+    assert.deepEqual(credentials, { username: 'fixture-staff', password: 'Fixture-Only-2026!' });
+    assert.equal(authorization, undefined);
+    body = { accessToken: 'browser-test-token', expiresAtUtc: new Date(Date.now() + expiresInMs).toISOString() };
+  } else if (authorization !== 'Bearer browser-test-token') status = 401;
   else if (path === '/api/auth/me') {
+    if (holdIdentity) await new Promise(resolve => waitingIdentities.push(resolve));
     status = identityStatus;
-    body = { employeeId: '7', username: 'fixture-staff', role: 'Admin', permissions: fixture.permissions };
+    body = { employeeId: 7, username: 'fixture-staff', role: 'Admin', permissions: fixture.permissions };
+  } else if (path === '/api/auth/logout') {
+    status = 204;
   } else if (request.method === 'PATCH') {
     if (holdPatch) await new Promise((resolve) => waitingPatches.push(resolve));
     if (!fixture.permissions.includes('computer.status.update')) status = 403;
+    else if (patchMode === 'expired') status = 401;
     else if (patchMode === 'failure') status = 500;
     else {
       const record = fixture.computers.find((row) => row.computerId === Number(path.split('/')[4]));
@@ -54,11 +67,18 @@ async function handleRequest({ requestId, request }) {
 }
 const onMessage = ({ data }) => {
   const message = JSON.parse(data);
-  if (message.method === 'Fetch.requestPaused') handleRequest(message.params).catch((error) => interceptionErrors.push(error.message));
+  if (message.method === 'Network.loadingFailed' && message.params.canceled) canceledRequests.add(message.params.requestId);
+  if (message.method === 'Fetch.requestPaused') handleRequest(message.params).catch((error) =>
+    interceptionErrors.push({ message: error.message, networkId: message.params.networkId }));
 };
 async function waitForNode(predicate) {
   for (let attempt = 0; attempt < 150; attempt++) { if (predicate()) return; await sleep(20); }
-  throw new Error('Timed out waiting for intercepted API request.');
+  throw new Error(`Timed out waiting for intercepted API request: ${JSON.stringify({ paths: requests.map(row => row.path), identities: waitingIdentities.length, lists: waitingLists.length })}`);
+}
+async function login() {
+  await input('#auth-identifier', 'fixture-staff');
+  await input('#auth-password', 'Fixture-Only-2026!');
+  await click('Đăng nhập', 'form.auth-form button[type="submit"]');
 }
 const ready = () => until('document.querySelectorAll(".cafe-station").length === 4');
 const open = async (name) => {
@@ -76,21 +96,25 @@ const close = async () => {
 };
 
 try {
-  await cdp('Runtime.enable'); await cdp('Page.enable');
+  await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Network.enable');
   socket.addEventListener('message', onMessage);
   await cdp('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-  await go('/client/home');
-  await evaluate(`sessionStorage.removeItem(${JSON.stringify(tokenKey)}); localStorage.setItem('net-cafe.admin.computers.v1', JSON.stringify([{ComputerId:1,ComputerName:'LOCAL-DEMO-SHOULD-NOT-APPEAR',RoomId:1,ComputerTypeId:1,Status:'Available'}]));`);
-  await go('/admin/computers');
-  await until('document.body.innerText.includes("Vui lòng đăng nhập nhân viên")');
+  await go('/admin/auth', 'document.querySelector(".auth-form")');
+  await evaluate(`localStorage.removeItem(${JSON.stringify(tokenKey)}); localStorage.setItem('net-cafe.admin.computers.v1', JSON.stringify([{ComputerId:1,ComputerName:'LOCAL-DEMO-SHOULD-NOT-APPEAR',RoomId:1,ComputerTypeId:1,Status:'Available'}]));`);
+  await go('/admin/computers', 'document.querySelector(".auth-form")');
+  assert.equal(await evaluate('location.pathname'), '/admin/auth');
   assert.equal(requests.length, 0, 'An anonymous page should request login before loading protected data');
   assert.equal(await evaluate('document.querySelectorAll(".cafe-station").length'), 0);
 
-  await evaluate(`sessionStorage.setItem(${JSON.stringify(tokenKey)}, 'browser-test-token')`);
+  await evaluate("sessionStorage.setItem('nexora.staff.accessToken', 'obsolete-token')");
+  holdIdentity = true;
   holdList = true;
-  await go('/admin/computers');
-  await waitForNode(() => waitingLists.length === 1);
+  await login();
+  await waitForNode(() => waitingIdentities.length > 0);
+  assert.equal(requests.filter(row => row.path.startsWith('/api/admin/')).length, 0, 'Wait for verified identity before loading computers');
+  holdIdentity = false; waitingIdentities.splice(0).forEach(resolve => resolve());
+  await waitForNode(() => waitingLists.length > 0);
   assert.ok(await evaluate('document.body.innerText.includes("Đang tải danh sách máy")'));
   assert.equal(await evaluate('document.querySelectorAll(".cafe-stat").length'), 0);
   holdList = false; waitingLists.splice(0).forEach((resolve) => resolve());
@@ -137,6 +161,14 @@ try {
   await cdp('Page.reload'); await ready(); await open('API-PC-01');
   assert.equal(await evaluate('Boolean(document.querySelector("dialog .cafe-dialog-actions button"))'), false);
   await close();
+  const readonlyStatus = fixture.computers[0].status;
+  assert.equal(await evaluate(`(async () => {
+    const { apiRequest } = await import('/src/shared/auth/api.js');
+    try { await apiRequest('/admin/computers/101/status', { method: 'PATCH', body: JSON.stringify({ status: 'Available', expectedStatus: 'Maintenance' }) }); }
+    catch (error) { return error.status; }
+  })()`), 403);
+  assert.equal(fixture.computers[0].status, readonlyStatus);
+  assert.ok(await evaluate(`localStorage.getItem(${JSON.stringify(tokenKey)}) !== null`));
   fixture.permissions.push('computer.status.update');
   await cdp('Page.reload'); await ready(); await open('API-PC-01');
   patchMode = 'failure';
@@ -167,39 +199,71 @@ try {
   await until('document.body.innerText.includes("Chưa có máy tính")');
   assert.equal(await evaluate('document.querySelectorAll(".cafe-station").length'), 0);
 
-  identityStatus = 403;
+  listStatus = 403;
   await click('Tải lại');
   await until('document.body.innerText.includes("Bạn không có quyền thực hiện thao tác này")');
   assert.equal(await evaluate('document.querySelectorAll(".cafe-stat").length'), 0);
-  identityStatus = 401;
+  assert.ok(await evaluate(`localStorage.getItem(${JSON.stringify(tokenKey)}) !== null`));
+  listStatus = 401;
   await click('Tải lại');
   await until('document.body.innerText.includes("Phiên đăng nhập đã hết hạn")');
-  assert.equal(await evaluate(`sessionStorage.getItem(${JSON.stringify(tokenKey)})`), null);
-  assert.equal(await evaluate('document.querySelector(".cafe-computers a").getAttribute("href")'), '/admin/auth');
+  assert.equal(await evaluate(`localStorage.getItem(${JSON.stringify(tokenKey)})`), null);
+  assert.equal(await evaluate('location.pathname'), '/admin/auth');
 
   for (const width of [390, 320]) {
     await cdp('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
-    identityStatus = 200;
+    identityStatus = 200; listStatus = 200;
     fixture.computers = computerFixture().computers;
-    await evaluate(`sessionStorage.setItem(${JSON.stringify(tokenKey)}, 'browser-test-token')`);
-    await click('Tải lại'); await ready();
+    if (await evaluate('Boolean(document.querySelector(".auth-form"))')) await login();
+    else await cdp('Page.reload');
+    await ready();
     assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'), `Overflow at ${width}`);
     await open('API-PC-01');
     assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'), `Modal overflow at ${width}`);
     await screenshot(`computers-api-${width}.png`);
     await close();
   }
-  assert.deepEqual(interceptionErrors, []);
+  // Server-side expiry on PATCH must clear the shared session and leave no success notice.
+  patchMode = 'expired';
+  await open('API-PC-01');
+  await click('Chuyển bảo trì', 'dialog button');
+  await until('location.pathname === "/admin/auth" && Boolean(document.querySelector(".auth-form"))');
+  assert.equal(await evaluate('Boolean(document.querySelector(".cafe-notice"))'), false);
+  assert.equal(await evaluate(`localStorage.getItem(${JSON.stringify(tokenKey)})`), null);
+
+  await login(); await ready();
+  identityStatus = 401;
+  await cdp('Page.reload');
+  await until('location.pathname === "/admin/auth" && document.body.innerText.includes("Phiên đăng nhập đã hết hạn")');
+  assert.equal(await evaluate(`localStorage.getItem(${JSON.stringify(tokenKey)})`), null);
+  identityStatus = 200;
+
+  // Reload with an expired stored session must not fetch protected computer data.
+  await login(); await ready();
+  const readsBeforeExpiry = requests.filter(row => row.path.startsWith('/api/admin/')).length;
+  await evaluate(`(() => { const key = ${JSON.stringify(tokenKey)}; const session = JSON.parse(localStorage.getItem(key)); session.expiresAtUtc = '2000-01-01T00:00:00Z'; localStorage.setItem(key, JSON.stringify(session)); })()`);
+  await cdp('Page.reload');
+  await until('location.pathname === "/admin/auth" && document.body.innerText.includes("Phiên đăng nhập đã hết hạn")');
+  assert.equal(requests.filter(row => row.path.startsWith('/api/admin/')).length, readsBeforeExpiry);
+  assert.equal(await evaluate(`localStorage.getItem(${JSON.stringify(tokenKey)})`), null);
+
+  expiresInMs = 1500;
+  await login(); await ready();
+  await until('location.pathname === "/admin/auth" && document.body.innerText.includes("Phiên đăng nhập đã hết hạn")');
+  assert.equal(await evaluate(`localStorage.getItem(${JSON.stringify(tokenKey)})`), null);
+  assert.deepEqual(interceptionErrors.filter(error =>
+    !(error.message.includes('Invalid InterceptionId') && canceledRequests.has(error.networkId))), []);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ passed: true, source: 'HTTP fixtures (not SQL)', checks: [
-    'login required/loading/no demo fallback', 'API rooms/types/search/list/nullable specs',
+    'login form/shared session/legacy token ignored/loading/no demo fallback', 'API rooms/types/search/list/nullable specs',
     'open-session/maintenance/unknown states blocked', 'pending/double-click/PATCH payload/reload',
-    'read-only permissions/500/409 refetch/401/403', 'malformed data/empty/retry', '390/320px layouts',
+    'read-only permissions/500/409 refetch/GET and PATCH 401/403/expired reload', 'malformed data/empty/retry', '390/320px layouts',
   ] }));
 } finally {
+  waitingIdentities.splice(0).forEach(resolve => resolve());
   waitingLists.splice(0).forEach((resolve) => resolve());
   waitingPatches.splice(0).forEach((resolve) => resolve());
-  await evaluate(`sessionStorage.removeItem(${JSON.stringify(tokenKey)}); localStorage.removeItem('net-cafe.admin.computers.v1')`).catch(() => {});
+  await evaluate(`localStorage.removeItem(${JSON.stringify(tokenKey)}); localStorage.removeItem('net-cafe.admin.computers.v1'); sessionStorage.removeItem('nexora.staff.accessToken')`).catch(() => {});
   await cdp('Fetch.disable').catch(() => {});
   socket.removeEventListener('message', onMessage);
   socket.close();

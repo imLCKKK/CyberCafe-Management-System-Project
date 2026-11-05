@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), '');
   const proxy = {
     // Keep OP.GG middleware local; forward only the .NET auth/admin routes.
-    '^/api/(auth|admin)(/|$)': { target: env.API_PROXY_TARGET || 'http://127.0.0.1:5088', changeOrigin: true },
+    '^/api/(auth|admin)(/|$)': { target: env.VITE_API_PROXY_TARGET || env.API_PROXY_TARGET || 'http://127.0.0.1:5088', changeOrigin: true },
   };
   return {
     plugins: [react(), {
