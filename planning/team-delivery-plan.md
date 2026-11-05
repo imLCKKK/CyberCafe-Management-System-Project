@@ -372,5 +372,12 @@ PR / trạng thái / blocker:
 | Giải đấu: UI đang miễn phí nhưng DBML có phí; chọn policy nhất quán, thời hạn đăng ký/hủy và điều kiện đủ đội | Đại + Minh + Phúc |
 | ML chia đội: kiểm kê phần Phúc đã làm; chốt bài toán, dataset/đặc trưng, ràng buộc đội, baseline, chỉ số/ngưỡng đánh giá và cách chạy model | Phúc + Đại |
 | Chứng từ/doanh thu: thời điểm ghi nhận, hoàn tiền, giảm giá, phân biệt nạp ví và doanh thu | Trường + Khang + Phúc |
+| Giờ hoàn ZaloPay khi Query Refund không trả thời điểm: đề xuất phân biệt thời điểm provider và thời điểm hệ thống xác nhận, ngày báo cáo theo mục 6.1.1 của contract SCRUM-12 | Minh + Trường; Trưởng nhóm review phương án |
+| Khóa phát hành hóa đơn qua retry/restart và hóa đơn 0 đồng: đề xuất InvoiceIssueRequests lưu cùng transaction theo mục 6.3.1 của contract SCRUM-12 | Trường; Khang/Phúc đối chiếu caller |
 
 Credentials ZaloPay và callback HTTPS là **task phụ thuộc S1-M**, không phải lựa chọn cần người dùng xác nhận lại. Kết quả kickoff phải được ghi vào hợp đồng/schema trước khi các module triển khai khác nhau.
+
+Ngày 05/11/2026, Trưởng nhóm yêu cầu giữ merge SCRUM-12 (`229d7af`, PR #8) và bổ sung phần thiếu để
+review tiếp. [Contract SCRUM-12](../docs/contracts/inventory-invoice-voucher.md) mục 6.1.1/6.3.1/9.4
+ghi phương án thời gian hoàn và lưu khóa phát hành, cùng trách nhiệm giao nhận. Đây là đề xuất bổ sung,
+chưa phải phản hồi đồng thuận của Đại/Minh/Phúc/Khang hoặc quyết định nghiệm thu; P1 liên module còn mở.
