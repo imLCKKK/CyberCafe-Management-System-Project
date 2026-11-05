@@ -5,7 +5,7 @@
 | Công việc           | Define-Inventory-Invoice-Voucher-Contracts                               |
 | Mã Jira / kế hoạch  | SCRUM-12 / S1-T-1                                                        |
 | Người phụ trách     | Lê Vũ Huy Trường                                                         |
-| Phiên bản           | 1.6 - cập nhật 05/11/2026                                                |
+| Phiên bản           | 1.7 - bổ sung sau review 05/11/2026, chờ duyệt                            |
 | Backend đích        | CyberManagement, cấu trúc Backend/src, ApplicationDbContext, nền 35 bảng |
 | Phụ thuộc           | SCRUM-2 / S1-D-1 và SCRUM-5 / S1-M-1                                     |
 | Trạng thái bàn giao | Đề nghị review; các đầu vào và xác nhận còn chờ được liệt kê tại mục 9   |
@@ -28,6 +28,8 @@ Phạm vi bàn giao gồm:
 - Kết quả đối chiếu nguồn, đầu vào còn chờ và tiêu chí nghiệm thu.
 
 Việc triển khai chức năng, áp migration và kiểm thử tích hợp được thực hiện trong các task liên quan.
+Phần bổ sung phiên bản 1.7 tại mục 6.1.1/6.3.1 và các mapping tương ứng là phương án sau review,
+chưa phải quyết định đã được Trường, các owner tích hợp hoặc Trưởng nhóm chấp thuận; xem mục 9.4.
 
 ## 2. Định danh, xác thực và quy ước dữ liệu
 
@@ -108,6 +110,7 @@ Toàn bộ PK/FK mới dùng int, đồng bộ với schema CyberManagement hi�
 | OrderDetails, OrderStatusHistories                        | OrderDetailId, OrderId, ProductId, Quantity, UnitPrice và lịch sử sẵn có                                                                                                                            | Thêm tên món snapshot, giảm phân bổ và trạng thái/hủy theo contract đơn; đây là các phần bổ sung vào schema hiện tại                                                                                                          | Không trong task này                                                                                          | Khang                                                                                      |
 | Invoices                                                  | InvoiceId, CustomerId, GamingSessionId, EmployeeId, PromotionId, InvoiceDate, Subtotal, Discount, TotalAmount, Status                                                                               | Snapshot tổng/giảm/thu/hoàn và mapper từ nguồn thực theo mục 3.3; chuyển cột tiền sang decimal(18,0) theo mục 2.3 sau đối soát                                                                                                | Không tạo lại bảng                                                                                            | Trường                                                                                     |
 | InvoiceOrders                                             | Khóa kép (InvoiceId,OrderId) và hai FK hiện có                                                                                                                                                      | Thêm unique index OrderId để một đơn chỉ thuộc một chứng từ; giữ index phục vụ truy nguồn theo OrderId, không chuyển sang Invoice.OrderId XOR                                                                                 | Không                                                                                                         | Trường + Khang                                                                             |
+| Chưa có InvoiceIssueRequests                              | Không có nơi lưu khóa phát hành hóa đơn trong nền hiện tại | Lưu khóa, hash yêu cầu và InvoiceId cùng transaction phát hành theo mục 6.3.1; độc lập với khóa thu/hoàn trong Payments | InvoiceIssueRequests, không phải bảng ghi tiền | Trường; Khang/Phúc đối chiếu caller |
 | InvoiceDetails                                            | InvoiceDetailId, InvoiceId, ItemType, Description, Quantity, UnitPrice, Amount                                                                                                                      | Thêm OrderDetailId/SessionChargeId nullable với XOR theo dòng món/phí; FK NoAction, unique có lọc theo từng nguồn; callback phí tìm InvoiceId bằng SessionChargeId; giữ snapshot bất biến                                     | Không                                                                                                         | Trường; Khang/Phúc cung cấp nguồn                                                          |
 | Promotions (entity Promotion)                             | PromotionId, PromoName, DiscountType, DiscountValue, StartDate, EndDate, IsActive                                                                                                                   | Thêm Code unique, MinOrderAmount, MaxDiscountAmount nullable, TotalUsageLimit/PerCustomerUsageLimit nullable; chuẩn hóa loại/offset; tiền decimal(18,0), DiscountValue decimal(18,2) theo mục 2.3                             | Không tạo bảng Voucher khác                                                                                   | Trường                                                                                     |
 | Chưa có PromotionUsage                                    | Không có bảng để tái sử dụng                                                                                                                                                                        | FK int đến Promotions/Orders/Customers; xem rule usage                                                                                                                                                                        | PromotionUsages: từng lần dùng và hoàn lượt, unique OrderId                                                   | Trường                                                                                     |
@@ -453,7 +456,10 @@ Quyết định owner không thay cho phản hồi xác nhận của Minh/Khang/
 | Mã yêu cầu/kết quả hoàn gateway | Lưu trong RefundAttempts ở mục 6.4.1             | Một Refund nghiệp vụ có thể có nhiều mã thử gửi qua ngày; không ghi đè mất mã cũ trong Payments                            |
 | Reason                          | nvarchar(250)?                                   | Bắt buộc có lý do đã trim khi Type=Refund                                                                                  |
 | CreatedAt                       | datetimeoffset, bắt buộc                         | Thời điểm tạo yêu cầu thu/hoàn nội bộ                                                                                      |
-| PaymentTime                     | datetimeoffset?                                  | Thời điểm thu hoặc hoàn đã xác minh thành công; null khi chưa thành công, không dùng CreatedAt thay thế                    |
+| PaymentTime                     | datetimeoffset?                                  | Mốc ghi nhận dùng cho báo cáo theo mục 6.1.1; chỉ có khi Succeeded, đọc cùng PaymentTimeBasis                               |
+| ConfirmedAt                     | datetimeoffset?                                  | Thời điểm hệ thống ghi nhận Succeeded trong transaction thành công đầu tiên, không thay khi retry                          |
+| ProviderOccurredAt              | datetimeoffset?                                  | Thời điểm giao dịch do provider cung cấp và được xác minh; nullable khi response không có trường này                       |
+| PaymentTimeBasis                | nvarchar(20)?, Source / Confirmation              | Source: có thời điểm nguồn; Confirmation: dùng ConfirmedAt khi thiếu thời điểm provider; không gắn nhãn là giờ thực hoàn   |
 
 Ràng buộc được phân theo nơi thực thi, không gộp kiểm tra chéo bảng vào CHECK:
 
@@ -463,7 +469,8 @@ Ràng buộc được phân theo nơi thực thi, không gộp kiểm tra chéo 
 - Đúng một nguồn OrderId hoặc SessionChargeId khác null; InvoiceId không thay thế nguồn nghiệp vụ.
 - Type=Payment: RefundOfPaymentId và OrderDetailId null. Type=Refund: RefundOfPaymentId không null,
   khác PaymentId, Reason không null và sau trim còn nội dung; không dùng trạng thái Expired.
-- Succeeded có PaymentTime; trạng thái khác để PaymentTime null. Expired chỉ dành cho Type=Payment.
+- Succeeded có PaymentTime, ConfirmedAt và PaymentTimeBasis hợp lệ; trạng thái khác để cả ba null.
+  Basis=Confirmation yêu cầu PaymentTime=ConfirmedAt. Expired chỉ dành cho Type=Payment.
 - Method=Wallet và Succeeded phải có WalletTransactionId. Thu ZaloPay phải có MerchantTransactionId,
   và khi Succeeded có GatewayTransactionId. Các điều kiện này chỉ xét cột cùng dòng, chưa chứng minh
   nội dung ledger hoặc dữ liệu provider hợp lệ.
@@ -495,6 +502,44 @@ WalletTransactions vẫn là sổ tiền có thẩm quyền của ví. Minh cung
 nguồn đơn/khoản phí cho ledger dịch vụ; có thể truy ngược FK qua dòng Payment liên kết, không dựa
 Description. Các nguồn nạp ví/giải ngoài phạm vi không bị ép thành đơn món hoặc SessionCharge.
 Không chuyển tiền trực tiếp trên Customers mà bỏ ledger hoặc chỉ tạo dòng đối soát khi đã phát hành hóa đơn.
+
+#### 6.1.1. Thời điểm nguồn và thời điểm xác nhận khi query hoàn
+
+**Bổ sung thiết kế sau review, chờ Trưởng nhóm duyệt và Minh đối chiếu adapter.**
+Response được công bố của [Query Refund](https://docs.zalopay.vn/docs/specs/order-query-refund/)
+chỉ có mã/thông báo trạng thái; không có thời điểm thực hoàn. Không lấy timestamp của request,
+CreatedAt của Refund hoặc tiền tố ngày trong mã hoàn làm thời điểm thực hoàn. Query thành công
+vẫn phải được ghi nhận dù thiếu thời điểm này; không giữ Refund Pending chỉ để chờ một trường
+provider không trả về. Quy tắc đích:
+
+Basis trong các mô tả dưới đây là viết tắt của cột PaymentTimeBasis, không phải một cột khác.
+
+| Nguồn | PaymentTime và PaymentTimeBasis khi lần đầu ghi Succeeded |
+| --- | --- |
+| Wallet | Mốc của ledger debit/credit đã đối soát, Basis=Source; ConfirmedAt là lúc hệ thống ghi nhận cùng transaction |
+| Cash | Mốc nhân viên đủ quyền xác nhận thực thu/hoàn tại server, Basis=Source; không nhận ngày tùy ý từ browser |
+| ZaloPay thu có thời điểm giao dịch hợp lệ | ProviderOccurredAt từ server_time đã xác minh của Callback/Query Order, PaymentTime bằng thời điểm này, Basis=Source |
+| ZaloPay hoàn, hoặc kết quả đã xác minh thiếu thời điểm giao dịch | ProviderOccurredAt null, PaymentTime=ConfirmedAt, Basis=Confirmation; đây là ngày hệ thống xác nhận, không phải khẳng định ngày thực hoàn |
+
+ConfirmedAt do server gán UTC khi chuyển Succeeded trong transaction; chỉ có giá trị sau khi
+transaction commit. Nếu rollback, lần xử lý thành công sau gán lại; retry sau commit giữ nguyên
+ConfirmedAt/PaymentTime/Basis. FK/ledger và kết quả provider vẫn phải được xác minh theo mục 6.1.
+Service kiểm tra Basis=Source có nguồn thời gian đúng loại: ledger/cash hợp lệ hoặc timestamp
+provider hợp lệ; không dùng CHECK liên bảng để thay việc đối chiếu này.
+
+Báo cáo và DTO tiền phải cung cấp paymentTime, confirmedAt, providerOccurredAt, paymentTimeBasis.
+Lọc ngày theo PaymentTime ở +07:00; hiển thị rõ các khoản Basis=Confirmation và số lượng/tổng tiền
+của chúng khi đối soát, để người đọc biết thiếu ngày giao dịch từ provider. Số đã thu/hoàn và
+PaidAmount vẫn tính đúng một lần theo Status/Type, không phụ thuộc việc có thời điểm provider.
+Ví dụ Refund được tạo 05/11 lúc 23:58, query xác nhận thành công 06/11 lúc 00:03 (+07:00), không có
+giờ thực hoàn: PaymentTime=ConfirmedAt tại 06/11 00:03, Basis=Confirmation; ghi giảm theo ngày
+06/11 và không ghi đây là bằng chứng tiền đã hoàn ngày 05/11 hay đúng 00:03 bên provider.
+
+Nếu có bằng chứng thời điểm provider đến sau, chỉ bổ sung ProviderOccurredAt có audit và nguồn
+chứng minh; không âm thầm đổi PaymentTime/Basis/ConfirmedAt hoặc tổng báo cáo đã ghi nhận.
+Điều chỉnh kỳ báo cáo cần quy trình đối soát do người có quyền phê duyệt; ghi nhận thời gian mới
+không tạo thêm Refund/ledger hoặc hoàn lại tiền. Dữ liệu cũ chỉ backfill từ bằng chứng có thật;
+không dùng thời điểm chạy migration làm ConfirmedAt của giao dịch lịch sử.
 
 ### 6.2. Ghi thu, khóa chống lặp và cash thu gộp
 
@@ -537,7 +582,7 @@ Customer (ví và chủ nguồn)
 → Computer → GamingSession → SessionCharge → Order (nguồn liên quan)
 → Product (tồn kho, ProductId tăng dần) → Promotion (nếu dùng voucher)
 → Payment gốc → Payment Refund → RefundAttempt
-→ Invoice → AuditLogs (ghi audit nếu có)
+→ Invoice → InvoiceIssueRequest (chỉ khi phát hành) → AuditLogs (ghi audit nếu có)
 ```
 
 Hủy đơn/món phải lấy toàn bộ Product liên quan theo ProductId tăng dần sau khi đã khóa nguồn Order,
@@ -563,7 +608,9 @@ Minh/Phúc/Khang phải phản hồi nếu writer của họ dùng thứ tự kh
 
 #### 6.2.2. Bảng chuyển trạng thái thu và hoàn
 
-PaymentTime chỉ được đặt khi ghi nhận Succeeded có căn cứ thực thu/hoàn, không tự dùng lúc query/callback đến.
+PaymentTime/ConfirmedAt/Basis chỉ được đặt khi ghi nhận Succeeded có căn cứ thu/hoàn.
+Thời điểm query chỉ dùng làm mốc xác nhận theo mục 6.1.1 khi thiếu thời điểm provider;
+phải ghi Basis=Confirmation, không coi đó là giờ giao dịch thực tế.
 Các chuyển trạng thái không nằm trong bảng bị từ chối hoặc đưa vào đối soát, không cập nhật ngầm.
 
 | Type    | Từ → sang                       | Điều kiện và tác động                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -634,7 +681,9 @@ khóa nghiệp vụ mới và kiểm tra lại quyền/hạn mức/nguồn hủy
 3. Tính PaidAmount theo quy tắc một nguồn tại mục 7, không debit ví, nhận cash hoặc gọi tạo giao dịch
    gateway trong thao tác phát hành. Hóa đơn còn phải thu vẫn Unpaid (API Pending).
 4. Retry cùng khóa phát hành và cùng tập nguồn trả hóa đơn cũ; khác nội dung trả 409.
-   Khóa nguồn và ràng buộc chống trùng phải chặn hai request tạo hóa đơn cho cùng đơn/phí phiên.
+   Khóa phát hành được lưu bền vững tại InvoiceIssueRequests theo mục 6.3.1, không chỉ giữ trong RAM
+   hoặc suy từ Payments.OperationKey. Khóa nguồn và ràng buộc chống trùng phải chặn hai request
+   tạo hóa đơn cho cùng đơn/phí phiên.
 
 Không chỉ xử lý liên kết ở lúc phát hành: khi Payment Pending/Expired hoặc Failed theo ngoại lệ ở bảng trạng thái được provider xác nhận thu
 thành công sau đó, callback/query phải khóa theo mục 6.2.1. Với OrderId tra InvoiceOrders qua
@@ -648,6 +697,60 @@ Trường hợp nguồn đã hủy, hóa đơn không còn nhận thu hoặc ph�
 phải giữ bằng chứng khoản thu thực tế theo mã gateway, đưa vào đối soát/hoàn theo nguồn gốc;
 không gắn vào hóa đơn khác, tự cộng ví, đánh dấu đã hoàn hoặc lặng lẽ cắt số tiền dư.
 Policy thời hạn và tự động hay duyệt hoàn thuộc giao điểm gateway tại mục 6.5.
+
+#### 6.3.1. Khóa phát hành hóa đơn lưu trong InvoiceIssueRequests
+
+**Bổ sung thiết kế sau review, chờ duyệt.** Trường bổ sung bảng InvoiceIssueRequests để một lần
+phát hành vẫn được nhận diện sau restart, kể cả hóa đơn 0 đồng không có dòng Payments.
+Đây là metadata của thao tác phát hành; không chứa Amount/ledger và không được cộng vào doanh thu.
+
+| Trường | Kiểu và ràng buộc đích | Ý nghĩa |
+| --- | --- | --- |
+| OperationKey | nvarchar(100), PK, bắt buộc, format [A-Za-z0-9:_-]{1,100}, so sánh phân biệt hoa/thường bằng binary collation | Khóa ổn định cho một yêu cầu phát hành; không tạo khóa mới khi retry |
+| RequestHash | char(64), NOT NULL, SHA-256 hex lowercase | Hash nội dung yêu cầu đã chuẩn hóa, gồm version của định dạng |
+| InvoiceId | int NOT NULL, FK Invoices.InvoiceId, NoAction, unique | Một yêu cầu thành công gắn đúng một hóa đơn; một hóa đơn mới chỉ có một bản ghi phát hành |
+
+OperationKey của bảng này độc lập với Payments.OperationKey. PK bảo vệ khóa không trùng;
+validation/CHECK bảo vệ định dạng không rỗng và hash 64 ký tự hex. Không hard-delete khóa sau
+khi hủy/hoàn hóa đơn; không cho InvoiceId hoặc RequestHash thay đổi sau commit.
+
+Chuẩn hóa yêu cầu trước khi tra khóa: kind=Orders hoặc Session theo điểm gọi, customerId lấy từ
+nguồn đã xác minh, employeeId từ principal nhân viên, gamingSessionId (null nếu không yêu cầu phiên),
+orderIds là mảng ID int dương đã loại trùng và sắp tăng dần. JSON UTF-8 compact có thứ tự field
+như ví dụ dưới, không BOM, không khoảng trắng; SHA-256 của bytes đó là RequestHash. Kind=Session
+bắt buộc có gamingSessionId. Giá/giảm/tổng, thời gian gọi và trạng thái thanh toán hiện tại không
+nằm trong hash; chúng là kết quả server đọc, không phải nội dung caller được phép đổi.
+
+```json
+{"version":1,"kind":"Orders","customerId":7,"employeeId":3,"gamingSessionId":null,"orderIds":[12,18]}
+```
+
+Invoice.IssueForSession phải nhận tập orderIds cụ thể, có thể rỗng; không hiểu retry là chọn lại
+mọi đơn mới phát sinh. Các SessionCharge được chọn dưới khóa nguồn trong lần đầu và giữ bằng
+InvoiceDetails bất biến; retry tra khóa cũ trước khi chọn lại phí. Không tự thêm phí/đơn mới vào
+hóa đơn cũ. Một yêu cầu phát hành bổ sung cần khóa mới và chỉ được chọn các nguồn chưa có chứng từ.
+
+Luồng nguyên tử và xử lý tranh chấp:
+
+1. Xác thực, kiểm tra invoice.create và quyền với khách/nguồn trước khi trả kết quả theo khóa.
+   Tra InvoiceIssueRequests; cùng hash trả cùng InvoiceId, khác hash trả 409, không ghi thay đổi.
+   Không dùng cùng khóa để xem hóa đơn vượt quyền; đổi employeeId cũng là đổi nội dung yêu cầu.
+2. Nếu chưa có khóa, mở transaction, khóa nguồn theo mục 6.2.1; đọc lại khóa sau khi chờ nguồn,
+   trước khi kết luận nguồn đã có chứng từ. Tạo Invoice, InvoiceOrders, InvoiceDetails, liên kết
+   khoản thu/hoàn và insert InvoiceIssueRequests cùng transaction. Không lưu bản ghi khóa mồ côi
+   trước khi có hóa đơn; lỗi bất kỳ phần nào rollback toàn bộ.
+3. Hai request cùng khóa nhưng khác nguồn có thể đụng PK sau khi đã tạo hóa đơn tạm trong transaction.
+   Khi lỗi unique, rollback toàn bộ request thua, rồi đọc khóa đã commit và áp quy tắc hash ở bước 1;
+   không giữ hóa đơn/chi tiết tạm và không retry riêng đoạn insert khóa. Khóa khác nhưng trùng nguồn
+   phải bị unique OrderId/SessionChargeId từ chối, trả 409, không tạo hóa đơn thứ hai.
+4. Mất response hoặc restart sau commit: tra cùng khóa để trả InvoiceId cũ; không gọi thu/hoàn,
+   không thêm Invoice/InvoiceDetail/Payment/ledger, kể cả nguồn đã bị hủy hoặc thanh toán thay đổi.
+   Quyền truy cập hiện tại vẫn được kiểm tra; không tự khôi phục trạng thái hóa đơn từ response cũ.
+
+Không tạo khóa giả cho hóa đơn lịch sử chưa có yêu cầu gốc; giữ các hóa đơn đó và xử lý trùng nguồn
+trước unique index. Khóa mới không được gắn vào hóa đơn cũ để tuyên bố đã xử lý một request chưa
+có bằng chứng. Bảng mới được triển khai trước khi bật đường phát hành mới; mọi caller phát hành mới
+bắt buộc ghi metadata này. Trường sở hữu entity/config/migration của bảng, Khang/Phúc nối điểm gọi.
 
 ### 6.4. Khoản hoàn là dòng riêng trong Payments
 
@@ -790,14 +893,15 @@ riêng đáp ứng giới hạn đã xác minh. Không đưa giới hạn 100 th
 
 ### 6.5. Đầu vào và xác nhận liên module còn chờ
 
-Ba phần nơi lưu, liên kết hóa đơn và chống thu/hoàn lặp đã được owner chọn về thiết kế tại mục 6.1–6.4.
+Ba phần nơi lưu, liên kết hóa đơn và chống thu/hoàn lặp đã được owner chọn ở nền thiết kế 1.6 tại mục 6.1–6.4.
+Phần bổ sung 1.7 về thời gian và khóa phát hành là đề xuất chờ review theo mục 9.4.
 Chưa coi đây là code đã chạy, migration đã áp hoặc phản hồi chấp thuận của các owner khác.
 
 | Giao điểm           | Đầu vào / xác nhận cần bổ sung                                                                                                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Minh: ví và gateway | Mapping ledger/OperationKey, dấu và Type ví, app merchant/callback/query/hoàn ZaloPay, trạng thái cuối và backfill; xác nhận Payments thu/hoàn, RefundAttempts và migration thuộc phần Minh |
-| Khang: đơn và cash  | Nguồn OrderId/OrderDetailId, khóa của thao tác đặt/hủy/thu gộp, tiền còn phải thu và điểm gọi cùng transaction                                                                              |
-| Phúc: phiên         | ChargeId, nguồn ledger/snapshot phí, đóng phiên/actor và đối chiếu thứ tự khóa đề xuất mục 6.2.1 với writer ví/chứng từ                                                                     |
+| Minh: ví và gateway | Mapping ledger/OperationKey, dấu và Type ví, app merchant/callback/query/hoàn ZaloPay, trạng thái cuối và backfill; xác nhận Payments thu/hoàn, RefundAttempts, các trường thời gian/Basis mục 6.1.1 và migration thuộc phần Minh |
+| Khang: đơn và cash  | Nguồn OrderId/OrderDetailId, khóa của thao tác đặt/hủy/thu gộp, tiền còn phải thu và điểm gọi cùng transaction; đối chiếu payload/khóa phát hành tại mục 6.3.1 |
+| Phúc: phiên         | ChargeId, nguồn ledger/snapshot phí, đóng phiên/actor, payload phát hành phí tại mục 6.3.1 và đối chiếu thứ tự khóa đề xuất mục 6.2.1 với writer ví/chứng từ |
 | Gateway             | Thời hạn giữ tồn/lượt, callback muộn, duyệt hoàn/thu dư; Minh xác nhận sandbox cho độ dài/format theo nguồn ngôn ngữ và bảng mã lỗi đúng API mục 6.4.1                                      |
 | Giao nhận và duyệt  | Commit/PR hoặc phản hồi cụ thể của từng owner; Trưởng nhóm xem xét contract chung trước triển khai                                                                                          |
 
@@ -813,7 +917,7 @@ nhất quán cho tổng đã thu của hóa đơn và báo cáo; Payment đối 
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Wallet thu/hoàn dịch vụ              | Chỉ WalletTransactions debit/credit đã commit, đúng nguồn đơn/phí phiên qua FK hoặc Payment liên kết; loại trừ Payment/Refund Method=Wallet khỏi phép cộng | CreatedAt của ledger sau đối chiếu múi giờ; không lấy InvoiceDate                             |
 | Cash                                 | Payments Method=Cash, Status=Succeeded; Type=Payment cộng, Type=Refund trừ                                                                                 | PaymentTime là lúc thực thu/hoàn, có xác nhận người đủ quyền                                  |
-| ZaloPay món                          | Payments Method=ZaloPay, Status=Succeeded, kết quả được server xác minh; Type quyết định thu/hoàn                                                          | PaymentTime theo kết quả thực tế đã xác minh, không dùng redirect hoặc ngày nhận lại callback |
+| ZaloPay món                          | Payments Method=ZaloPay, Status=Succeeded, kết quả được server xác minh; Type quyết định thu/hoàn                                                          | PaymentTime cùng Basis theo mục 6.1.1; thiếu giờ provider thì dùng ngày xác nhận đầu tiên và ghi rõ Confirmation |
 | Phí phiên                            | Nguồn SessionCharge và ledger/Payment tương ứng theo phương thức, không cộng thêm SessionCharge.Amount vào khoản đã tính                                   | Theo khoản thực thu được ghi nhận, không coi phí ước tính là doanh thu                        |
 | Nạp ví                               | Nguồn nạp do Minh bàn giao                                                                                                                                 | Báo riêng, không là doanh thu sử dụng dịch vụ                                                 |
 | Invoice/InvoiceOrders/InvoiceDetails | Đối soát nguồn, snapshot và trạng thái phải thu/đã thu/hủy                                                                                                 | InvoiceDate là ngày phát hành, không mặc định ngày thu/hoàn                                   |
@@ -842,8 +946,9 @@ Ví dụ đối chiếu bắt buộc:
 
 Mapping Type/dấu ledger và dữ liệu cũ do Minh xác nhận; không áp enum của DBML cũ vào schema mới.
 Nạp ZaloPay vào ví vẫn là nạp ví, không tính như thu ZaloPay món. Thu trước hóa đơn vẫn được tính
-đúng ngày thực thu theo nguồn, không bỏ qua chỉ vì InvoiceId còn null. Khoản hoàn tính ngày
-thực hoàn, không sửa lại doanh thu ngày đặt; Pending/Failed không được tính như đã thu/hoàn.
+theo ngày ghi nhận của nguồn, không bỏ qua chỉ vì InvoiceId còn null. Khoản hoàn tính theo
+PaymentTime và Basis ở mục 6.1.1; thiếu giờ provider thì dùng ngày xác nhận và thể hiện rõ giới hạn,
+không sửa lại doanh thu ngày đặt. Pending/Failed không được tính như đã thu/hoàn.
 Thiếu liên kết hoặc khoản thu dư chưa đối soát phải báo rõ, không tự trả số 0 hoặc che tiền dư.
 
 Ngày from/to dạng YYYY-MM-DD; từ đầu ngày +07:00 đến trước đầu ngày sau to. Đơn đếm theo
@@ -858,14 +963,15 @@ chưa có nguồn Minh bàn giao. Hóa đơn seed không có ledger/payment khô
 | Minh   | Customers/WalletTransactions/Payments và nguồn nạp/gateway             | Đối chiếu dấu/type ledger, nguồn/khóa thu-hoàn trong Payments, gateway và migration mục 6.1–6.5 |
 | Phúc   | Computers/GamingSessions/SessionCharges                                | Snapshot phí/giá giờ, tổng đã ghi nhận, kết thúc phiên và actor                                 |
 | Khang  | Categories/Products/Orders/OrderDetails                                | Giữ Stock/IsActive; thêm snapshot món/giảm, trạng thái hủy và điểm gọi rule                     |
-| Trường | InventoryTransactions/Promotions/Invoices/InvoiceOrders/InvoiceDetails | Mở rộng các bảng sẵn có; thêm PromotionUsages, query/DTO và rule; điều phối thứ tự migration    |
+| Trường | InventoryTransactions/Promotions/Invoices/InvoiceOrders/InvoiceDetails | Mở rộng các bảng sẵn có; thêm PromotionUsages, InvoiceIssueRequests, query/DTO và rule; điều phối thứ tự migration |
 
 Thứ tự tích hợp trên nền CyberManagement 35 bảng:
 
 1. Giữ lịch sử migration nguồn, xác nhận commit nền và đúng database thử.
    Không tạo lại Employees/Customers/Products/Invoices hoặc áp InitialCreate của hệ 19 bảng vào đây.
 2. Minh đối chiếu và mở rộng Payments thu/hoàn theo mục 6.1–6.4; Khang/Phúc bổ sung nguồn đơn/phiên
-   và snapshot phần mình. Bổ sung RefundAttempts phục vụ query/retry mã hoàn; không thêm sổ tiền song song.
+   và snapshot phần mình. Bổ sung RefundAttempts phục vụ query/retry mã hoàn; ConfirmedAt,
+   ProviderOccurredAt, PaymentTimeBasis và mapping báo cáo theo mục 6.1.1; không thêm sổ tiền song song.
    Với OperationKey: thêm cột tạm nullable và unique filtered, bắt buộc khóa ở mọi ghi mới, backfill
    dữ liệu cũ có đối ứng rồi chuyển NOT NULL trước nghiệm thu; chặn thiếu/trùng, không bỏ qua dữ liệu lỗi.
    Trường đối chiếu chỉ những field/constraint Product thực sự thiếu; không thêm StockQuantity cạnh Stock.
@@ -873,7 +979,9 @@ Thứ tự tích hợp trên nền CyberManagement 35 bảng:
    Cùng Khang thêm snapshot voucher trên Orders/OrderDetails; tạo PromotionUsages sau khi FK nguồn đã có.
 4. Trường mở rộng InventoryTransactions, InvoiceDetails và phần truy vết/tiền chứng từ cần thiết.
    Giữ InvoiceOrders, thêm unique OrderId; thêm InvoiceDetails.OrderDetailId/SessionChargeId,
-   FK NoAction và unique filtered theo nguồn sau backfill. Đối soát trùng trước khi áp constraint.
+   FK NoAction và unique filtered theo nguồn sau backfill. Thêm InvoiceIssueRequests với PK khóa,
+   hash và unique FK InvoiceId; bật ghi nguyên tử cho mọi phát hành mới theo mục 6.3.1.
+   Đối soát trùng trước khi áp constraint; không backfill khóa giả cho hóa đơn cũ.
 5. Rà backfill/type/precision/offset, thêm constraint/index sau dữ liệu hợp lệ, chạy trên DB thử mới
    với seed nhất quán; cập nhật schema/SQL mô tả theo migration đã tích hợp ở S1-T-2.
 
@@ -928,6 +1036,23 @@ liên kết hóa đơn và chống thu/hoàn lặp tại mục 6.1–6.4; chưa 
 Các bên cung cấp đầu vào của module mình và phản hồi những xung đột cụ thể trước khi triển khai.
 Không tự thay quy tắc hoặc duy trì hai schema/rule khác nhau.
 
+### 9.4. Bổ sung theo yêu cầu Trưởng nhóm ngày 05/11/2026
+
+Trưởng nhóm yêu cầu giữ merge PR #8 tại 229d7af và bổ sung phần thiếu để review tiếp.
+Yêu cầu thực hiện bổ sung không phải quyết định nghiệm thu SCRUM-12 hoặc xác nhận thay các owner.
+
+| Nội dung | Ghi nhận / nơi đối chiếu | Trạng thái |
+| --- | --- | --- |
+| Nền bổ sung | Giữ merge 229d7af; sửa tài liệu trên nhánh riêng từ dev | Theo yêu cầu trực tiếp của Trưởng nhóm |
+| Giờ hoàn thiếu từ provider | Phương án ConfirmedAt/ProviderOccurredAt/PaymentTimeBasis, quy tắc ngày báo cáo ở mục 6.1.1 | Đề xuất bổ sung chờ review; Minh đối chiếu adapter và dữ liệu |
+| Khóa phát hành | InvoiceIssueRequests, hash yêu cầu và lưu cùng transaction ở mục 6.3.1 | Đề xuất bổ sung chờ review; Trường triển khai, Khang/Phúc đối chiếu caller |
+| Phản hồi liên module | Các đầu vào tại mục 6.5 và 9.2–9.3 | Chưa có bằng chứng phản hồi mới; giữ P1 còn mở |
+| Nghiệm thu cuối | Từng tiêu chí mục 10.2 và quyết định của Trưởng nhóm | Chưa ghi nhận duyệt; không chuyển Done từ việc đã merge hoặc sửa tài liệu |
+
+Khi nhận phản hồi, bổ sung commit/PR hoặc nội dung xác nhận có thể đối chiếu theo từng giao điểm;
+nếu có khác biệt thì cập nhật cùng một contract trước khi viết migration. Không ghi “đã đồng ý”
+chỉ vì đã rà code, được giao bổ sung, hoặc thành viên không phản hồi.
+
 ## 10. Kiểm chứng và tiêu chí bàn giao
 
 ### 10.1. Bằng chứng hiện có
@@ -966,6 +1091,16 @@ dotnet run --project Backend/tests/CyberManagement.API.Checks/CyberManagement.AP
 - Hóa đơn: nhiều đơn cùng khách/phiên, chống phát hành trùng, snapshot bất biến,
   thu/hoàn lặp, hóa đơn 0 đồng và hủy một phần hóa đơn gộp; callback thành công sau phát hành
   và tranh chấp phát hành/callback vẫn liên kết đúng nguồn, không thu lại.
+- Khóa phát hành: cùng khóa/cùng nguồn sau restart trả InvoiceId cũ; thứ tự orderIds khác hoặc ID
+  lặp được chuẩn hóa như nhau; cùng khóa đổi khách/nhân viên/kind/phiên/tập đơn trả 409.
+  Hai request cùng khóa khác tập nguồn chỉ một request commit; request thua không để lại hóa đơn,
+  chi tiết hoặc liên kết tiền. Khóa khác cùng nguồn không tạo hóa đơn thứ hai. Thử hóa đơn 0 đồng,
+  mất response, quyền bị thu hồi, lỗi insert khóa và hóa đơn lịch sử chưa có khóa.
+- Thời gian hoàn: tạo trước nửa đêm, query xác nhận sau nửa đêm không có giờ provider thì Succeeded
+  với Basis=Confirmation, ghi đúng ngày xác nhận và chỉ giảm PaidAmount/doanh thu một lần.
+  Query trùng ngày sau không đổi mốc/Basis; rollback không lưu mốc thành công. Có giờ provider
+  đến sau thì giữ ngày báo cáo đã ghi nhận, bổ sung bằng chứng/audit, không thêm khoản hoàn;
+  không coi CreatedAt của Refund hoặc ngày trong mã hoàn là giờ thực hoàn.
 - Thanh toán: XOR nguồn, khóa bắt buộc cho ghi mới, retry cùng/khác nội dung, cash batch nguyên tử,
   ví/Payment không cộng hai lần; hai yêu cầu hoàn cạnh tranh tính cả Pending, timeout hoàn không
   giải phóng giữ chỗ sai, Refund không thay Amount/Status của khoản thu gốc.
@@ -1030,6 +1165,8 @@ Nguồn auth đã kiểm tra: SCRUM-2 tại 15d537d. Các nguồn được ghim 
 - [ZaloPay Create Order: `app_trans_id` string(40), format ngày và app](https://docs.zalopay.vn/vi/docs/specs/order-create/).
 
 - [ZaloPay Query Refund: truy vấn theo `app_id` và `m_refund_id` đã lưu](https://docs.zalopay.vn/docs/specs/order-query-refund/).
+
+- [ZaloPay Query Order: server_time của giao dịch thu; khác response Query Refund không có thời điểm thực hoàn](https://docs.zalopay.vn/docs/specs/order-query/).
 
 - [ZaloPay status codes: phân biệt Processing, query lỗi và `M_REFUND_ID_NOT_FOUND`](https://docs.zalopay.vn/docs/developer-tools/knowledge-base/status-codes/).
 
