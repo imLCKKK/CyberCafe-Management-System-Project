@@ -2,16 +2,21 @@
 import { request } from './http';
 import { toWalletTransaction } from './walletTypes';
 
-const staff = (path, options = {}) => request(path, { kind: 'staff', ...options });
+export { newIdempotencyKey } from './http';
 
-export const listCustomers = () => staff('/api/admin/customers');
-export const createCustomer = (body) => staff('/api/admin/customers', { method: 'POST', body });
-export const updateCustomer = (id, body) => staff(`/api/admin/customers/${id}`, { method: 'PUT', body });
+export const listCustomers = () => request('/api/admin/customers');
+export const createCustomer = (body) => request('/api/admin/customers', { method: 'POST', body });
+export const updateCustomer = (id, body) => request(`/api/admin/customers/${id}`, { method: 'PUT', body });
 export const changeCustomerStatus = (id, status, reason) =>
-  staff(`/api/admin/customers/${id}/status`, { method: 'PUT', body: { status, reason } });
-export const staffTopUp = (id, amount, collectionMethod) =>
-  staff(`/api/admin/customers/${id}/wallet/top-ups`, { method: 'POST', body: { amount, collectionMethod } });
+  request(`/api/admin/customers/${id}/status`, { method: 'PUT', body: { status, reason } });
+// idempotencyKey bắt buộc: gửi lại request (mạng chập chờn, bấm lại) với CÙNG khóa chỉ cộng ví một lần.
+export const staffTopUp = (id, amount, collectionMethod, idempotencyKey) =>
+  request(`/api/admin/customers/${id}/wallet/top-ups`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: { amount, collectionMethod },
+  });
 export async function listWalletTransactions(id) {
-  const rows = await staff(`/api/admin/customers/${id}/wallet-transactions`);
+  const rows = await request(`/api/admin/customers/${id}/wallet-transactions`);
   return rows.map(toWalletTransaction);
 }

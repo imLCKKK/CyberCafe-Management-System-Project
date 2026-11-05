@@ -11,7 +11,7 @@ public interface ICustomerService
     Task<CustomerDto> UpdateAsync(UpdateCustomerCommand command, CancellationToken cancellationToken);
     Task<CustomerDto> ChangeStatusAsync(ChangeCustomerStatusCommand command, CancellationToken cancellationToken);
     Task<IReadOnlyList<WalletTransactionDto>> GetWalletTransactionsAsync(int customerId, CancellationToken cancellationToken);
-    Task<WalletTransactionDto> TopUpAsync(StaffTopUpCommand command, CancellationToken cancellationToken);
+    Task<StaffTopUpResult> TopUpAsync(StaffTopUpCommand command, CancellationToken cancellationToken);
 }
 
 // Khách tự xem dữ liệu của mình: customerId luôn lấy từ token, không nhận từ request.

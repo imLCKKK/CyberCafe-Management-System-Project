@@ -56,11 +56,17 @@ public sealed class CustomersController(ICustomerService customers) : Controller
     [HttpPost("{id:int}/wallet/top-ups")]
     [Authorize(Policy = CustomerPolicies.WalletTopUp)]
     public async Task<ActionResult<WalletTransactionDto>> TopUp(
-        int id, [FromBody] StaffTopUpRequest request, CancellationToken cancellationToken)
+        int id, [FromBody] StaffTopUpRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey, CancellationToken cancellationToken)
     {
-        var transaction = await customers.TopUpAsync(
-            new StaffTopUpCommand(id, request.Amount, request.CollectionMethod, ActorId()), cancellationToken);
-        return StatusCode(StatusCodes.Status201Created, transaction);
+        var result = await customers.TopUpAsync(
+            new StaffTopUpCommand(id, request.Amount, request.CollectionMethod, ActorId(), idempotencyKey?.Trim()),
+            cancellationToken);
+        // 201: ví vừa được cộng. 200 + Idempotency-Replayed: khóa đã xử lý trước đó, đây là kết quả cũ, ví không đổi thêm.
+        if (!result.Replayed)
+            return StatusCode(StatusCodes.Status201Created, result.Transaction);
+        Response.Headers["Idempotency-Replayed"] = "true";
+        return Ok(result.Transaction);
     }
 
     // sub = EmployeeId (hợp đồng identity); thiếu/sai thì ApiExceptionHandler trả 401/403.

@@ -1,4 +1,4 @@
-﻿# Client tournaments / OP.GG
+# Client tournaments / OP.GG
 
 Home → “Chi tiết & đăng ký” → `/client/tournaments?tournament=1`. Nhập tên trong game và tag ở hai ô riêng, có dấu `#` cố định ở giữa, rồi chọn vai trò. Tag nhận cả chữ và số. Form nhắc chuyển hồ sơ OP.GG từ Private sang Public để truy vấn thông tin. Rank tự lấy từ OP.GG; không có ô chọn rank. Trang tự tải thống kê thực cho các dòng đang xem khi mở trang hoặc đăng ký; bấm **Đồng bộ OP.GG** để cập nhật/thử lại. Lỗi không tự lặp request. Liên kết **Mở OP.GG** mở hồ sơ nguồn. Danh sách giải/đăng ký vẫn dùng localStorage chung với Home, chưa có database hay xác minh quyền sở hữu Riot ID.
 

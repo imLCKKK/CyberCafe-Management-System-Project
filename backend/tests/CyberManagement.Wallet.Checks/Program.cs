@@ -277,13 +277,59 @@ try
     WalletLedger.Record(probe, WalletTransactionTypes.OrderRefund, 2_000, DateTime.UtcNow, "Check refund");
     Check("Locked customer still receives a refund", probe.WalletBalance == 12_000 && probe.WalletTransactions.Count == 1);
 
-    // ---------- Giới hạn đã biết (KHÔNG tính là pass) ----------
+    // ---------- Chống xử lý lặp (Idempotency-Key) ----------
     var customerG = await CreateCustomer(admin, "Khách G", "0910000012");
-    for (var i = 0; i < 2; i++)
-        await Send(HttpMethod.Post, $"/api/admin/customers/{customerG.CustomerId}/wallet/top-ups", cashier, TopUp(10_000));
-    Console.WriteLine(await Balance(customerG.CustomerId) == 20_000
-        ? "KNOWN GAP (not a pass): two identical sequential top-up requests are both applied; no idempotency key in schema yet (Backend/docs/002-wallet-ledger.md section 4)."
-        : "NOTE: duplicate top-up behaviour changed; update docs/002-wallet-ledger.md section 4.");
+    var topUpG = $"/api/admin/customers/{customerG.CustomerId}/wallet/top-ups";
+    await Expect("Top-up without Idempotency-Key is 400", HttpStatusCode.BadRequest,
+        await Send(HttpMethod.Post, topUpG, cashier, TopUp(10_000), withoutKey: true));
+    await Expect("Top-up with a too-short Idempotency-Key is 400", HttpStatusCode.BadRequest,
+        await Send(HttpMethod.Post, topUpG, cashier, TopUp(10_000), idempotencyKey: "abc"));
+    Check("Rejected keys change nothing", await Balance(customerG.CustomerId) == 0 && await LedgerCount(customerG.CustomerId) == 0);
+
+    const string keyG = "retry-key-0001";
+    using var first = await Send(HttpMethod.Post, topUpG, cashier, TopUp(10_000), idempotencyKey: keyG);
+    using var second = await Send(HttpMethod.Post, topUpG, cashier, TopUp(10_000), idempotencyKey: keyG);
+    var firstTx = (await first.Content.ReadFromJsonAsync<WalletTransactionDto>())!;
+    var secondTx = (await second.Content.ReadFromJsonAsync<WalletTransactionDto>())!;
+    Check("First request with a key is 201, replay of the same key is 200 + Idempotency-Replayed",
+        first.StatusCode == HttpStatusCode.Created && second.StatusCode == HttpStatusCode.OK
+        && second.Headers.TryGetValues("Idempotency-Replayed", out var replayed) && replayed.Single() == "true");
+    Check("Replay returns the ORIGINAL transaction", secondTx.TransactionId == firstTx.TransactionId && secondTx.BalanceAfter == 10_000);
+    Check("Replayed top-up credits the wallet and ledger exactly once", await Balance(customerG.CustomerId) == 10_000 && await LedgerCount(customerG.CustomerId) == 1);
+    Check("Idempotency key is stored on the ledger row",
+        await Query(db => db.WalletTransactions.AsNoTracking().Where(t => t.TransactionId == firstTx.TransactionId).Select(t => t.IdempotencyKey).SingleAsync()) == keyG);
+
+    await Expect("Same key with a different amount is 409 and not applied", HttpStatusCode.Conflict,
+        await Send(HttpMethod.Post, topUpG, cashier, TopUp(20_000), idempotencyKey: keyG));
+    Check("Conflicting reuse of a key changes nothing", await Balance(customerG.CustomerId) == 10_000 && await LedgerCount(customerG.CustomerId) == 1);
+    await Expect("A new key is a new request and is applied", HttpStatusCode.Created,
+        await Send(HttpMethod.Post, topUpG, cashier, TopUp(10_000), idempotencyKey: "retry-key-0002"));
+    Check("Two different keys credit twice", await Balance(customerG.CustomerId) == 20_000 && await LedgerCount(customerG.CustomerId) == 2);
+
+    var customerH = await CreateCustomer(admin, "Khách H", "0910000013");
+    await Expect("The same key for another customer is independent", HttpStatusCode.Created,
+        await Send(HttpMethod.Post, $"/api/admin/customers/{customerH.CustomerId}/wallet/top-ups", cashier, TopUp(10_000), idempotencyKey: keyG));
+    Check("Another customer's use of the key did not touch customer G", await Balance(customerG.CustomerId) == 20_000 && await Balance(customerH.CustomerId) == 10_000);
+
+    var customerI = await CreateCustomer(admin, "Khách I", "0910000014");
+    var concurrent = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+        Send(HttpMethod.Post, $"/api/admin/customers/{customerI.CustomerId}/wallet/top-ups", cashier, TopUp(10_000), idempotencyKey: "parallel-key-01")));
+    var concurrentIds = new List<int>();
+    foreach (var item in concurrent)
+        concurrentIds.Add((await item.Content.ReadFromJsonAsync<WalletTransactionDto>())!.TransactionId);
+    Check("8 concurrent requests with one key: exactly one 201, the rest 200",
+        concurrent.Count(r => r.StatusCode == HttpStatusCode.Created) == 1 && concurrent.Count(r => r.StatusCode == HttpStatusCode.OK) == 7);
+    Check("8 concurrent requests with one key all point at the same transaction", concurrentIds.Distinct().Count() == 1);
+    Check("8 concurrent requests with one key credit once", await Balance(customerI.CustomerId) == 10_000 && await LedgerCount(customerI.CustomerId) == 1);
+
+    // Gửi lại sau khi khách bị khóa vẫn nhận kết quả cũ (đã xử lý thành công), nhưng khóa mới thì bị chặn.
+    await Expect("Manager locks customer I", HttpStatusCode.OK,
+        await Send(HttpMethod.Put, $"/api/admin/customers/{customerI.CustomerId}/status", manager, new { status = "Locked", reason = "Kiểm tra gửi lại" }));
+    await Expect("Replay after the customer was locked still returns the original result", HttpStatusCode.OK,
+        await Send(HttpMethod.Post, $"/api/admin/customers/{customerI.CustomerId}/wallet/top-ups", cashier, TopUp(10_000), idempotencyKey: "parallel-key-01"));
+    await Expect("A NEW key for a locked customer is still rejected", HttpStatusCode.Conflict,
+        await Send(HttpMethod.Post, $"/api/admin/customers/{customerI.CustomerId}/wallet/top-ups", cashier, TopUp(10_000), idempotencyKey: "parallel-key-02"));
+    Check("Locked customer's balance is unchanged by replay and rejection", await Balance(customerI.CustomerId) == 10_000 && await LedgerCount(customerI.CustomerId) == 1);
 
     Console.WriteLine($"{checks} customer/wallet checks passed on SQL Server ({databaseFixture.Provider}).");
 }
@@ -308,9 +354,14 @@ static object NewCustomer(string name, string phone, string? email = null) =>
 
 static object TopUp(decimal amount) => new { amount, collectionMethod = "Cash" };
 
-async Task<HttpResponseMessage> Send(HttpMethod method, string path, string? token = null, object? body = null)
+// Nạp ví bắt buộc có Idempotency-Key: mặc định mỗi lần gọi một khóa MỚI (mỗi lời gọi là một yêu cầu khác nhau);
+// kiểm tra chống lặp truyền idempotencyKey cụ thể, hoặc withoutKey: true để thử trường hợp thiếu khóa.
+async Task<HttpResponseMessage> Send(HttpMethod method, string path, string? token = null, object? body = null,
+    string? idempotencyKey = null, bool withoutKey = false)
 {
     using var request = new HttpRequestMessage(method, path);
+    if (method == HttpMethod.Post && path.EndsWith("/wallet/top-ups", StringComparison.Ordinal) && !withoutKey)
+        request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString("N"));
     if (token is not null)
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
     if (body is not null)

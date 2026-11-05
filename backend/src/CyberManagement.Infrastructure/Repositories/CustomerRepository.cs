@@ -42,6 +42,14 @@ public sealed class CustomerRepository(ApplicationDbContext database) : ICustome
                 t.TransactionId, t.CustomerId, t.Amount, t.BalanceAfter, t.Type, t.Description, t.CreatedAt))
             .ToListAsync(cancellationToken);
 
+    public Task<WalletTransactionDto?> FindWalletTransactionByKeyAsync(
+        int customerId, string idempotencyKey, CancellationToken cancellationToken) =>
+        database.WalletTransactions.AsNoTracking()
+            .Where(t => t.CustomerId == customerId && t.IdempotencyKey == idempotencyKey)
+            .Select(t => new WalletTransactionDto(
+                t.TransactionId, t.CustomerId, t.Amount, t.BalanceAfter, t.Type, t.Description, t.CreatedAt))
+            .FirstOrDefaultAsync(cancellationToken);
+
     public Task<Customer?> FindTrackedAsync(int customerId, CancellationToken cancellationToken) =>
         database.Customers.FirstOrDefaultAsync(c => c.CustomerId == customerId, cancellationToken);
 

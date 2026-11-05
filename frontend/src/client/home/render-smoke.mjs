@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 globalThis.localStorage = { getItem: () => null };
 const server = await createServer({
   root: fileURLToPath(new URL('../../../', import.meta.url)),
+  optimizeDeps: { noDiscovery: true },
   server: { middlewareMode: true },
   appType: 'custom',
   ssr: {

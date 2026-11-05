@@ -167,7 +167,7 @@ Các lệnh hiện có để chọn dùng:
 .\scripts\npm-local.cmd --prefix frontend run test:frontend:models
 .\scripts\npm-local.cmd --prefix frontend run test:frontend:render
 .\scripts\npm-local.cmd --prefix frontend run test:frontend -- routes
-.\scripts\npm-local.cmd --prefix frontend run test:frontend -- client-workflows wallet-customers-api
+.\scripts\npm-local.cmd --prefix frontend run test:frontend -- client-workflows wallet-customers-api cross-tab
 .\scripts\dotnet-local.cmd build Backend\CyberManagement.slnx
 ```
 

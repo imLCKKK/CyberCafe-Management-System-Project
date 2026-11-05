@@ -1,12 +1,14 @@
 # Hướng dẫn AI review cho Trưởng nhóm
 
-Cập nhật 31/10/2026. **Reviewer và người duyệt cuối là Trưởng nhóm**, người đã yêu cầu lập bộ tài liệu này. AI tìm lỗi, đối chiếu tiêu chí và cung cấp bằng chứng; thành viên liên quan hỗ trợ giải thích nghiệp vụ. Không tự ghi “đã được duyệt”, tự thay Trưởng nhóm chấp thuận PR hoặc chuyển Done chỉ vì test pass.
+Cập nhật 02/11/2026 theo nền CyberManagement/DB mới 35 bảng. **Reviewer và người duyệt cuối là Trưởng nhóm**, người đã yêu cầu lập bộ tài liệu này. AI tìm lỗi, đối chiếu tiêu chí và cung cấp bằng chứng; thành viên liên quan hỗ trợ giải thích nghiệp vụ. Không tự ghi “đã được duyệt”, tự thay Trưởng nhóm chấp thuận PR hoặc chuyển Done chỉ vì test pass.
 
 Đọc [PROJECT_GUIDE.md](PROJECT_GUIDE.md) để nắm flow và [SPRINT_TASKS.md](SPRINT_TASKS.md) để xác định đúng Task độc lập. Dùng hướng dẫn này cho cả tự kiểm tra trước bàn giao và review thay đổi của thành viên. Khi yêu cầu chỉ là review, giữ nguyên code; nếu được yêu cầu sửa thì ghi rõ phần sửa và kiểm tra lại.
 
 Backlog có **55 Task**: 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI giao Phúc. Review theo một kết quả bàn giao của Task và checklist bên trong; không yêu cầu tạo issue hay một lượt review riêng cho từng bước nhỏ. Một Task có thể có vài commit/PR để người khác tích hợp sớm; báo cáo cần bao quát tất cả phần thuộc Task. Khi review lại, tập trung diff mới và finding đã sửa, dùng lại bằng chứng còn hiệu lực cho phần không đổi.
 
 Với hai Task UI giao Phúc, đối chiếu NEXORA CYBER, bảng màu cyan–tím–đen và ảnh trước–sau. Concept logo đang chờ nhóm chốt chiều 31/10/2026; phải có mẫu/asset được nhóm chọn trước khi nghiệm thu logo, không coi một trong ba concept là đã được duyệt. Kiểm tra token chung, tính dễ đọc, responsive và màu trạng thái nghiệp vụ, không biến sở thích của AI thành lỗi chức năng. Khang giữ logic vòng quay/checkout; Phúc bàn giao theme và component ảnh. Trưởng nhóm là reviewer cuối.
+
+Kết quả review gửi trực tiếp trong chat theo dạng lỗi, ảnh hưởng, hướng sửa và kiểm tra; chỉ tạo file báo cáo khi người dùng yêu cầu. Lựa chọn hiện tại là DB mới 35 bảng: không bắt Task auth nâng cấp DB 19 bảng khi không có yêu cầu chuyển dữ liệu. Kiểm tra một backend chung, giữ OP.GG/tài liệu/scripts và không đưa bin/obj hoặc secret vào Git.
 
 ## 1. Xác định phạm vi review
 

@@ -1,7 +1,7 @@
 ﻿import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { cdp, evaluate, until, screenshot, errors, socket, sleep, origin, outputDir } from './cdp.mjs';
+import { cdp, evaluate, until, screenshot, errors, socket, sleep, origin, outputDir, setupWorkflowLogin } from './cdp.mjs';
 import { mkdir, readFile } from 'node:fs/promises';
 const key = 'tram.client.dbml.demo.v2', legacyKey = 'tram.client.home.demo.v1';
 const data = () => evaluate(`JSON.parse(localStorage.getItem('${key}'))`);
@@ -14,10 +14,10 @@ const rowAction = (text, action) => evaluate(`(() => { const row = [...document.
 try {
   await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Page.bringToFront');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor:1, mobile:false });
-  // Khách hàng/nạp ví đã nối API/SQL: xem wallet-customers-api.mjs. Trang Sản phẩm vẫn dùng dữ liệu demo nên dọn localStorage ở đây.
-  await go('/admin/products', 'Quản lý sản phẩm');
-  await evaluate('localStorage.clear()'); await cdp('Page.reload'); await sleep(400); await until("Boolean(document.querySelector('.admin-module'))");
+  await setupWorkflowLogin('employee', { resetDemo: true });
+  // Khách hàng/nạp ví đã nối API/SQL: xem wallet-customers-api.mjs.
   let saved;
+  await go('/admin/products', 'Quản lý sản phẩm');
   await click('Thêm sản phẩm'); await field('name', 'Snack kiểm thử'); await field('current_price', 18000); await field('cost_price', 9000); await submit(); await until("!document.querySelector('dialog[open]')");
   saved = await data(); const product = saved.products.find(row => row.name === 'Snack kiểm thử'); assert.equal(product.stock_quantity, 0);
   await go('/admin/inventory', 'Quản lý kho');
@@ -39,15 +39,19 @@ try {
   saved = await data(); assert.equal(saved.customers[0].wallet_balance, 168000); assert.equal(saved.order_items.find(row => row.id === 2).status, 'Cancelled'); assert.equal(saved.products.find(row => row.id === 3).stock_quantity, 25);
   await go('/admin/invoices', 'Hóa đơn & thanh toán'); await until("document.querySelector('tbody').textContent.includes('PC1027')"); await evaluate("[...document.querySelectorAll('tbody tr')].find(row => row.textContent.includes('PC1027')).querySelector('button').click()");
   await until("Boolean(document.querySelector('dialog[open]'))"); assert.ok(await evaluate("document.querySelector('dialog').textContent.includes('Tiền mặt đã thu')")); await close();
+  await setupWorkflowLogin('customer');
   await go('/client/ordering', 'Nạp năng lượng'); await click('Đơn của tôi', '.client-page-tabs button').catch(async () => { await evaluate("document.querySelectorAll('.client-page-tabs button')[2].click()"); });
   await until("Boolean(document.querySelector('.client-orders-list'))");
   assert.ok(await evaluate("document.querySelector('.client-orders-list').textContent.includes('tiền mặt · đã thu')"));
+  await setupWorkflowLogin('employee');
   await go('/admin/tournaments', 'Quản lý giải đấu'); await click('Tạo giải đấu'); await field('TournamentName', 'Giải kiểm thử'); await submit(); await until("!document.querySelector('dialog[open]')");
   let tournaments = await evaluate(`JSON.parse(localStorage.getItem('${legacyKey}'))`); const tournamentId = tournaments.Tournaments.at(-1).TournamentId; assert.equal(tournaments.Tournaments.at(-1).Status, 'Draft');
   await rowAction('Giải kiểm thử', 'Quản lý'); await click('Mở đăng ký', 'dialog button'); await submit(); await until("document.querySelectorAll('dialog[open]').length === 1");
   await click('Thêm người tham gia', 'dialog button'); await field('gameName', 'AdminTester'); await field('tagLine', 'VN'); await submit(); await until("document.querySelectorAll('dialog[open]').length === 1"); await close();
   tournaments = await evaluate(`JSON.parse(localStorage.getItem('${legacyKey}'))`); assert.equal(tournaments.TournamentRegistrations.at(-1).TournamentId, tournamentId);
+  await setupWorkflowLogin('customer');
   await go('/client/tournaments', 'Giải đấu'); assert.ok(await evaluate("document.body.textContent.includes('Giải kiểm thử')"));
+  await setupWorkflowLogin('employee');
   await go('/admin/reports', 'Báo cáo & thống kê');
   assert.equal(await evaluate("document.querySelectorAll('.admin-chart svg polyline').length"), 2); await evaluate("document.querySelector('.admin-chart-legend button').click()"); assert.equal(await evaluate("document.querySelectorAll('.admin-chart svg polyline').length"), 1); await evaluate("document.querySelector('.admin-chart-legend button').click()");
   await evaluate("document.querySelector('.admin-chart circle').focus()"); assert.ok(await evaluate("!document.querySelector('.admin-chart-readout').textContent.includes('Di chuột')"));

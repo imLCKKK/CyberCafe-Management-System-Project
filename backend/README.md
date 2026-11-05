@@ -7,10 +7,10 @@ Quyết định của Trưởng nhóm ngày 02/11/2026: dùng **database SQL Ser
 | `src/CyberManagement.Domain/Entities/` | 35 entity nghiệp vụ, C# thuần |
 | `src/CyberManagement.Application/` | Use case, DTO, interface, validator; tham chiếu Domain |
 | `src/CyberManagement.Infrastructure/Persistance/` | ApplicationDbContext, cấu hình EF và factory design-time |
-| `src/CyberManagement.Infrastructure/Migrations/` | Bốn migration hiện có của schema 35 bảng |
+| `src/CyberManagement.Infrastructure/Migrations/` | Năm migration hiện có của schema 35 bảng (migration thứ năm thêm khóa chống nạp lặp cho ví) |
 | `src/CyberManagement.API/` | Controller, JWT/authorization, DI, `/health` |
 | `tests/CyberManagement.API.Checks/` | Auth/seed regression, chế độ InMemory hoặc SQL thử riêng |
-| `tests/CyberManagement.Wallet.Checks/` | Khách hàng, ví, sổ cái, phân quyền, đồng thời/rollback; **bắt buộc SQL Server** (DB thử riêng) |
+| `tests/CyberManagement.Wallet.Checks/` | Khách hàng, ví, sổ cái, phân quyền, đồng thời/rollback, chống nạp lặp; **bắt buộc SQL Server** (DB thử riêng) |
 
 Owner triển khai module xuyên các tầng và UI. Application/Domain không dùng DbContext/HttpContext; interface được implementation ở tầng ngoài. [Hợp đồng identity](docs/001-monorepo.md) quy định EmployeeId/CustomerId kiểu int, năm role nhân viên và customer principal. Frontend còn demo; nối login và nghiệp vụ khác theo [55 task](../codex/SPRINT_TASKS.md).
 
@@ -97,8 +97,10 @@ $env:WALLET_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;T
 Remove-Item Env:WALLET_CHECKS_SQL_CONNECTION
 ```
 
-Gồm: tạo khách và đăng nhập bằng auth chung; danh sách/chi tiết/sửa/khóa (kèm lịch sử trạng thái); khách chỉ đọc dữ liệu của mình; quyền Admin/Manager/Cashier/Waiter/Technician; nạp tại quầy và các giá trị sai; nạp song song cùng ví; trừ vượt số dư; rollback đồng bộ số dư và sổ cái; trừ song song không âm. Giới hạn đã biết (chưa có khóa chống lặp theo nghiệp vụ) được in ra dạng `KNOWN GAP`, không tính là pass. Chi tiết hợp đồng: `Backend/docs/002-wallet-ledger.md`.
+Gồm: tạo khách và đăng nhập bằng auth chung; danh sách/chi tiết/sửa/khóa (kèm lịch sử trạng thái); khách chỉ đọc dữ liệu của mình; quyền Admin/Manager/Cashier/Waiter/Technician; nạp tại quầy và các giá trị sai; nạp song song cùng ví; trừ vượt số dư; rollback đồng bộ số dư và sổ cái; trừ song song không âm; **chống nạp lặp**: thiếu/sai `Idempotency-Key` bị từ chối, gửi lại cùng khóa chỉ cộng ví một lần (kể cả 8 request song song và gửi lại sau khi khách bị khóa), cùng khóa khác số tiền bị 409. Chi tiết hợp đồng: `Backend/docs/002-wallet-ledger.md`.
 
-Thử giao diện với API thật (chưa có màn đăng nhập): đăng nhập bằng Console của trình duyệt rồi lưu token vào `sessionStorage` (khách: `cybercafe.client.accessToken`, nhân viên: `cybercafe.staff.accessToken`); các trang Ví, Tài khoản và Khách hàng tự gửi `Authorization: Bearer`. Khi Đại bàn giao đăng nhập, chỉ cần đổi `frontend/src/services/accessToken.js`.
+Nạp tại quầy (`POST /api/admin/customers/{id}/wallet/top-ups`) **bắt buộc** header `Idempotency-Key` (8-100 ký tự gồm chữ, số, `.` `_` `:` `-`). Lần đầu trả 201; gửi lại cùng khóa trả 200 kèm `Idempotency-Replayed: true` và đúng giao dịch cũ, ví không đổi.
+
+Thử giao diện với API thật: đăng nhập bằng màn đăng nhập chung của frontend (`/admin/auth` cho nhân viên, `/client/auth` cho khách). Các trang Ví, Tài khoản và Khách hàng dùng chung client/phiên đăng nhập `frontend/src/shared/auth/api.js` (khóa `cybermanagement.auth.v1`), nên đăng xuất hoặc đổi tài khoản không để lại token cũ. Kiểm tra nhanh API đang chạy: `minh-wallet-smoke.ps1` ở thư mục gốc.
 
 Kết quả review/bàn giao mới gửi trong chat; chỉ tạo file báo cáo khi được yêu cầu. [Quy trình nhóm](../planning/team-workflow.md) quy định Trưởng nhóm review rồi mới merge `dev`.

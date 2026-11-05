@@ -6,7 +6,7 @@ Mã nguồn: `Application/Wallet/WalletLedger.cs`, `WalletTransactionTypes.cs`; 
 
 ## 1. Đầu vào và quy ước dấu
 
-`WalletLedger.Record(customer, type, amount, recordedAtUtc, description?)`
+`WalletLedger.Record(customer, type, amount, recordedAtUtc, description?, idempotencyKey?)`
 
 | `Type` (lưu ở `WalletTransactions.Type`) | Dấu `amount` | Ai gọi (dự kiến) |
 |---|---|---|
@@ -20,7 +20,7 @@ Mã nguồn: `Application/Wallet/WalletLedger.cs`, `WalletTransactionTypes.cs`; 
 
 - Tiền là số nguyên VND, khác 0. `Amount` và `BalanceAfter` lưu `decimal(12,2)`.
 - Số tiền cộng ví luôn dương, trừ ví luôn âm (trừ `Adjustment`). Sai dấu hoặc sai loại: `ArgumentException` (HTTP 400).
-- `BalanceAfter` = số dư sau giao dịch; `Description` ghi nguồn (ví dụ `Phiên #12`, `Đơn #34`) vì bảng chưa có cột khóa nguồn (xem mục 4).
+- `BalanceAfter` = số dư sau giao dịch; `Description` ghi nguồn (ví dụ `Phiên #12`, `Đơn #34`); khóa chống lặp nằm ở `IdempotencyKey` (mục 4).
 
 ## 2. Kết quả và lỗi
 
@@ -42,19 +42,19 @@ Mã nguồn: `Application/Wallet/WalletLedger.cs`, `WalletTransactionTypes.cs`; 
 
 Xung đột: trùng khóa duy nhất, deadlock (1205) hoặc `DbUpdateConcurrencyException` được `CustomerRepository.SaveChangesAsync` đổi thành `BusinessRuleException` (409). Client được phép thử lại; **server không tự retry**.
 
-## 4. Chống xử lý lặp (CHƯA ĐỦ — cần chốt với Trường)
+## 4. Chống xử lý lặp
 
-Schema hiện tại không có khóa chống lặp cho ví. Trạng thái thật:
+Khóa dòng chỉ chống **hai request chạy cùng lúc làm sai số dư**; nó không biết hai request là "cùng một nghiệp vụ". Phần chống lặp nằm ở cột `WalletTransactions.IdempotencyKey` (nullable, tối đa 100 ký tự) và chỉ mục duy nhất có lọc `UX_WalletTransactions_Customer_IdempotencyKey` trên `(CustomerId, IdempotencyKey)` khi khóa khác null (migration `WalletTransactionIdempotencyKey`).
 
-- Khóa dòng chỉ chống **hai request chạy cùng lúc làm sai số dư**. Nó **không** biết hai request là "cùng một nghiệp vụ".
-- Một request gửi lại (bấm đúp, mạng chập chờn, callback ZaloPay gọi hai lần) sẽ bị ghi **hai lần**.
+**Nạp tại quầy (đã áp dụng):**
 
-Đề xuất cần Trường/Trưởng nhóm duyệt (thêm migration mới, không sửa lịch sử đã áp):
+- `POST /api/admin/customers/{id}/wallet/top-ups` bắt buộc header `Idempotency-Key`; thiếu hoặc sai định dạng (8-100 ký tự gồm chữ, số, `.` `_` `:` `-`) là 400.
+- Khóa do client sinh cho **một ý định** của nhân viên (một lần mở form nạp) và gửi lại đúng khóa đó khi retry. Đổi số tiền hoặc phương thức thì phải dùng khóa mới.
+- Server khóa dòng khách rồi tìm giao dịch cùng `(CustomerId, IdempotencyKey)` **trước** khi ghi: nếu đã có và cùng số tiền, trả lại giao dịch cũ (200 + `Idempotency-Replayed: true`) và **không ghi ví thêm**; nếu đã có nhưng khác số tiền hoặc khác loại, trả 409. Chưa có thì ghi như thường (201). Vì dòng khách đang bị khóa, các request song song cùng khóa xếp hàng nên chỉ một request ghi.
+- Kiểm tra replay đứng trước kiểm tra trạng thái khách: gửi lại một nạp đã thành công vẫn nhận kết quả cũ dù khách vừa bị khóa; khóa mới cho khách đang khóa vẫn bị chặn (409).
+- Khóa chỉ có phạm vi trong từng khách; chỉ mục duy nhất là lớp bảo vệ cuối nếu có đường ghi nào bỏ qua kiểm tra trên.
 
-- `WalletTransactions.ReferenceType varchar(30) null` và `ReferenceId int null` (ví dụ `GamingSession`/12, `Order`/34, `GatewayTransaction`/7).
-- Chỉ mục duy nhất có lọc trên `(Type, ReferenceType, ReferenceId)` khi `ReferenceId IS NOT NULL`. Nghiệp vụ nào được ghi nhiều lần theo thiết kế (phí phiên theo từng chu kỳ) thì thêm `ChargeSequence`.
-
-Khi có cột này, module gọi `Record` truyền khóa nguồn; request trùng bị DB từ chối (409) và rollback. **Tới lúc đó, mỗi module tự chịu trách nhiệm không gọi hai lần cho cùng một nghiệp vụ.**
+**Các nghiệp vụ khác (phí phiên, đơn, giải đấu, ZaloPay):** `WalletLedger.Record(..., idempotencyKey)` đã nhận khóa tùy chọn. Module nào có thể bị gọi lặp (callback ZaloPay, trừ phí theo chu kỳ) phải tự đặt khóa ổn định theo nghiệp vụ, ví dụ `GamingCharge:<sessionId>:<chuKy>`, `OrderPayment:<orderId>`, `ZaloPay:<transTokenOrAppTransId>`, và dùng cùng mẫu "tìm trước khi ghi" ở trên (`ICustomerRepository.FindWalletTransactionByKeyAsync`). Không truyền khóa thì ví **không** chống lặp cho giao dịch đó.
 
 ## 5. Thời điểm cộng/trừ ví
 
@@ -62,7 +62,7 @@ Khi có cột này, module gọi `Record` truyền khóa nguồn; request trùng
 |---|---|
 | Nạp tại quầy | Nhân viên xác nhận đã thu tiền (`Cash`/`BankTransfer`) rồi bấm nạp: **cộng ví ngay**, cùng transaction. Không có trạng thái "đã cộng nhưng chưa thu" |
 | Nạp qua ZaloPay | Chỉ cộng khi server xác minh chữ ký callback/truy vấn trạng thái; redirect trình duyệt không phải bằng chứng (S1-M-2) |
-| Phí phiên chơi | Phúc chốt chu kỳ trừ; mỗi lần trừ là một `GamingCharge` |
+| Phí phiên chơi | **ĐỀ XUẤT, chờ Phúc/Trường xác nhận:** trừ **đầu mỗi chu kỳ** (trả trước) bằng một `GamingCharge` có khóa `GamingCharge:<sessionId>:<số thứ tự chu kỳ>`; `InsufficientWalletBalanceException` (409) khi không đủ tiền thì Phúc kết thúc/khóa phiên; kết thúc sớm không hoàn phần chu kỳ đang chạy trừ khi Phúc/Trường chốt hoàn bằng `Adjustment`. Độ dài chu kỳ và công thức làm tròn do Phúc chốt trong contract phiên chơi |
 | Đơn món | Trừ khi xác nhận đơn (Khang chốt); hủy/hoàn món là `OrderRefund` |
 | Giải đấu | Trừ khi đăng ký thành công; hủy/hoàn là `TournamentRefund` |
 
@@ -70,7 +70,7 @@ Schema 35 bảng không có bảng yêu cầu nạp (TopUps), nên luồng "khá
 
 ## 6. API đã có
 
-Nhân viên (JWT `permission` claim): `GET/POST /api/admin/customers`, `GET/PUT /api/admin/customers/{id}`, `PUT .../{id}/status` (bắt buộc lý do, ghi `CustomerStatusHistory`), `GET .../{id}/wallet-transactions`, `POST .../{id}/wallet/top-ups`.
+Nhân viên (JWT `permission` claim): `GET/POST /api/admin/customers`, `GET/PUT /api/admin/customers/{id}`, `PUT .../{id}/status` (bắt buộc lý do, ghi `CustomerStatusHistory`), `GET .../{id}/wallet-transactions`, `POST .../{id}/wallet/top-ups` (bắt buộc header `Idempotency-Key`; 201 lần đầu, 200 + `Idempotency-Replayed: true` khi gửi lại).
 
 Khách (`role=Customer`, id luôn lấy từ claim `customer_id`): `GET /api/client/profile`, `GET /api/client/wallet`.
 

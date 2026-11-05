@@ -7,3 +7,4 @@
 - Giữ stack đã chốt và nhận một Task Jira độc lập theo yêu cầu. Không tự mở rộng sang các task chưa được giao.
 - Chạy kiểm tra phù hợp với phần sửa; bàn giao kết quả, giới hạn và phụ thuộc thật. Hướng dẫn này không tự cấp quyền gửi tin, cập nhật Jira, merge hay triển khai bên ngoài.
 - Yêu cầu trực tiếp mới nhất của người dùng có ưu tiên hơn hướng dẫn cũ trong repository; cập nhật tài liệu liên quan khi quyết định của nhóm thay đổi.
+- Review gửi trực tiếp trong chat; chỉ tạo file báo cáo khi người dùng yêu cầu. Backend/DB đích là CyberManagement 35 bảng theo PROJECT_GUIDE hiện tại.

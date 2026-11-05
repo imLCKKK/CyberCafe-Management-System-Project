@@ -14,7 +14,8 @@ namespace CyberManagement.Application.Wallet;
 public static class WalletLedger
 {
     public static WalletTransaction Record(
-        Customer customer, string type, decimal amount, DateTime recordedAtUtc, string? description = null)
+        Customer customer, string type, decimal amount, DateTime recordedAtUtc, string? description = null,
+        string? idempotencyKey = null)
     {
         ArgumentNullException.ThrowIfNull(customer);
 
@@ -42,6 +43,7 @@ public static class WalletLedger
             BalanceAfter = balanceAfter,
             Type = type,
             Description = description,
+            IdempotencyKey = idempotencyKey,
             CreatedAt = recordedAtUtc,
         };
         customer.WalletTransactions.Add(transaction);

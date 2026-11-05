@@ -4,10 +4,10 @@ import { toWalletTransaction } from './walletTypes';
 
 export { ApiError } from './http';
 
-export const getClientProfile = () => request('/api/client/profile', { kind: 'client' });
+export const getClientProfile = () => request('/api/client/profile');
 
 export async function getClientWallet() {
-  const data = await request('/api/client/wallet', { kind: 'client' });
+  const data = await request('/api/client/wallet');
   return {
     walletBalance: Number(data.walletBalance),
     transactions: data.transactions.map(toWalletTransaction),

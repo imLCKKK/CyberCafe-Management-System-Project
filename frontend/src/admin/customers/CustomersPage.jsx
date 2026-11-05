@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, UserCheck, Users, WalletCards } from 'lucide-react';
 import { PageHeading, StatCard } from '../computers/components/CafeUI';
 import { DetailDialog, Filter, FormDialog, Notice, Panel, Row, Status, Table, Toolbar } from '../shared/AdminUI';
 import { dateTime, matches, money } from '../shared/adminModel';
 import {
-  changeCustomerStatus, createCustomer, listCustomers, listWalletTransactions, staffTopUp, updateCustomer,
+  changeCustomerStatus, createCustomer, listCustomers, listWalletTransactions, newIdempotencyKey, staffTopUp, updateCustomer,
 } from '../../services/customerAdminApi';
 import { walletTypeLabel } from '../../services/walletTypes';
 
@@ -21,6 +21,8 @@ export function CustomersPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [history, setHistory] = useState({ status: 'idle', rows: [], error: '' });
+  // Khóa chống nạp lặp: cùng số tiền + cùng phương thức thì retry dùng lại khóa cũ; đổi nội dung thì sang khóa mới.
+  const topUpAttempt = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -82,7 +84,7 @@ export function CustomersPage() {
         { key: 'status', label: 'Trạng thái', render: (row) => <Status value={row.status === 'Active' ? 'Active' : 'Inactive'}/> },
         { key: 'created', label: 'Ngày tạo', render: (row) => dateTime(row.createdAt) },
         { key: 'actions', label: 'Thao tác', render: (row) => <div className="admin-row-actions">
-          <button className="cafe-button" onClick={() => setDialog({ kind: 'topup', customer: row })}>Nạp ví</button>
+          <button className="cafe-button" onClick={() => { topUpAttempt.current = null; setDialog({ kind: 'topup', customer: row }); }}>Nạp ví</button>
           <button className="cafe-button" onClick={() => setDialog({ kind: 'edit', customer: row })}>Sửa</button>
           <button className="cafe-button" onClick={() => setDialog({ kind: 'lock', customer: row })}>{row.status === 'Active' ? 'Khóa' : 'Mở khóa'}</button>
         </div> },
@@ -131,7 +133,10 @@ export function CustomersPage() {
       ]}
       initial={{ amount: 100000, method: 'Cash' }}
       onSave={async (form) => {
-        await staffTopUp(dialog.customer.customerId, Number(form.amount), form.method);
+        const signature = `${Number(form.amount)}|${form.method}`;
+        if (topUpAttempt.current?.signature !== signature) topUpAttempt.current = { signature, key: newIdempotencyKey() };
+        await staffTopUp(dialog.customer.customerId, Number(form.amount), form.method, topUpAttempt.current.key);
+        topUpAttempt.current = null;
         await saved(`Đã nạp ${money(Number(form.amount))} vào ví ${dialog.customer.fullName}.`);
       }}/>}
 

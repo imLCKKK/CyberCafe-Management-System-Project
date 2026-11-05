@@ -111,7 +111,7 @@ public sealed class CustomerService(
         return await repository.ListWalletTransactionsAsync(customerId, TransactionListLimit, cancellationToken);
     }
 
-    public async Task<WalletTransactionDto> TopUpAsync(StaffTopUpCommand command, CancellationToken cancellationToken)
+    public async Task<StaffTopUpResult> TopUpAsync(StaffTopUpCommand command, CancellationToken cancellationToken)
     {
         topUpValidator.Validate(command);
         return await repository.ExecuteInTransactionAsync(async () =>
@@ -119,13 +119,29 @@ public sealed class CustomerService(
             // Khóa dòng khách tới hết transaction: hai request đồng thời cùng ví sẽ xử lý lần lượt.
             var customer = await repository.FindTrackedForWalletUpdateAsync(command.CustomerId, cancellationToken)
                 ?? throw new EntityNotFoundException("Không tìm thấy khách hàng.");
+
+            // Chống xử lý lặp: đã có giao dịch với khóa này của khách (khóa dòng ở trên làm hai request cùng khóa xếp hàng)
+            // thì trả lại giao dịch đó, không ghi ví lần nữa. Kiểm tra TRƯỚC khi xét trạng thái khách để gửi lại vẫn nhận kết quả cũ
+            // dù khách vừa bị khóa. Cùng khóa nhưng khác số tiền là lỗi của người gọi: từ chối, không đoán ý.
+            var existing = await repository.FindWalletTransactionByKeyAsync(
+                command.CustomerId, command.IdempotencyKey!, cancellationToken);
+            if (existing is not null)
+            {
+                if (existing.Type != WalletTransactionTypes.TopUp || existing.Amount != command.Amount)
+                    throw new BusinessRuleException("Khóa chống lặp này đã dùng cho một yêu cầu khác. Hãy tạo khóa mới cho yêu cầu mới.");
+                return new StaffTopUpResult(existing, Replayed: true);
+            }
+
             var transaction = WalletLedger.Record(
                 customer, WalletTransactionTypes.TopUp, command.Amount, DateTime.UtcNow,
-                $"Nạp tại quầy ({command.CollectionMethod}) - nhân viên #{command.ActorEmployeeId}");
+                $"Nạp tại quầy ({command.CollectionMethod}) - nhân viên #{command.ActorEmployeeId}",
+                command.IdempotencyKey);
             await repository.SaveChangesAsync(cancellationToken);
-            return new WalletTransactionDto(
-                transaction.TransactionId, transaction.CustomerId, transaction.Amount, transaction.BalanceAfter,
-                transaction.Type, transaction.Description, transaction.CreatedAt);
+            return new StaffTopUpResult(
+                new WalletTransactionDto(
+                    transaction.TransactionId, transaction.CustomerId, transaction.Amount, transaction.BalanceAfter,
+                    transaction.Type, transaction.Description, transaction.CreatedAt),
+                Replayed: false);
         }, cancellationToken);
     }
 

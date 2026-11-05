@@ -12,6 +12,7 @@ internal static class CustomerRules
     public const decimal TopUpStep = 1_000m;
 
     private static readonly Regex PhonePattern = new("^0[0-9]{9,10}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex IdempotencyKeyPattern = new("^[A-Za-z0-9._:-]{8,100}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex EmailPattern = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public static void Name(string? value)
@@ -25,6 +26,12 @@ internal static class CustomerRules
     {
         if (value is null || !PhonePattern.IsMatch(value.Trim()))
             throw new ValidationException("Số điện thoại phải bắt đầu bằng 0 và gồm 10-11 chữ số.");
+    }
+
+    public static void IdempotencyKey(string? value)
+    {
+        if (value is null || !IdempotencyKeyPattern.IsMatch(value))
+            throw new ValidationException("Thiếu hoặc sai khóa chống lặp Idempotency-Key (8-100 ký tự gồm chữ, số, . _ : -).");
     }
 
     public static void Email(string? value)
@@ -80,5 +87,6 @@ public sealed class StaffTopUpCommandValidator : IRequestValidator<StaffTopUpCom
                 $"Số tiền nạp phải từ {CustomerRules.MinTopUp:N0} đến {CustomerRules.MaxTopUp:N0} VND và là bội số của {CustomerRules.TopUpStep:N0}.");
         if (request.CollectionMethod is not ("Cash" or "BankTransfer"))
             throw new ValidationException("Hình thức thu tiền phải là Cash hoặc BankTransfer.");
+        CustomerRules.IdempotencyKey(request.IdempotencyKey);
     }
 }

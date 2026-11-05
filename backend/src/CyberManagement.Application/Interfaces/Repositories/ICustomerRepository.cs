@@ -21,6 +21,14 @@ public interface ICustomerRepository
     /// </summary>
     Task<Customer?> FindTrackedForWalletUpdateAsync(int customerId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Tìm giao dịch ví đã ghi với khóa chống lặp này của khách (không theo dõi thay đổi).
+    /// Gọi SAU <see cref="FindTrackedForWalletUpdateAsync"/> trong cùng transaction: khóa dòng khách đảm bảo
+    /// hai request cùng khóa xử lý lần lượt nên request sau luôn thấy giao dịch của request trước.
+    /// </summary>
+    Task<WalletTransactionDto?> FindWalletTransactionByKeyAsync(
+        int customerId, string idempotencyKey, CancellationToken cancellationToken);
+
     void Add(Customer customer);
 
     /// <summary>Chạy work trong một transaction; lỗi thì rollback toàn bộ.</summary>

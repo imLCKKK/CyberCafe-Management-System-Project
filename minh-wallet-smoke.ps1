@@ -17,8 +17,9 @@ $pass = 0; $fail = 0
 # Mật khẩu khách chỉ dùng cho khách thử tạo trong lần chạy này; sinh ngẫu nhiên, không lưu ở đâu.
 $customerPassword = 'Aa1!' + [guid]::NewGuid().ToString('N')
 
-function Call($method, $path, $body = $null, $token = $null) {
+function Call($method, $path, $body = $null, $token = $null, $idemKey = $null) {
     $req = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::new($method), "$BaseUrl$path")
+    if ($idemKey) { $req.Headers.Add('Idempotency-Key', $idemKey) }
     if ($token) { $req.Headers.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', $token) }
     if ($null -ne $body) {
         $json = if ($body -is [string]) { $body } else { $body | ConvertTo-Json -Compress }
@@ -43,6 +44,8 @@ $staffPassword = $null
 if ($login.Status -ne 200) { Write-Host "Đăng nhập nhân viên thất bại (HTTP $($login.Status)). Kiểm tra tên đăng nhập/mật khẩu." -ForegroundColor Red; exit 2 }
 $staff = $login.Body.accessToken
 function Admin($m, $p, $b = $null) { Call $m $p $b $staff }
+# Nạp ví bắt buộc có Idempotency-Key: mặc định mỗi lần gọi là một yêu cầu mới (khóa mới); truyền $key để thử gửi lại, $key = '' để thử thiếu khóa.
+function TopUp($p, $b, $key = $null) { Call 'POST' $p $b $staff $(if ($null -eq $key) { [guid]::NewGuid().ToString('N') } elseif ($key -eq '') { $null } else { $key }) }
 function CustomerLogin($phone) { Call 'POST' '/api/auth/customer/login' @{ phone = $phone; password = $customerPassword } }
 
 # ---- Xác thực và phân quyền ----
@@ -89,7 +92,7 @@ $lock = Admin 'PUT' "/api/admin/customers/$($cb.customerId)/status" @{ status = 
 Check 'Khóa khách -> 200 Locked' ($lock.Status -eq 200 -and $lock.Body.status -eq 'Locked')
 Check 'Khóa lần nữa -> 409' ((Admin 'PUT' "/api/admin/customers/$($cb.customerId)/status" @{ status = 'Locked'; reason = 'x' }).Status -eq 409)
 Check 'Khách đang khóa đăng nhập -> 403' ((CustomerLogin $phoneB).Status -eq 403)
-Check 'Nạp cho khách đang khóa -> 409' ((Admin 'POST' "/api/admin/customers/$($cb.customerId)/wallet/top-ups" @{ amount = 50000; collectionMethod = 'Cash' }).Status -eq 409)
+Check 'Nạp cho khách đang khóa -> 409' ((TopUp "/api/admin/customers/$($cb.customerId)/wallet/top-ups" @{ amount = 50000; collectionMethod = 'Cash' }).Status -eq 409)
 $unlock = Admin 'PUT' "/api/admin/customers/$($cb.customerId)/status" @{ status = 'Active'; reason = 'Mo khoa kiem thu' }
 Check 'Mở khóa -> 200 Active' ($unlock.Status -eq 200 -and $unlock.Body.status -eq 'Active')
 Check 'Khóa khách không tồn tại -> 404' ((Admin 'PUT' '/api/admin/customers/99999999/status' @{ status = 'Locked'; reason = 'x' }).Status -eq 404)
@@ -97,16 +100,16 @@ Check 'Khóa khách không tồn tại -> 404' ((Admin 'PUT' '/api/admin/custome
 # ---- Nạp tại quầy: dữ liệu sai ----
 $topUpPath = "/api/admin/customers/$($ca.customerId)/wallet/top-ups"
 foreach ($amount in -1000, 0, 5000, 2001000, 15500) {
-    Check "Nạp $amount -> 400" ((Admin 'POST' $topUpPath @{ amount = $amount; collectionMethod = 'Cash' }).Status -eq 400)
+    Check "Nạp $amount -> 400" ((TopUp $topUpPath @{ amount = $amount; collectionMethod = 'Cash' }).Status -eq 400)
 }
-Check 'Phương thức thu sai -> 400' ((Admin 'POST' $topUpPath @{ amount = 100000; collectionMethod = 'Visa' }).Status -eq 400)
-Check 'Thiếu phương thức thu -> 400' ((Admin 'POST' $topUpPath '{"amount":100000}').Status -eq 400)
-Check 'Nạp cho khách không tồn tại -> 404' ((Admin 'POST' '/api/admin/customers/99999999/wallet/top-ups' @{ amount = 100000; collectionMethod = 'Cash' }).Status -eq 404)
+Check 'Phương thức thu sai -> 400' ((TopUp $topUpPath @{ amount = 100000; collectionMethod = 'Visa' }).Status -eq 400)
+Check 'Thiếu phương thức thu -> 400' ((TopUp $topUpPath '{"amount":100000}').Status -eq 400)
+Check 'Nạp cho khách không tồn tại -> 404' ((TopUp '/api/admin/customers/99999999/wallet/top-ups' @{ amount = 100000; collectionMethod = 'Cash' }).Status -eq 404)
 Check 'Token khách không được nạp -> 403' ((Call 'POST' $topUpPath @{ amount = 100000; collectionMethod = 'Cash' } $tokenA).Status -eq 403)
 Check 'Các lần nạp bị từ chối không đổi ví' ((Admin 'GET' "/api/admin/customers/$($ca.customerId)").Body.walletBalance -eq 0)
 
 # ---- Nạp tại quầy: hợp lệ ----
-$t = Admin 'POST' $topUpPath @{ amount = 100000; collectionMethod = 'Cash' }
+$t = TopUp $topUpPath @{ amount = 100000; collectionMethod = 'Cash' }
 Check 'Nạp 100.000 -> 201, loại TopUp, số dư sau 100.000' ($t.Status -eq 201 -and $t.Body.type -eq 'TopUp' -and $t.Body.amount -eq 100000 -and $t.Body.balanceAfter -eq 100000)
 $wa = Call 'GET' '/api/client/wallet' $null $tokenA
 Check 'Ví khách A = 100.000 và có đúng 1 giao dịch' ($wa.Status -eq 200 -and $wa.Body.walletBalance -eq 100000 -and @($wa.Body.transactions).Count -eq 1)
@@ -118,13 +121,17 @@ $tx = Admin 'GET' "/api/admin/customers/$($ca.customerId)/wallet-transactions"
 Check 'Nhân viên xem lịch sử ví của khách' ($tx.Status -eq 200 -and @($tx.Body).Count -eq 1)
 Check 'Danh sách khách cho thấy số dư mới' ((Admin 'GET' "/api/admin/customers/$($ca.customerId)").Body.walletBalance -eq 100000)
 
-# ---- Giới hạn đã biết (KHÔNG tính là pass) ----
+# ---- Chống xử lý lặp (Idempotency-Key) ----
 $cc = (Admin 'POST' '/api/admin/customers' @{ fullName = 'Khach C'; phone = (Phone); initialPassword = $customerPassword }).Body
 $cPath = "/api/admin/customers/$($cc.customerId)/wallet/top-ups"
-[void](Admin 'POST' $cPath @{ amount = 10000; collectionMethod = 'Cash' })
-[void](Admin 'POST' $cPath @{ amount = 10000; collectionMethod = 'Cash' })
-$balanceC = (Admin 'GET' "/api/admin/customers/$($cc.customerId)").Body.walletBalance
-if ($balanceC -eq 20000) { Write-Host 'KNOWN GAP (không tính là pass): hai yêu cầu nạp giống nhau đều được ghi; chưa có khóa chống lặp trong schema (Backend/docs/002-wallet-ledger.md mục 4).' -ForegroundColor Yellow }
+Check 'Nạp thiếu Idempotency-Key -> 400' ((TopUp $cPath @{ amount = 10000; collectionMethod = 'Cash' } '').Status -eq 400)
+$key = 'smoke-' + [guid]::NewGuid().ToString('N')
+$r1 = TopUp $cPath @{ amount = 10000; collectionMethod = 'Cash' } $key
+$r2 = TopUp $cPath @{ amount = 10000; collectionMethod = 'Cash' } $key
+Check 'Lần đầu -> 201, gửi lại cùng khóa -> 200 và cùng giao dịch' ($r1.Status -eq 201 -and $r2.Status -eq 200 -and $r1.Body.transactionId -eq $r2.Body.transactionId)
+Check 'Gửi lại không cộng ví lần hai' ((Admin 'GET' "/api/admin/customers/$($cc.customerId)").Body.walletBalance -eq 10000)
+Check 'Cùng khóa khác số tiền -> 409, ví không đổi' ((TopUp $cPath @{ amount = 20000; collectionMethod = 'Cash' } $key).Status -eq 409 -and (Admin 'GET' "/api/admin/customers/$($cc.customerId)").Body.walletBalance -eq 10000)
+Check 'Khóa mới là yêu cầu mới -> 201' ((TopUp $cPath @{ amount = 10000; collectionMethod = 'Cash' }).Status -eq 201 -and (Admin 'GET' "/api/admin/customers/$($cc.customerId)").Body.walletBalance -eq 20000)
 
 Write-Host ''
 Write-Host 'Chưa kiểm tra bằng script này: nạp/trừ song song, rollback giữa giao dịch (đã có trong Backend\tests\CyberManagement.Wallet.Checks), khóa khách đang có phiên chơi (cần phần phiên của Phúc).'
