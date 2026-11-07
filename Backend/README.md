@@ -87,3 +87,11 @@ Remove-Item Env:AUTH_CHECKS_SQL_CONNECTION
 Test gồm login đúng/sai/khóa, quyền nhân viên/khách, JWT sai chữ ký/issuer/audience/hết hạn, seed lặp và giữ permission của role ngoài catalog. Key/password trong project checks chỉ phục vụ TestServer; không phải cấu hình để chạy API. Logout stateless giữ token hợp lệ tới lúc hết hạn theo contract đã có.
 
 Kết quả review/bàn giao mới gửi trong chat; chỉ tạo file báo cáo khi được yêu cầu. [Quy trình nhóm](../planning/team-workflow.md) quy định Trưởng nhóm review rồi mới merge `dev`.
+
+## SCRUM-13: schema contract và luồng đọc kho
+
+Sau bốn migration nền, SCRUM-13 bổ sung `20261107071954_IntegrateInventoryInvoiceVoucherContracts`: 38 bảng theo contract SCRUM-12; không sửa migration đã áp. Migration mới dừng nếu dữ liệu lịch sử cần đối soát hoặc tiền có phần lẻ, không tự reset/backfill giả.
+GET `/api/admin/inventory` đọc Products bằng JWT + `stockreceipt.view`.
+Seed test nằm trong `src/CyberManagement.Infrastructure/DataTest/InventoryReadSeed.sql`.
+SQL/DBML được xuất từ migrations/model hiện tại ở [database](database/).
+Hướng dẫn DB thử, seed, đăng nhập, màn hình và kiểm thử: [SCRUM-13](../docs/scrum-13-inventory-setup.md).

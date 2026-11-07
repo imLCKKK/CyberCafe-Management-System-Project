@@ -1,4 +1,4 @@
-﻿using CyberManagement.Domain.Entities;
+using CyberManagement.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace CyberManagement.Infrastructure.Persistance;
@@ -42,6 +42,9 @@ public class ApplicationDbContext : DbContext
 
     // Sales
     public DbSet<Promotion> Promotions => Set<Promotion>();
+    public DbSet<PromotionUsage> PromotionUsages => Set<PromotionUsage>();
+    public DbSet<InvoiceIssueRequest> InvoiceIssueRequests => Set<InvoiceIssueRequest>();
+    public DbSet<RefundAttempt> RefundAttempts => Set<RefundAttempt>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderDetail> OrderDetails => Set<OrderDetail>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();

@@ -64,7 +64,7 @@ export async function apiRequest(path, options = {}) {
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...requestOptions, headers });
   const contentType = response.headers.get('content-type') || '';
-  const body = response.status === 204 ? null : contentType.includes('application/json')
+  const body = response.status === 204 ? null : (contentType.includes('application/json') || contentType.includes('+json'))
     ? await response.json()
     : await response.text();
 
@@ -72,7 +72,7 @@ export async function apiRequest(path, options = {}) {
     window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: { accountType: session.accountType } }));
   }
   if (!response.ok) {
-    const message = body?.message || body?.title || (typeof body === 'string' && body) || `Yêu cầu thất bại (${response.status}).`;
+    const message = body?.detail || body?.message || body?.title || (typeof body === 'string' && body) || `Yêu cầu thất bại (${response.status}).`;
     const error = new Error(message);
     error.status = response.status;
     error.body = body;

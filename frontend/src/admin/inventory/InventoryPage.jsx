@@ -1,27 +1,66 @@
-import React, { useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, Boxes, Package } from 'lucide-react';
-import { remainingStock } from '../../client/ordering/recommendation';
-import { useAdminAction } from '../shared/AdminContext';
-import { AdminPage, StatCard, Panel, Table, Toolbar, Filter, Status, Notice, FormDialog, ExportButton } from '../shared/AdminUI';
-import { dateTime, matches, money, moveInventory } from '../shared/adminModel';
-import { DonutChart } from '../shared/Charts';
+import React, { useEffect, useState } from 'react';
+import { Boxes, Package, RefreshCw } from 'lucide-react';
+import { AdminPage, StatCard, Panel, Table, Toolbar, Filter } from '../shared/AdminUI';
+import { matches, money } from '../shared/adminModel';
+import { useAuth } from '../../shared/auth/AuthContext';
+import { getInventory } from './inventoryApi';
 
 export function InventoryPage() {
-  const { db, commit, notice, error, clear, setNotice, setError } = useAdminAction();
-  const [query, setQuery] = useState(''), [stockFilter, setStockFilter] = useState('all'), [tab, setTab] = useState('stock'), [movement, setMovement] = useState(null);
-  const stock = (product) => remainingStock(db, product);
-  const filtered = db.products.filter((row) => matches(query, row.name, row.id) && (stockFilter === 'all' || stockFilter === 'empty' ? stockFilter !== 'empty' || stock(row) === 0 : stock(row) <= row.min_stock));
-  const logs = [...db.inventory_movements].sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at)).filter((row) => matches(query, row.id, row.reason, db.products.find((product) => product.id === row.product_id)?.name));
-  const fields = [{ name: 'product_id', label: 'Sản phẩm', options: db.products.map((row) => [row.id, `${row.name} · còn ${stock(row)}`]) }, { name: 'type', label: 'Loại phiếu', options: [['In', 'Nhập kho'], ['Out', 'Xuất hủy / hao hụt'], ['Adjust', 'Kiểm kê thực tế']] }, { name: 'quantity', label: 'Số lượng', type: 'number', min: 0, max: 100000, help: 'Nhập/xuất: số lượng phát sinh. Kiểm kê: số tồn thực tế sau khi đếm.' }, { name: 'unit_cost', label: 'Đơn giá nhập (VNĐ)', type: 'number', min: 0, max: 10000000, help: 'Chỉ dùng cho phiếu nhập; lưu tại thời điểm nhập.' }, { name: 'reason', label: 'Lý do / Nhà cung cấp', type: 'textarea' }];
-  return <AdminPage title="Quản lý kho" description="Nhập hàng, kiểm kê và kiểm soát mức tồn kho thực tế." actions={<button className="cafe-button primary" onClick={() => setMovement({ type: 'In', product_id: db.products[0]?.id, quantity: 10, unit_cost: db.products[0]?.cost_price || 0, reason: '' })}><ArrowDownToLine size={16}/>Tạo phiếu kho</button>}>
-    <Notice notice={notice} error={error} clear={clear}/>
-    <div className="cafe-stats"><StatCard label="Mặt hàng trong kho" value={db.products.length} icon={Package}/><StatCard label="Tổng số lượng" value={db.products.reduce((sum, row) => sum + stock(row), 0)} icon={Boxes}/><StatCard label="Sắp hết / hết hàng" value={db.products.filter((row) => stock(row) <= row.min_stock).length} icon={AlertTriangle}/><StatCard label="Giá trị tồn tham khảo" value={money(db.products.reduce((sum, row) => sum + stock(row) * row.cost_price, 0))} icon={Boxes}/></div>
-    <div className="admin-tabs"><button aria-pressed={tab === 'stock'} onClick={() => setTab('stock')}>Tồn kho</button><button aria-pressed={tab === 'history'} onClick={() => setTab('history')}>Lịch sử nhập / xuất</button></div>
-    <Panel title={tab === 'stock' ? 'Danh sách tồn kho' : 'Phiếu kho đã ghi nhận'} description="Đơn món giữ tồn khi đặt; hủy món hợp lệ sẽ tự hoàn tồn." actions={<ExportButton filename={`kho-${tab}.csv`} headers={tab === 'stock' ? ['Mã', 'Tên', 'Tồn', 'Ngưỡng', 'Giá vốn'] : ['Mã phiếu', 'Sản phẩm', 'Loại', 'Thay đổi', 'Trước', 'Sau', 'Lý do', 'Thời gian']} rows={tab === 'stock' ? filtered.map((row) => [row.id, row.name, stock(row), row.min_stock, row.cost_price]) : logs.map((row) => [row.id, row.product_id, row.type, row.quantity, row.before, row.after, row.reason, dateTime(row.recorded_at)])} onError={setError}/>}>
-      <Toolbar query={query} onQuery={setQuery} placeholder="Tìm mặt hàng, phiếu kho, lý do…" onReset={() => { setQuery(''); setStockFilter('all'); }}>{tab === 'stock' && <Filter label="Mức tồn kho" value={stockFilter} onChange={setStockFilter} options={ [['all', 'Tất cả mức tồn'], ['low', 'Sắp hết / hết hàng'], ['empty', 'Đã hết hàng']] }/>}</Toolbar>
-      {tab === 'stock' ? <Table rows={filtered} resetKey={query + stockFilter} columns={[{ key: 'name', label: 'Mặt hàng', sortValue: (row) => row.name, render: (row) => <><strong>{row.name}</strong><small>#SP{row.id}</small></> }, { key: 'stock', label: 'Số còn lại', sortValue: stock, render: (row) => <><strong className={stock(row) <= row.min_stock ? 'admin-low-stock' : ''}>{stock(row)} phần</strong><div className="admin-stock-bar"><i style={{ width: `${Math.min(100, stock(row) / Math.max(1, row.min_stock * 3) * 100)}%` }}/></div></> }, { key: 'min', label: 'Ngưỡng cảnh báo', render: (row) => row.min_stock }, { key: 'cost', label: 'Giá trị tồn', render: (row) => money(stock(row) * row.cost_price) }, { key: 'action', label: '', render: (row) => <button className="cafe-button" onClick={() => setMovement({ product_id: row.id, type: 'In', quantity: 10, unit_cost: row.cost_price, reason: '' })}>Nhập / Kiểm kê</button> }]}/> : <Table rows={logs} resetKey={query} columns={[{ key: 'id', label: 'Phiếu', render: (row) => <><strong>#K{row.id}</strong><small>{dateTime(row.recorded_at)}</small></> }, { key: 'product', label: 'Mặt hàng', render: (row) => db.products.find((product) => product.id === row.product_id)?.name }, { key: 'type', label: 'Loại', render: (row) => <Status value={row.type}/> }, { key: 'quantity', label: 'Thay đổi', render: (row) => <strong>{row.quantity > 0 ? '+' : ''}{row.quantity}</strong> }, { key: 'balance', label: 'Trước → Sau', render: (row) => `${row.before} → ${row.after}` }, { key: 'reason', label: 'Lý do', render: (row) => <>{row.reason}<small>Đơn giá {money(row.unit_cost)}</small></> }]}/>}
-    </Panel>
-    <div style={{ marginTop: 22 }}><Panel title="Phân bổ số lượng tồn" description="Tổng số phần theo danh mục."><DonutChart label="phần còn lại" data={db.product_categories.map((category) => ({ name: category.name, value: db.products.filter((row) => row.category_id === category.id).reduce((sum, row) => sum + stock(row), 0) }))}/></Panel></div>
-    {movement && <FormDialog title="Ghi nhận phiếu kho" fields={fields} initial={movement} submit="Lưu phiếu & cập nhật tồn" onClose={() => setMovement(null)} onSave={(form) => { commit((data) => moveInventory(data, form)); setNotice('Đã lưu phiếu và cập nhật tồn kho.'); }}/>}
+  const { principal } = useAuth();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [stockFilter, setStockFilter] = useState('all');
+  const [reload, setReload] = useState(0);
+  const canRead = principal?.type === 'employee' && principal.permissions.includes('stockreceipt.view');
+
+  useEffect(() => {
+    if (!canRead) { setItems([]); setLoading(false); return undefined; }
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    setItems([]);
+    getInventory(controller.signal)
+      .then(data => { if (!controller.signal.aborted) setItems(data); })
+      .catch(reason => {
+        if (!controller.signal.aborted) setError(reason.status === 403
+          ? 'Bạn không có quyền xem tồn kho.'
+          : 'Không tải được tồn kho. Vui lòng thử lại.');
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [canRead, principal, reload]);
+
+  const filtered = items.filter(item => matches(query, item.name, item.id)
+    && (stockFilter !== 'empty' || item.stockQuantity === 0)
+    && (stockFilter !== 'inactive' || !item.isActive));
+
+  return <AdminPage title="Quản lý kho" description="Xem số lượng tồn và trạng thái bán của sản phẩm."
+    actions={canRead && <button className="cafe-button" disabled={loading} onClick={() => setReload(value => value + 1)}><RefreshCw size={16}/>Tải lại</button>}>
+    {!canRead ? <div className="cafe-error" role="alert">Bạn không có quyền xem tồn kho.</div>
+      : loading ? <p role="status">Đang tải tồn kho…</p>
+      : error ? <div className="cafe-error" role="alert">{error}</div>
+      : <>
+        <div className="cafe-stats">
+          <StatCard label="Mặt hàng trong kho" value={items.length} icon={Package}/>
+          <StatCard label="Tổng số lượng" value={items.reduce((sum, item) => sum + item.stockQuantity, 0)} icon={Boxes}/>
+          <StatCard label="Hết hàng" value={items.filter(item => item.stockQuantity === 0).length} icon={Package}/>
+        </div>
+        <Panel title="Danh sách tồn kho">
+          <Toolbar query={query} onQuery={setQuery} placeholder="Tìm mã hoặc tên sản phẩm…" onReset={() => { setQuery(''); setStockFilter('all'); }}>
+            <Filter label="Trạng thái" value={stockFilter} onChange={setStockFilter}
+              options={[['all', 'Tất cả'], ['empty', 'Hết hàng'], ['inactive', 'Ngừng bán']]}/>
+          </Toolbar>
+          {items.length === 0 ? <p role="status">Chưa có sản phẩm trong kho.</p>
+            : filtered.length === 0 ? <p role="status">Không có sản phẩm phù hợp bộ lọc.</p>
+            : <Table rows={filtered} resetKey={query + stockFilter} columns={[
+              { key: 'name', label: 'Sản phẩm', render: item => <><strong>{item.name}</strong><small>#SP{item.id}</small></> },
+              { key: 'stockQuantity', label: 'Số lượng tồn', render: item => item.stockQuantity },
+              { key: 'currentPrice', label: 'Giá bán', render: item => money(item.currentPrice) },
+              { key: 'isActive', label: 'Trạng thái bán', render: item => item.isActive ? 'Đang bán' : 'Ngừng bán' },
+            ]}/>}
+        </Panel>
+      </>}
   </AdminPage>;
 }

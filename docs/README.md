@@ -17,3 +17,5 @@ Giữ các báo cáo cũ để đối chiếu đúng thời điểm. Review/bàn
 ## Contract nghiệp vụ
 
 - [SCRUM-12: kho, hóa đơn và voucher](contracts/inventory-invoice-voucher.md): mapping schema CyberManagement, quy tắc voucher, phân quyền, hóa đơn và các giao điểm còn chờ xác nhận.
+
+- [SCRUM-13: migration, seed và luồng đọc kho](scrum-13-inventory-setup.md).

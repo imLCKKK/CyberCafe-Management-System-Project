@@ -38,7 +38,7 @@ const clientComponents = { tournaments: TournamentsPage, ordering: OrderingPage,
 const adminComponents = { dashboard: DashboardPage, computers: ComputersPage, customers: CustomersPage, orders: OrdersPage, products: ProductsPage, inventory: InventoryPage, invoices: AdminInvoicesPage, tournaments: AdminTournamentsPage, staff: StaffPage, reports: ReportsPage };
 const adminPermissions = {
   computers: 'computer.view', customers: 'customer.view', orders: 'order.view', products: 'product.view',
-  inventory: ['stockreceipt.view', 'inventory.adjust'], invoices: 'invoice.view', tournaments: 'tournament.view',
+  inventory: 'stockreceipt.view', invoices: 'invoice.view', tournaments: 'tournament.view',
   staff: 'employee.view', reports: 'report.view',
 };
 
