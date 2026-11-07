@@ -253,7 +253,8 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 #### S1-K-2 — Define-Order-Checkout-Contracts
 
 **Tài liệu bàn giao:** [Hợp đồng đơn món và checkout](../Backend/docs/004-order-checkout-contract.md),
-phiên bản 0.2 ngày 07/11/2026; đã đối chiếu tĩnh và sửa các điểm lệch, đề nghị Trưởng nhóm review thiết kế.
+phiên bản 0.3 ngày 07/11/2026; bổ sung API/DTO đọc khoản hoàn và tạo yêu cầu thay thế Refund Failed
+sau review SCRUM-11 tại 06ba492, đề nghị Trưởng nhóm re-review thiết kế.
 Kết quả đối chiếu ở mục 11.1; quyết định còn chờ Minh/Trường/Phúc và Trưởng nhóm ở mục 11.2;
 ca kiểm chứng triển khai ở mục 12. Chưa đánh dấu Done.
 

@@ -2,10 +2,10 @@
 
 | Thông tin | Nội dung |
 | --- | --- |
-| Task | Define-Order-Checkout-Contracts / S1-K-2; chưa có Jira key được cung cấp |
+| Task | Define-Order-Checkout-Contracts / S1-K-2 / SCRUM-11 |
 | Owner | Khang; Minh đối chiếu ví/gateway, Trường đối chiếu tồn/voucher/chứng từ |
 | Reviewer cuối | Trưởng nhóm |
-| Phiên bản | 0.2, ngày 07/11/2026, đã đối chiếu nguồn và sửa các điểm lệch; đề nghị Trưởng nhóm review |
+| Phiên bản | 0.3, ngày 07/11/2026, bổ sung đường đọc/duyệt và thay thế Refund sau review 06ba492; đề nghị re-review |
 | Backend đích | CyberManagement .NET 10 / SQL Server, nền 35 bảng |
 | Phụ thuộc | S1-M-1 và S1-T-1; giao diện gateway bàn giao tiếp cho S1-M-2 |
 
@@ -22,7 +22,8 @@ hoàn thiện cạnh tranh/hủy/hoàn thuộc S3-K-1. Không tick Done chỉ v�
 - [PROJECT_GUIDE](../../codex/PROJECT_GUIDE.md), [task S1-K-2](../../codex/SPRINT_TASKS.md#s1-k-2--define-order-checkout-contracts)
   và [các quyết định cần nhóm chốt](../../planning/team-delivery-plan.md#11-quyết-định-nghiệp-vụ-cần-nhóm-chốt-trong-s1).
 - Nhánh làm việc: `SCRUM-11-Define-Order-Checkout-Contracts`; base từ `dev` tại
-  `e14a362e5f635db62deebf7752493672e755a24e`. Nội dung hợp đồng đang là thay đổi chưa commit.
+  `e14a362e5f635db62deebf7752493672e755a24e`. Bản 0.3 sửa tiếp hai finding của review
+  `06ba49289ea3d801ac120f47f980caa36ea8406f`; thay đổi sau commit này chưa được commit.
   [Order](../src/CyberManagement.Domain/Entities/Order.cs),
   [OrderDetail](../src/CyberManagement.Domain/Entities/OrderDetail.cs),
   [Payment](../src/CyberManagement.Domain/Entities/Payment.cs) và EF configuration hiện có
@@ -97,7 +98,10 @@ Khách đọc/yêu cầu hủy chỉ được thao tác dữ liệu của mình;
 | `POST /api/admin/orders/{orderId}/cancellations` | CancelOrderRequest → 200 OrderDto | `order.cancel`; nếu phát sinh hoàn ví thêm `wallet.refund`, gateway thêm `payment.refund` |
 | `POST /api/admin/orders/{orderId}/cancellation-requests/{requestId}/reject` | RejectCancellationRequest → 200 OrderDto | `order.cancel` |
 | `POST /api/admin/orders/{orderId}/cash-collections` | VersionRequest → 200 OrderDto | `payment.create`; server tính khoản còn phải thu |
-| `POST /api/admin/orders/{orderId}/refunds/{refundId}/approve` | VersionRequest → 200 OrderDto, chưa đồng nghĩa đã hoàn | `payment.refund`; chỉ Refund ZaloPay Pending đã có, server lấy nguồn/amount; Failed/Succeeded trả 409 nếu không phải replay đã lưu |
+| `GET /api/admin/orders/{orderId}/refunds` | page/pageSize như trên → 200 RefundPageDto, có cả Pending/Succeeded/Failed | `order.view` và `payment.refund`; không cấp cho Customer/Cashier/Waiter |
+| `GET /api/admin/orders/{orderId}/refunds/{refundId}` | 200 RefundDto | `order.view` và `payment.refund`; Refund phải thuộc đơn trên route |
+| `POST /api/admin/orders/{orderId}/refunds/{refundId}/approve` | VersionRequest → 200 RefundDto, chưa đồng nghĩa đã hoàn | `order.view` và `payment.refund`; chỉ Refund ZaloPay Pending chưa duyệt; Failed/Succeeded/đã duyệt trả 409 nếu không phải replay đã lưu |
+| `POST /api/admin/orders/{orderId}/refunds/{refundId}/replacements` | RefundReplacementRequest → 201 RefundDto mới, chưa duyệt | `order.view` và `payment.refund`; chỉ thay thế Refund ZaloPay Failed đủ điều kiện mục 7.4, không hủy lại món |
 
 Mọi POST trong bảng bắt buộc `Idempotency-Key`; quy tắc retry ở mục 8. API kiểm tra dòng/request/Refund
 thuộc đúng orderId trên route. Tạo đơn staff nhận CustomerId vì là đặt thay; EmployeeId luôn lấy JWT.
@@ -108,6 +112,9 @@ Client phải truyền phiên Active của chính mình; không lấy CustomerId
 Callback/query gateway là adapter server của Minh, có xác minh provider; không dùng JWT khách
 hoặc quyền nhân viên giả để ghi thanh toán. Redirect browser chỉ dẫn về trang đọc lại OrderDto.
 page phải >=1, pageSize trong 1..100; status thuộc tập ở mục 5, customerId là int dương.
+Danh sách Refund không lọc mất các dòng Failed hoặc chưa duyệt; sắp createdAtUtc giảm dần, rồi id giảm dần.
+Route Refund không tồn tại hoặc thuộc orderId khác trả 404, không ghi tác động. GET không thay đổi version,
+không tạo/duyệt/claim khoản hoàn và không trả secret, chữ ký, raw payload hoặc thông tin ví khách khác.
 
 ## 4. DTO đề xuất
 
@@ -125,10 +132,49 @@ entity EF không được dùng trực tiếp làm request/response.
 | RejectCancellationRequest | VersionRequest + `reason: string` trim 1..250; requestId trên route phải Pending |
 | CancellationDto | `id`, `orderId`, `itemIds: int[]` đã chuẩn hóa; `status: Pending/Approved/Rejected`; `reason`, `resolutionReason: string?`, `requestedAtUtc`, `resolvedAtUtc: string?` |
 | OrderItemDto | `id` map OrderDetailId; `productId`, `productNameSnapshot`, `quantity`, `unitPrice`, `discountAmount`, `netAmount`, `status: Pending/Confirmed/Cancelled`, `cancelReason: string?` |
-| PaymentSummaryDto | `method`, `paymentStatus`, `collectedAmount`, `refundedAmount`, `refundPendingAmount`, `refundUnresolvedAmount`, `outstandingAmount`; `paymentId: int?`; `paymentUrl: string?` chỉ URL sandbox do adapter trả; `expiresAtUtc: string?`; `requiresReconciliation: bool` |
+| PaymentSummaryDto | `method`, `paymentStatus`, `collectedAmount`, `refundedAmount`, `refundPendingAmount`, `refundUnresolvedAmount`, `outstandingAmount`; `paymentId: int?` chỉ khoản thu Type=Payment; `paymentUrl: string?` chỉ URL sandbox do adapter trả; `expiresAtUtc: string?`; `requiresReconciliation: bool` |
 | OrderDto | `id` map OrderId; `customerId`, `gamingSessionId: int?`, `createdByEmployeeId: int?`, `createdAtUtc`, `status`, `version`, `subtotal`, `discountAmount`, `originalPayable`, `cancelledAmount`, `payableAmount`, `voucher: VoucherSnapshotDto?`, `items: OrderItemDto[]`, `payment: PaymentSummaryDto`, `cancellationRequests: CancellationDto[]` |
 | VoucherSnapshotDto | `promotionId`, `code`, `discountType: Percent/Fixed`, `discountValue`, `discountAmount`; tất cả do server chụp lúc đặt |
 | OrderPageDto | `items: OrderDto[]`, `page`, `pageSize`, `totalCount`; sắp `createdAtUtc` giảm dần, rồi id giảm dần |
+| RefundSourceItemDto | `orderDetailId: int`, `amount: decimal` nguyên đồng > 0; lấy từ snapshot phần hủy được khoản hoàn bao phủ; tổng amount các phần bằng amount của Refund |
+| RefundDto | `id` map PaymentId của dòng Type=Refund; `orderId`, `refundOfPaymentId` trỏ khoản thu gốc; `orderDetailId: int?`, `sourceItems: RefundSourceItemDto[]`; `amount`, `method: Wallet/Cash/ZaloPay`, `status: Pending/Succeeded/Failed`, `reason`, `createdAtUtc`; `approvedByEmployeeId: int?`, `approvedAtUtc: string?`, `failureReason: string?` đã lọc dữ liệu nội bộ; `replacementOfRefundId: int?`, `replacedByRefundId: int?`; `canApprove: bool`, `canReplace: bool`, `orderVersion: string` |
+| RefundPageDto | `items: RefundDto[]`, `page`, `pageSize`, `totalCount`; version trên các dòng cùng snapshot đọc của Order |
+| RefundReplacementRequest | VersionRequest + `reason: string` trim 1..250 giải thích phương án xử lý mới; không nhận amount, method, nguồn hủy, trạng thái, actor hoặc mã provider từ browser |
+
+RefundDto dành cho API quản trị Refund, không ghép dữ liệu duyệt/attempt vào OrderDto của khách.
+`canApprove/canReplace` phản ánh quyền và điều kiện server tại lúc đọc; POST vẫn kiểm tra lại dưới khóa.
+`orderVersion` là version của Order aggregate, dùng làm expectedVersion cho approve/replacements;
+đọc GET mới khi có 409, không tự tăng token. ApprovedAt/ApprovedBy cùng null khi chưa duyệt,
+cùng có giá trị khi đã duyệt; việc có duyệt không chứng minh đã thực hoàn.
+`replacedByRefundId` được suy từ quan hệ ngược ReplacementOfRefundId, không lưu hai cột trùng chức năng.
+Hủy toàn đơn có orderDetailId=null vẫn trả đầy đủ sourceItems từ snapshot thao tác hoàn đã lưu;
+không suy nguồn lại từ danh sách món hiện tại hoặc chỉ từ tổng tiền.
+
+Ví dụ body của GET `/api/admin/orders/34/refunds/8101` sau khi đơn hết hạn được xác minh thu muộn
+40000, tạo một nghĩa vụ hoàn chưa duyệt; các ID/version/thời gian là dữ liệu minh họa:
+
+```json
+{
+  "id": 8101,
+  "orderId": 34,
+  "refundOfPaymentId": 7001,
+  "orderDetailId": null,
+  "sourceItems": [{ "orderDetailId": 901, "amount": 40000 }],
+  "amount": 40000,
+  "method": "ZaloPay",
+  "status": "Pending",
+  "reason": "LateVerifiedZaloPay: expired order",
+  "createdAtUtc": "2026-11-07T03:20:00Z",
+  "approvedByEmployeeId": null,
+  "approvedAtUtc": null,
+  "failureReason": null,
+  "replacementOfRefundId": null,
+  "replacedByRefundId": null,
+  "canApprove": true,
+  "canReplace": false,
+  "orderVersion": "AAAAAAAAAAE="
+}
+```
 
 Voucher code trim, uppercase invariant, 1..50 ký tự ASCII chữ/số/`-`/`_`; null là không áp dụng.
 Mã sai/hết hạn/hết lượt trả lỗi, không tự bỏ voucher rồi thu giá cao hơn. Reason lưu nội bộ đầy đủ;
@@ -276,7 +322,10 @@ từ thời điểm SQL chấp nhận đơn, trả qua expiresAtUtc; retry/resta
 7. Thu muộn tạo nghĩa vụ hoàn theo khoản thu gốc trong cùng transaction ghi nhận tiền. Đề xuất chuyển
    Admin/Manager có payment.refund duyệt gửi hoàn; không tự gọi hoàn hoặc cộng ví từ callback.
    Lưu ApprovedByEmployeeId/ApprovedAtUtc trên Refund; callback tạo nghĩa vụ với hai trường null.
-   Route approve khóa đúng nguồn/Refund, kiểm tra version và hạn mức, ghi actor/thời điểm một lần.
+   Admin đọc GET danh sách Refund của đơn, lấy id/orderVersion của dòng Pending chưa duyệt,
+   rồi POST approve với Idempotency-Key và expectedVersion đó. Route approve khóa đúng nguồn/Refund,
+   kiểm tra version và hạn mức, ghi actor/thời điểm một lần, trả RefundDto có thông tin duyệt/version mới.
+   Pending đã chiếm hạn mức từ lúc tạo; approve không tạo Refund mới hoặc giữ thêm cùng số tiền lần nữa.
    Refund sinh từ thao tác hủy của người có payment.refund có thể ghi duyệt ngay cùng transaction hủy.
    Worker chỉ gửi sau duyệt và sau kiểm tra điều kiện provider; duyệt không đánh dấu Succeeded.
    Pending Refund giữ hạn mức; chỉ kết quả provider đã xác minh mới tăng RefundedAmount.
@@ -294,7 +343,8 @@ từ thời điểm SQL chấp nhận đơn, trả qua expiresAtUtc; retry/resta
      Failed là trạng thái cuối của yêu cầu hoàn đó, không tự Failed → Pending/Succeeded hoặc gửi lại bằng mã mới.
    - Refund Failed không xóa nghĩa vụ từ snapshot hủy: refundUnresolvedAmount còn dương,
      requiresReconciliation=true và không báo đã trả tiền. Phương án hoàn khác cần payment.refund duyệt,
-     truy nguồn và kiểm tra lại số đã hoàn/đang giữ trước khi tạo yêu cầu nghiệp vụ mới với khóa mới.
+     truy nguồn và kiểm tra lại số đã hoàn/đang giữ trước khi tạo yêu cầu nghiệp vụ mới với khóa mới
+     theo POST replacements ở mục 7.4; không gọi lại cancellations cho dòng đã Cancelled.
      Không tăng Amount thành hoàn toàn bộ đơn còn món đã phục vụ hoặc tự chuyển sang cash/ví.
    - Nếu query sau đó chứng minh đã thực hoàn trái với Refund Failed, giữ bằng chứng attempt và chuyển
      đối soát có duyệt trước khi điều chỉnh; không bỏ qua khoản thực hoàn hoặc tự sửa trạng thái cuối.
@@ -353,6 +403,82 @@ Chỉ một policy được triển khai chung. Minh/Phúc/Trường cần thố
 owner phiên cung cấp BeforeWalletDebit tương đương theo policy đó và cập nhật contract trước tích hợp;
 Khang không tự viết công thức phí trong checkout. Đây là quyết định còn mở, không phải lỗi đã sửa trong code phiên/ví.
 
+### 7.4. Đọc, duyệt và thay thế khoản hoàn Failed
+
+Khang cung cấp các route quản trị ở mục 3; Application gọi logic hoàn của Minh trong cùng transaction.
+Các thao tác này không phụ thuộc món còn Pending: nguồn hoàn là phần hủy đã được xác minh và khoản thu
+gốc đã Succeeded. Đơn/món vẫn Cancelled/Expired; không hủy lần nữa, trả tồn/lượt lần nữa hoặc thu thêm.
+
+**Đọc và duyệt sau thu muộn:** admin có order.view + payment.refund gọi GET `/api/admin/orders/34/refunds`;
+trong RefundPageDto đọc được dòng 8101 như ví dụ mục 4, bao gồm nguồn 7001, amount và thông tin chưa duyệt.
+POST `/api/admin/orders/34/refunds/8101/approve` với expectedVersion từ GET chỉ ghi duyệt dòng đó.
+Worker ghi/claim RefundAttempt bền vững cho Refund đã duyệt rồi commit trước lời gọi provider;
+retry/worker khác phải query/claim cùng attempt theo adapter Minh, không tạo một khoản hoàn mới.
+Sau query xác minh thành công, GET trả dòng 8101 Succeeded; replay approve cùng key trả cùng RefundDto,
+không tạo/duyệt/gửi hoàn thêm. Người không đủ quyền nhận 403 và không được đọc/duyệt nguồn này.
+
+**Phương án thay thế V1:** chỉ tạo yêu cầu ZaloPay mới cùng khoản thu gốc, cùng nguồn hủy, cùng amount
+và cùng method với Refund Failed. Không đổi sang cash/ví hoặc tăng số tiền qua route này.
+POST `/api/admin/orders/{orderId}/refunds/{failedRefundId}/replacements` nhận reason/expectedVersion
+và Idempotency-Key mới cho ý định nghiệp vụ thay thế; không nhận dữ liệu tiền/nguồn do client tự quyết.
+
+1. Xác thực và kiểm tra quyền/sở hữu nguồn; tìm replay trước version như mục 8. Lấy khóa chung Customer
+   → Order → Payment gốc → các Refund liên quan theo ID → RefundAttempt theo mục 8; kiểm tra lại version.
+2. Refund tiền nhiệm phải Type=Refund, Method=ZaloPay, Status=Failed, thuộc đúng đơn/khoản thu gốc Succeeded.
+   Mọi attempt cũ đã được xác minh thất bại/không thực hiện, không còn attempt đang gửi/xử lý/chưa rõ;
+   mọi claim cũ đã kết thúc/vô hiệu để worker không thể tiếp tục gửi. Nếu đang đối soát hoặc có bằng chứng kết quả mâu thuẫn thì trả 409,
+   không lấy việc nhấn nút thay thế làm bằng chứng provider chưa hoàn.
+3. Tiền nhiệm chưa có yêu cầu thay thế. Server sao chép sourceItems snapshot bất biến và amount cũ;
+   kiểm tra cho từng nguồn hủy: phần đã hoàn Succeeded + đang giữ bởi Refund Pending + phần mới
+   không vượt netAmount đã hủy. Kiểm tra cùng hạn mức trên khoản thu gốc và số tiền chưa hoàn của đơn.
+   Refund Failed không được tính như đã hoàn hoặc đang giữ; không được bỏ qua các yêu cầu khác cùng nguồn.
+   Nguồn đã hoàn/đang giữ không còn đủ cho toàn amount tiền nhiệm thì 409, không giảm amount ngầm.
+4. Nếu khoản thay thế là hoàn từng phần nhưng điều kiện giao dịch đã xác minh cấm hoàn từng phần,
+   không tạo yêu cầu để thử vượt hạn chế;
+   trả 409 RefundReplacementNotAllowed, giữ lịch sử Failed và requiresReconciliation để nhóm xử lý phương án khác.
+   Nếu chưa biết điều kiện thì theo cơ chế gửi một lần sau duyệt của mục 7.2, không mặc định chặn trước.
+5. Tạo một Payments.Type=Refund mới: RefundOfPaymentId vẫn là ID khoản thu gốc, ReplacementOfRefundId
+   trỏ tiền nhiệm Failed, Status=Pending, ApprovedByEmployeeId/ApprovedAtUtc=null. Dùng OperationKey ổn định
+   `OrderRefundReplacement:{failedRefundId}` trong Payments; lưu OrderOperations theo scope/key HTTP,
+   fingerprint reason/version và resource ID mới, cùng sourceItems snapshot. Giữ phần hạn mức mới,
+   tăng version Order và ghi actor/reason/audit của thao tác trong cùng transaction; commit mới trả 201 RefundDto.
+   Tạo yêu cầu thay thế chưa đồng nghĩa đã duyệt hoặc đã gửi provider.
+6. Admin đọc RefundDto mới và POST approve bằng một Idempotency-Key riêng, expectedVersion mới.
+   Worker chỉ gửi Refund mới sau duyệt, với attempt/mã hoàn riêng do adapter Minh cấp; không sửa hoặc gửi
+   lại dòng Failed/attempt cũ. Query thành công mới ghi Succeeded và cập nhật tiền/chứng từ một lần.
+
+Mỗi Refund có tối đa một yêu cầu thay thế trực tiếp, bảo vệ bằng unique filtered index trên
+Payments.ReplacementOfRefundId. Cùng key/payload replay trả 200 cùng ID mới và Idempotency-Replayed=true;
+cùng key khác payload 409. Khác key nhưng tiền nhiệm đã có yêu cầu thay thế trả 409 RefundReplacementConflict
+(hoặc OrderVersionConflict nếu version cũ), không tạo nhánh hoàn song song. GET tiền nhiệm trả replacedByRefundId
+để admin theo tiếp. Nếu yêu cầu mới lại Failed thì quy trình có thể tiếp tục từ chính ID mới đó;
+không tạo thêm con từ tiền nhiệm cũ. Không tự tạo chuỗi yêu cầu mới bằng retry kỹ thuật.
+
+Ví dụ tiếp nối: dòng 8101 đã được xác minh Failed, vẫn còn 40000 chưa hoàn, mọi attempt cũ đã chốt
+và kênh hiện cho phép hoàn số tiền đó. Admin GET 8101 lấy orderVersion mới rồi gửi:
+
+```http
+POST /api/admin/orders/34/refunds/8101/replacements
+Authorization: Bearer <admin-or-manager-token>
+Idempotency-Key: refund-replace:8101:manual-1
+Content-Type: application/json
+
+{
+  "expectedVersion": "AAAAAAAAAAM=",
+  "reason": "Da doi soat that bai dut khoat; de nghi yeu cau hoan thay the cung nguon"
+}
+```
+
+| Mốc xử lý minh họa | Refund 8101 | Refund 8102, ReplacementOfRefundId=8101 | Tổng thực hoàn | RefundPendingAmount | RefundUnresolvedAmount |
+| --- | --- | --- | --- | --- | --- |
+| Tạo thay thế thành công, trả id=8102 | Failed, giữ nguyên lịch sử | Pending, amount=40000, chưa duyệt | 0 | 40000 | 40000 |
+| Duyệt 8102 và worker/query xác minh thành công | Failed, không gửi lại | Succeeded, amount=40000 | 40000 | 0 | 0 |
+| Replay create/approve, callback/query lặp | Failed, replacedByRefundId=8102 | Cùng id=8102, không thêm khoản tiền/attempt do replay | 40000 | 0 | 0 |
+
+Nếu query phát hiện kết quả cũ trái kết luận Failed khi đang có yêu cầu thay thế, dừng claim/gửi mới
+cho nguồn đang tranh chấp và chuyển đối soát có duyệt; query các attempt liên quan trước điều chỉnh tiền.
+Không tự giải phóng khoản đang xử lý ở provider, che khoản thực hoàn hoặc cấp thêm yêu cầu thay thế.
+
 ## 8. Chống lặp, transaction và lỗi
 
 ### 8.1. Idempotency và cạnh tranh
@@ -363,7 +489,7 @@ Khang không tự viết công thức phí trong checkout. Đây là quyết đ�
   itemIds null giữ nguyên null trong fingerprint; tập dòng thực tế đã chốt lưu riêng cùng thao tác,
   không suy lại từ trạng thái mới khi tính fingerprint cho replay.
   Có unique constraint trên scope. Không cache key chỉ trong RAM; không xóa key của nguồn còn lưu lịch sử.
-- Cùng scope/key + payload giống: lần đầu create/yêu cầu hủy 201, replay 200 với
+- Cùng scope/key + payload giống: lần đầu create đơn/yêu cầu hủy/yêu cầu hoàn thay thế 201, replay 200 với
   `Idempotency-Replayed: true` và cùng resource ID, DTO đọc trạng thái hiện tại; không tạo side effect mới.
   Các thao tác khác 200 cả lần đầu và replay. Cùng key khác payload → 409 IdempotencyConflict.
 - Xác thực, quyền và sở hữu luôn kiểm tra trước replay; replay đã thành công được tìm trước kiểm tra
@@ -404,12 +530,14 @@ có thể chưa có ProblemDetails; client phải xử lý được bằng HTTP 
 | 401 | Chưa đăng nhập/token sai hoặc hết hạn |
 | 403 | Sai loại principal, thiếu permission, nhân viên không hoạt động |
 | 404 OrderNotFound / OrderItemNotFound | Không tồn tại hoặc khách không sở hữu; dòng không thuộc đơn |
+| 404 RefundNotFound | Không có Refund hoặc Refund không thuộc orderId trên route; không trả dữ liệu nguồn khác |
 | 409 CustomerLocked / SessionNotActive | Tạo mới khi khách Locked, phiên không Active/không thuộc khách; không áp vào replay đã lưu |
 | 409 ProductUnavailable / InsufficientStock | Món ngừng bán, thiếu tồn tại lúc giữ khóa |
 | 409 VoucherInvalid / VoucherLimitExceeded | Mã không hợp lệ/hết hạn/không đạt ngưỡng/hết lượt |
 | 409 InsufficientWalletBalance | Không đủ tiền sau tính giá/giảm; không có đơn/ledger/tồn/usage mới |
 | 409 InvalidOrderTransition / OrderVersionConflict | Confirm/hủy/thu sai trạng thái hoặc version cũ |
 | 409 CancellationConflict / IdempotencyConflict | Trùng yêu cầu Pending hoặc dùng lại key khác payload |
+| 409 RefundReplacementNotAllowed / RefundReplacementConflict | Tiền nhiệm không phải Refund ZaloPay Failed đủ điều kiện, còn attempt chưa rõ, nguồn/tiền đã hoàn hoặc đang giữ không đủ, kênh cấm hoàn, hoặc đã có yêu cầu thay thế trực tiếp |
 | 409 ConcurrencyConflict | Unique/deadlock/concurrency ở SQL; toàn bộ thao tác chưa commit rollback |
 | 500 | Lỗi nội bộ chưa phân loại; không lộ SQL/secret; client GET và retry cùng key khi chưa rõ commit |
 
@@ -420,6 +548,7 @@ có thể chưa có ProblemDetails; client phải xử lý được bằng HTTP 
 | Khang | Order application service/DTO, snapshot, version, yêu cầu/duyệt hủy, TTL worker | Orchestrate cùng transaction; không tự ghi ví hoặc tạo bộ kho/voucher khác |
 | Minh | WalletLedger.Record; FindTrackedForWalletUpdateAsync; FindWalletTransactionByKeyAsync | OrderPayment âm / OrderRefund dương; SaveChanges/commit do caller; khóa ledger <=100 ký tự |
 | Minh | Payments neo OrderId; adapter tạo/query/hoàn purpose Order, worker đối soát | Unique operationKey/mã provider; RefundOfPaymentId; lưu Pending trước gọi ngoài transaction; không ghi tiền từ redirect |
+| Khang + Minh | GET Refunds/RefundDto, POST approve/replacements và logic ứng dụng mục 7.4 | Admin đọc được refundId/nguồn/amount/thông tin duyệt; thay thế Failed bằng khoản mới có nguồn/lineage và cùng transaction/hạn mức; không hủy lại món |
 | Trường | Inventory.ApplySale/ApplyReturn; Voucher.ValidateAndUse/ReleaseForCancelledOrder | Tồn khả dụng + lịch sử; một usage/đơn; snapshot/phân bổ và giải phóng idempotent |
 | Trường | Invoice.IssueForOrders/IssueForSession; Invoice.ApplyFinancialChange | Hóa đơn gộp chỉ liên kết nguồn, không thu lại; OrderDetailId truy snapshot; thu/hủy/hoàn cập nhật đúng hóa đơn nếu đã phát hành |
 | Phúc | Hạ tầng realtime theo S1-P-2 | Khang nối event sau commit vào nhóm customer/nhân viên được server cấp quyền |
@@ -454,11 +583,12 @@ Nền 35 bảng là điểm xuất phát; bảng/cột bổ sung phải được
 | OrderDetails | Giữ UnitPrice làm snapshot; thêm ProductNameSnapshot, DiscountAmount, thứ tự dòng, Status, thông tin confirm/hủy/reason; Quantity không sửa sau tạo | Khang |
 | OrderStatusHistory (table theo EF config) | ChangedBy nullable cho khách/hệ thống, thêm ActorType/reason; truy customer qua Order, không giả nhân viên; lịch sử dòng và yêu cầu hủy cũng lưu được actor/time | Khang + Đại |
 | Chưa có nguồn lưu yêu cầu hủy | OrderCancellationRequests + tập OrderDetailId được chuẩn hóa; người yêu cầu/xử lý, lý do, trạng thái/thời gian; kiểm tra trùng Pending dưới khóa Order | Khang |
-| Chưa có khóa thao tác đơn | OrderOperations: scope/key/fingerprint/orderId/result ID/thời gian; unique scope; cùng transaction nguồn, không chỉ dùng WalletTransactions để chống tạo trùng đơn | Khang |
+| Chưa có khóa thao tác đơn | OrderOperations: scope/key/fingerprint/orderId/result type/ID/thời gian; snapshot nguồn RefundSourceItems gồm OrderDetailId/Amount do server tạo, bất biến và lưu cùng thao tác hoàn (kể cả hoàn toàn đơn); unique scope; cùng transaction nguồn, không chỉ dùng WalletTransactions để chống tạo trùng đơn | Khang; Minh đối chiếu liên kết Refund |
 | Products/InventoryTransactions | Stock là khả dụng; Sale/Return theo OrderDetailId, unique nguồn/type; Stock>=0, Before/After; EmployeeId nullable cho khách/hệ thống theo S1-T-1 | Khang Product; Trường lịch sử tồn |
 | Promotions và lượt dùng | Snapshot/validation/rule + PromotionUsages unique OrderId; ReleasedAt và hạn giữ chỗ truy từ Orders, giữ chỗ chiếm hạn mức | Trường; Khang cung cấp trạng thái/hạn |
 | Payments.InvoiceId NOT NULL, chưa có nguồn/khóa hoàn | Theo S1-T-1: nullable InvoiceId, OrderId/SessionChargeId XOR, Type, RefundOfPaymentId, OrderDetailId cho hoàn dòng, OperationKey unique, trạng thái/mốc thời gian/mã gateway; RefundAttempts thuộc adapter | Minh + Trường |
 | Refund chưa có nguồn duyệt trên base | Đề xuất thêm ApprovedByEmployeeId/ApprovedAtUtc cho khoản hoàn gateway; null khi hệ thống tạo nghĩa vụ thu muộn; worker không gửi trước duyệt, không giả actor nhân viên. Nghĩa vụ chưa hoàn suy từ snapshot hủy + khoản thu/hoàn, không xóa dòng Failed | Minh; Trường đối chiếu với S1-T-1 |
+| Refund chưa có quan hệ thay thế trên base | Đề xuất Payments.ReplacementOfRefundId int? tự FK Payments.PaymentId, NoAction; chỉ Type=Refund, khác PaymentId; unique filtered khi khác null để mỗi tiền nhiệm có tối đa một con trực tiếp. Service kiểm tra tiền nhiệm Failed cùng nguồn/amount/method và mọi attempt đã chốt; replacedByRefundId trong DTO suy ngược từ FK | Minh; Khang gọi nghiệp vụ, Trường đối chiếu |
 | WalletTransactions chưa có IdempotencyKey trên base | Nhận migration/code S1-M-1 từ commit được nhóm tích hợp, không viết lại migration của Minh | Minh |
 | InvoiceOrders/InvoiceDetails | Unique nguồn, snapshot và cập nhật tài chính theo contract Trường; không tạo Invoice.OrderId thay quan hệ gộp | Trường |
 
@@ -468,18 +598,20 @@ Không sửa migration đã áp. Không nhập migration MySQL/schema 19 bảng 
 
 ## 11. Các điểm cần xác nhận để chốt S1-K-2
 
-### 11.1. Kết quả đối chiếu kỹ thuật của bản 0.2
+### 11.1. Kết quả đối chiếu kỹ thuật của bản 0.3
 
 Nguồn ghim tại mục 1; kết quả dưới đây là đối chiếu tài liệu/code, không phải phản hồi chấp thuận của owner
 hoặc bằng chứng đã chạy tích hợp. Các finding đã được sửa ngay trong hợp đồng để Trưởng nhóm review.
 
-| Giao điểm | Nguồn đối chiếu | Kết quả trong bản 0.2 |
+| Giao điểm | Nguồn đối chiếu | Kết quả trong bản 0.3 |
 | --- | --- | --- |
 | Loại/dấu ví, số tiền 0 và khách Locked | S1-M-1 tại 8b2e6a2, WalletLedger.Record và mục 1/2/4 hợp đồng ví | Khớp: OrderPayment âm, OrderRefund dương; không ghi giao dịch 0; hoàn được cho khách Locked; tìm khóa trước ghi |
 | Snapshot, voucher và tồn | S1-T-1 mục 3.1/3.2/4 | Khớp quy tắc sau giảm/phân bổ/hoàn lượt; giữ UnitPrice sẵn có, Sale/Return theo dòng, không giảm/trả hai lần |
 | Tiền và hóa đơn | S1-T-1 mục 6.1–6.4/7 | Khớp thiết kế Payments neo nguồn trước hóa đơn, Refund tách khoản thu; không debit lại khi phát hành hoặc cộng đôi ledger/Payment |
 | Hoàn từng phần chưa rõ/bị từ chối | S1-T-1 bản 1.6/1.7, mục 6.4/6.4.1 | Đã sửa mục 7.2: chưa biết thì gửi một lần sau duyệt; chỉ giữ Pending khi chưa chốt; thất bại dứt khoát chuyển Failed đúng điều kiện, vẫn theo dõi tiền còn phải hoàn |
 | Thu muộn của Payment Failed | S1-T-1 bản 1.6/1.7, bảng trạng thái và quy tắc audit mục 6.2.2 | Đã bổ sung query độc lập, đối chiếu giao dịch, audit cùng transaction, callback chỉ ack sau commit và worker query khi rollback |
+| P1: admin không lấy được refundId để duyệt | Review SCRUM-11 tại 06ba492 | Đã bổ sung GET danh sách/chi tiết, RefundDto có nguồn/amount/trạng thái/actor duyệt/version và ví dụ; approve trả đúng RefundDto; case thu muộn → đọc → duyệt → worker → replay ở mục 7.4/12 |
+| P2: thiếu đường tiếp tục sau Refund Failed | Review SCRUM-11 tại 06ba492; S1-T-1 mục 6.4 | Đã có POST replacements, lineage unique, cùng nguồn/amount/method, kiểm tra attempt/hạn mức và duyệt khoản mới; ví dụ 40000 thất bại rồi thành công, giữ dòng Failed và tổng thực hoàn 40000 |
 | Flush identity và commit | CustomerRepository.ExecuteInTransactionAsync/SaveChangesAsync tại 8b2e6a2 | Code cho phép nhiều lần lưu trong một transaction; tài liệu ví còn ghi một lần lưu. Bản này nêu phương án và nội dung cần đồng bộ, chưa khẳng định test rollback đã pass |
 | Phí phiên trước OrderPayment | Contract phiên tại 761333c mục 3–5 và ví tại 8b2e6a2 mục 5 | Đã bổ sung điểm gọi/phạm vi rollback và ví dụ ở mục 7.3; khác biệt thu phí tích lũy/trả trước vẫn cần nhóm chọn chung |
 | Schema đích so với base e14a362 | Order/OrderDetail/Payment và EF configuration | Đã phân biệt phần có sẵn/phần cần migration ở mục 10; chưa có API checkout, không coi đề xuất schema là đã triển khai |
@@ -496,6 +628,7 @@ người/ngày/commit hoặc phản hồi thực tế vào đây, rồi cập nh
 | Giữ tồn bằng Sale khi đặt, Return khi hủy/expired; usage chiếm lượt ngay, chỉ hoàn khi hủy toàn bộ | Khang + Trường | Không trừ/trả hai lần; tương thích InventoryTransaction/PromotionUsage và phân bổ giảm |
 | TTL ZaloPay 15 phút, không gia hạn; callback xử lý tại/sau hạn là thu muộn | Khang + Minh + Trường | Khớp hạn provider, chủ worker, không khôi phục đơn; trách nhiệm xử lý tiền đã thu |
 | Hoàn gateway theo nguồn gốc; thu muộn cần Admin/Manager duyệt; partial theo quy tắc đã đối chiếu mục 7.2 | Minh + Khang + Trường | Interface adapter/approval, điều kiện kênh/chương trình và đường xử lý nghĩa vụ còn lại khi Refund Failed; không tự hoàn ví |
+| API quản trị Refund và yêu cầu thay thế cùng nguồn theo mục 7.4 | Minh + Khang + Trường | Xác nhận RefundDto, snapshot nguồn, ReplacementOfRefundId/index/operationKey và điểm gọi chung của Minh; đây là phần bổ sung sau review, chưa phải schema/endpoint đã có |
 | Payments neo nguồn trước hóa đơn, thứ tự khóa và flush identity mục 8; actor khách/hệ thống nullable | Minh + Trường + Khang; Đại đối chiếu actor | Migration/DI cùng DbContext, nhiều SaveChanges trong một transaction nếu cần ID; ledger và Payment không đếm tiền hai lần, không giả nhân viên |
 | Phí phiên được xử lý trước OrderPayment qua điểm gọi chung mục 7.3 | Phúc + Minh + Trường + Khang | Chọn policy phí tích lũy hay trả trước; xác nhận phần phí đã thu, thứ tự gọi/khóa và rollback; không thu hai policy cho cùng thời gian |
 | DTO/route/version/idempotency/error/event và precision tiền | Khang + Minh + Trường; Phúc đối chiếu event | Các caller dùng cùng cấu trúc; phần bổ sung schema được điều phối, chưa coi có sẵn |
@@ -524,9 +657,13 @@ Các ca dưới là yêu cầu bàn giao cho S2/S3, **chưa được chạy tron
 | Cash trước/sau confirm, thu lặp, đơn 0 | Chờ thu không debit; thu đúng khoản còn lại một lần, không giả Paid khi chưa thực nhận |
 | Gateway Pending, callback sai/lặp/TopUp nhầm Order | Không tự Paid từ redirect hoặc dữ liệu sai; callback hợp lệ ghi một lần; không mở transaction lúc chờ |
 | Hết hạn đua callback, callback sau hủy, provider đã thu nhưng SQL rollback | Không giữ/trả tồn/lượt hai lần, không hồi sinh đơn; query giao dịch cũ để ghi nhận và đối soát khoản thực thu |
+| P1: hết hạn → thu muộn → GET Refunds → duyệt → worker → retry | Admin đọc được đúng refundId/orderId/khoản thu gốc/amount/nguồn/trạng thái duyệt; expectedVersion từ DTO dùng được; approve chỉ đổi thông tin duyệt, worker xác minh hoàn một lần; replay trả cùng ID, không thêm khoản hoàn |
+| Đọc/duyệt Refund sai quyền hoặc khác orderId | Customer/Cashier/Waiter nhận 403; Refund khác đơn 404; không lộ nguồn tiền hoặc tạo/duyệt/gửi hoàn; GET không đổi version |
 | Payment Failed nhận callback thành công muộn / query khớp / lỗi audit | Callback đơn lẻ không sửa Failed; query khớp mới ghi Succeeded + audit một lần, không hồi sinh đơn; lỗi audit rollback SQL, retry query mã cũ |
 | Hoàn gateway chưa rõ khả năng partial / timeout / bị từ chối dứt khoát | Chưa rõ điều kiện thì gửi một lần sau duyệt; timeout giữ Pending/hạn mức; xác minh thất bại và không còn attempt chưa rõ mới Failed/nhả giữ chỗ; vẫn hiện đúng refundUnresolvedAmount, không báo đã hoàn |
 | Refund Failed cần xử lý tiếp / worker restart / query trái kết luận cũ | Worker không tự gửi lại Failed; phương án mới cần duyệt và kiểm tra hạn mức/nguồn; kết quả mâu thuẫn chuyển đối soát có duyệt, không bỏ qua thực hoàn |
+| P2: Refund 8101 Failed 40000 → tạo 8102 → duyệt → hoàn thành → replay | 8101 vẫn Failed, 8102 có ReplacementOfRefundId=8101/cùng nguồn/amount/method; chỉ 8102 đã duyệt được gửi; tổng Succeeded Refund=40000, unresolved=0; món/đơn/tồn/lượt không đổi do thay thế |
+| Hai request thay thế cùng tiền nhiệm, khác key; nguồn đã hoàn/đang giữ hoặc attempt cũ chưa rõ | Tối đa một Refund mới; request thua 409; cùng key replay cùng ID, khác payload 409; không vượt hạn mức khoản thu/nguồn hủy, không claim/gửi trước duyệt hoặc gửi lại tiền nhiệm Failed |
 | Hóa đơn gộp trước/sau thu/hủy/hoàn | Chỉ nối nguồn đúng đơn, không debit/thu lại, số thu/hoàn khớp; không cộng đôi ledger + Payment |
 | Event và reconnect | Phát sau commit đúng người nhận; GET thấy trạng thái đã lưu, không fallback localStorage |
 
