@@ -51,7 +51,7 @@ Các task backend dùng nền mới sau khi Trưởng nhóm review/tích hợp; 
 1. Mỗi tiêu đề có mã dạng **S1-D-1** là một thẻ Jira độc lập. Copy nguyên tên tiếng Anh nối bằng dấu gạch ngang sau dấu “—” vào **Summary**, không đưa mã kế hoạch vào tên Jira. Người phụ trách và reviewer ghi ở đầu nhóm, sprint ghi ở đầu phần; chọn các trường này trên Jira, không lặp lại trong Description. Jira key thực tế chỉ ghi sau khi tạo issue.
 2. Copy **Description**, **Dependencies** và **Done khi** vào nội dung Jira; giữ cả căn cứ/ranh giới nếu thẻ có. Description là phạm vi cần làm, Done khi là kết quả cần chứng minh. Chỉ tick khi có bằng chứng; không tạo Sub-task hoặc lượt review riêng cho từng dòng.
 3. Có thể chia nhiều commit/PR nhỏ cùng tham chiếu một Task khi cần bàn giao code dùng chung sớm. Ghi mốc/PR đã cung cấp để người phụ thuộc tích hợp; Task chỉ Done khi đủ checklist và được Trưởng nhóm duyệt, không đợi cuối sprint mới đẩy toàn bộ code.
-4. Gửi **một báo cáo review tổng hợp theo Task**: checklist đạt/chưa đạt, diff/PR liên quan và kiểm tra. Lượt sau tập trung vào phần đã sửa; không buộc Trưởng nhóm đọc lại toàn bộ phần không đổi.
+4. Gửi **kết quả review tổng hợp theo Task trực tiếp trong chat**, theo mẫu tin nhắn ở mục 6 của [REVIEW_GUIDE.md](REVIEW_GUIDE.md), để Trưởng nhóm copy gửi người làm: lỗi/thiếu sót, hướng sửa và kết quả cần kiểm tra; nêu ngắn diff/PR và bằng chứng liên quan. Chỉ tạo file báo cáo khi người dùng yêu cầu rõ. Lượt sau tập trung vào phần đã sửa; không buộc Trưởng nhóm đọc lại toàn bộ phần không đổi.
 5. Các phụ thuộc là điều kiện để hoàn tất tích hợp. Có thể phát triển theo contract đã chốt trước khi chúng Done, nhưng phải có bằng chứng tích hợp thật để nghiệm thu. Khi đã tạo issue, ánh xạ mã kế hoạch sang Jira key và liên kết “is blocked by” phù hợp; không dùng Parent.
 6. Workflow: To Do → In Progress → Review → Done, ánh xạ vào board hiện có. Mỗi người tập trung một luồng chính; chỉ tách thêm thẻ khi có kết quả độc lập hoặc blocker riêng cần theo dõi, không tách vì mỗi bước mất một ngày.
 7. Tên Task dùng dạng `Build-Admin-Client-Login` để dùng trực tiếp khi tạo branch từ Jira theo flow của nhóm. Không cần trường Branch riêng trong backlog hoặc Description. Giữ mã kế hoạch để tra phụ thuộc trong tài liệu; ánh xạ với key thật sau khi tạo issue.
@@ -251,6 +251,11 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 **Gom từ mã cũ:** `S1-K-01`, `S1-K-03`, `S1-K-04`, `S1-K-05`. Đây là mã tra cứu, không tạo lại các thẻ cũ.
 
 #### S1-K-2 — Define-Order-Checkout-Contracts
+
+**Tài liệu bàn giao:** [Hợp đồng đơn món và checkout](../Backend/docs/004-order-checkout-contract.md),
+phiên bản 0.2 ngày 07/11/2026; đã đối chiếu tĩnh và sửa các điểm lệch, đề nghị Trưởng nhóm review thiết kế.
+Kết quả đối chiếu ở mục 11.1; quyết định còn chờ Minh/Trường/Phúc và Trưởng nhóm ở mục 11.2;
+ca kiểm chứng triển khai ở mục 12. Chưa đánh dấu Done.
 
 **Description:**
 

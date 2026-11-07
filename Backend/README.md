@@ -13,6 +13,8 @@ Quyết định của Trưởng nhóm ngày 02/11/2026: dùng **database SQL Ser
 
 Owner triển khai module xuyên các tầng và UI. Application/Domain không dùng DbContext/HttpContext; interface được implementation ở tầng ngoài. [Hợp đồng identity](docs/001-monorepo.md) quy định EmployeeId/CustomerId kiểu int, năm role nhân viên và customer principal. Frontend còn demo; nối login và nghiệp vụ khác theo [55 task](../codex/SPRINT_TASKS.md).
 
+
+
 ## Build từ repository root
 
 ```powershell
