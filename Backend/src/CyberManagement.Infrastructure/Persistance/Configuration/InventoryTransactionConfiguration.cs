@@ -8,7 +8,15 @@ public class InventoryTransactionConfiguration : IEntityTypeConfiguration<Invent
 {
     public void Configure(EntityTypeBuilder<InventoryTransaction> builder)
     {
-        builder.ToTable("InventoryTransactions");
+        builder.ToTable("InventoryTransactions", t =>
+        {
+            t.HasCheckConstraint("CK_InventoryTransactions_Values", "[Before] >= 0 AND [After] >= 0 AND CAST([Before] AS bigint) + [Quantity] = [After]");
+            t.HasCheckConstraint("CK_InventoryTransactions_Reason", "LEN(LTRIM(RTRIM([Reason]))) BETWEEN 1 AND 200");
+            t.HasCheckConstraint("CK_InventoryTransactions_Type", "(([Type] IN ('Receive','Return') AND [Quantity] > 0) OR ([Type] = 'Sale' AND [Quantity] < 0) OR ([Type] = 'Adjust' AND [Quantity] <> 0)) AND (([Type] IN ('Receive','Adjust') AND [OrderDetailId] IS NULL) OR ([Type] IN ('Sale','Return') AND [OrderDetailId] IS NOT NULL AND [OrderId] IS NOT NULL))");
+        });
+        builder.Property(x => x.Reason).HasMaxLength(200).IsRequired();
+        builder.HasIndex(x => new { x.OrderDetailId, x.Type }).IsUnique().HasFilter("[OrderDetailId] IS NOT NULL");
+        builder.HasOne(x => x.OrderDetail).WithMany().HasForeignKey(x => x.OrderDetailId).OnDelete(DeleteBehavior.NoAction);
         builder.HasKey(x => x.InvTransId);
 
         builder.Property(x => x.Type).HasMaxLength(50).IsRequired();

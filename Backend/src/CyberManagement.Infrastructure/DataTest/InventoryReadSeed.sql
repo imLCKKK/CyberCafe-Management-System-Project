@@ -7,8 +7,8 @@ IF DB_NAME() NOT LIKE N'CyberManagement[_]SCRUM13[_]%'
     THROW 51000, 'Seed requires a separate CyberManagement_SCRUM13_ database.', 1;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.__EFMigrationsHistory
-               WHERE MigrationId = N'20261102084459_RemoveEmployeeLoginLockout')
-    THROW 51000, 'Apply the CyberManagement 35-table migrations before seed.', 1;
+               WHERE MigrationId = N'20261107071954_IntegrateInventoryInvoiceVoucherContracts')
+    THROW 51000, 'Apply the SCRUM13 contract migration before seed.', 1;
 
 BEGIN TRANSACTION;
 DECLARE @CategoryId int;
@@ -26,7 +26,7 @@ BEGIN
     SET @CategoryId = CONVERT(int, SCOPE_IDENTITY());
 END;
 
-DECLARE @Expected TABLE (ProductName nvarchar(150), Stock int, IsActive bit, Price decimal(12,2));
+DECLARE @Expected TABLE (ProductName nvarchar(150), Stock int, IsActive bit, Price decimal(18,0));
 INSERT @Expected VALUES
     (N'TEST_Nước suối', 20, 1, 10000),
     (N'TEST_Mì ly hết hàng', 0, 1, 20000),

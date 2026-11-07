@@ -15,7 +15,7 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(x => x.Phone).HasMaxLength(20).IsRequired();
         builder.Property(x => x.PasswordHash).HasMaxLength(255);
         builder.Property(x => x.Email).HasMaxLength(150);
-        builder.Property(x => x.WalletBalance).HasPrecision(12, 2);
+        builder.Property(x => x.WalletBalance).HasPrecision(18, 0);
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();
 
         builder.HasIndex(x => x.Phone).IsUnique();

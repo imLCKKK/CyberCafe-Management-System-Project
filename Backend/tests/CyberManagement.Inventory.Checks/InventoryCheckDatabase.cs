@@ -2,11 +2,15 @@ using CyberManagement.Domain.Entities;
 using CyberManagement.Infrastructure.Persistance;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 internal sealed class InventoryCheckDatabase(string? serverConnection)
 {
     // Chỉ DB có tên sinh trong lượt kiểm tra này mới được tạo/xóa.
     private readonly string name = $"CyberManagement_SCRUM13_Checks_{Guid.NewGuid():N}";
+    public const string BaselineMigration = "20261102084459_RemoveEmployeeLoginLockout";
+    public const string ContractMigration = "20261107071954_IntegrateInventoryInvoiceVoucherContracts";
     private bool created;
     public bool IsSql => !string.IsNullOrWhiteSpace(serverConnection);
     public string ConnectionString => new SqlConnectionStringBuilder(serverConnection ??
@@ -19,7 +23,7 @@ internal sealed class InventoryCheckDatabase(string? serverConnection)
         else options.UseInMemoryDatabase(name);
     }
 
-    public async Task InitializeAsync(ApplicationDbContext database)
+    public async Task InitializeAsync(ApplicationDbContext database, bool baselineOnly = false)
     {
         if (!IsSql) { await database.Database.EnsureCreatedAsync(); return; }
         await using var connection = Master();
@@ -28,14 +32,16 @@ internal sealed class InventoryCheckDatabase(string? serverConnection)
         command.CommandText = $"IF DB_ID(N'{name}') IS NOT NULL THROW 51000, 'Check DB already exists.', 1; CREATE DATABASE [{name}];";
         await command.ExecuteNonQueryAsync();
         created = true;
-        await database.Database.MigrateAsync();
-        if ((await database.Database.GetAppliedMigrationsAsync()).Count() != 4)
+        await database.GetService<IMigrator>().MigrateAsync(baselineOnly ? BaselineMigration : null);
+        var expectedMigrations = baselineOnly ? 4 : 5;
+        var expectedTables = baselineOnly ? 35 : 38;
+        if ((await database.Database.GetAppliedMigrationsAsync()).Count() != expectedMigrations)
             throw new InvalidOperationException("Unexpected migration count; review integration order.");
         await using var count = connection.CreateCommand();
         count.CommandText = $"SELECT COUNT(*) FROM [{name}].sys.tables WHERE is_ms_shipped=0 AND name <> '__EFMigrationsHistory';";
-        if (Convert.ToInt32(await count.ExecuteScalarAsync()) != 35)
-            throw new InvalidOperationException("Expected 35 business tables.");
-        Console.WriteLine("PASS fresh SQL database: 4 migrations, 35 business tables.");
+        if (Convert.ToInt32(await count.ExecuteScalarAsync()) != expectedTables)
+            throw new InvalidOperationException($"Expected {expectedTables} business tables.");
+        Console.WriteLine($"PASS fresh SQL database: {expectedMigrations} migrations, {expectedTables} business tables.");
     }
 
     public async Task SeedInventoryAsync(ApplicationDbContext database)

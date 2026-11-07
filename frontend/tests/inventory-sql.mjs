@@ -45,6 +45,12 @@ try {
   await input('input[placeholder="Tìm mã hoặc tên sản phẩm…"]', 'khong-co-san-pham-nay');
   await until('document.body.innerText.includes("Không có sản phẩm phù hợp bộ lọc.")');
   await input('input[placeholder="Tìm mã hoặc tên sản phẩm…"]', '');
+  await input('select[aria-label="Trạng thái"]', 'empty');
+  await until('document.querySelectorAll("tbody tr").length === 1 && document.body.innerText.includes("TEST_Mì ly hết hàng")');
+  await input('select[aria-label="Trạng thái"]', 'inactive');
+  await until('document.querySelectorAll("tbody tr").length === 1 && document.body.innerText.includes("TEST_Coca ngừng bán")');
+  await input('select[aria-label="Trạng thái"]', 'all');
+  await until('document.querySelectorAll("tbody tr").length === 3');
   await signOut();
   await login('manager01');
   await go('/admin/inventory', ready);

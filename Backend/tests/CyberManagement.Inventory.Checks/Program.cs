@@ -30,6 +30,8 @@ if (args.Contains("--export-schema") || args.Contains("--check-schema"))
 
 var fixture = new InventoryCheckDatabase(Environment.GetEnvironmentVariable("INVENTORY_CHECKS_SQL_CONNECTION"));
 var serve = args.Contains("--serve");
+if (serve && !fixture.IsSql)
+    throw new InvalidOperationException("--serve requires INVENTORY_CHECKS_SQL_CONNECTION; the browser SQL checks must not use InMemory.");
 var checks = 0;
 const string password = "Inventory-check-only-2026!";
 var signingKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(48));
@@ -48,6 +50,21 @@ try
             customer.PasswordHash = scope.ServiceProvider.GetRequiredService<ICustomerPasswordHasher>()
                 .HashPassword(customer, password);
             db.Customers.Add(customer);
+            // Role ngoài catalog chứng minh API quyết định theo permission, không theo tên role.
+            foreach (var (username, permissionName) in new[]
+            {
+                ("inventory-reader", "stockreceipt.view"),
+                ("inventory-adjuster", "inventory.adjust")
+            })
+            {
+                var permission = await db.Permissions.SingleAsync(item => item.PermissionName == permissionName);
+                var role = new Role { RoleName = username };
+                role.RolePermissions.Add(new RolePermission { Permission = permission });
+                var employee = new Employee { Username = username, FullName = username, Role = role };
+                employee.PasswordHash = scope.ServiceProvider.GetRequiredService<IEmployeePasswordHasher>()
+                    .HashPassword(employee, password);
+                db.Employees.Add(employee);
+            }
             await db.SaveChangesAsync();
         }
         await app.StartAsync();
@@ -73,6 +90,10 @@ try
             var manager = await Login(client, "manager01");
             var managerItems = await ReadInventory(client, manager);
             Check("Manager inventory allowed", items.SequenceEqual(managerItems));
+            var readerItems = await ReadInventory(client, await Login(client, "inventory-reader"));
+            Check("Custom role with view permission can read inventory", items.SequenceEqual(readerItems));
+            await ExpectStatus("Adjust permission alone does not grant inventory read", HttpStatusCode.Forbidden,
+                await Send(client, await Login(client, "inventory-adjuster")));
             foreach (var username in new[] { "cashier01", "waiter01", "tech01" })
                 await ExpectStatus($"{username} inventory denied", HttpStatusCode.Forbidden,
                     await Send(client, await Login(client, username)));
@@ -87,6 +108,7 @@ try
             await scope.ServiceProvider.GetRequiredService<IInventoryQueries>().GetInventoryAsync();
             Check("Read does not track or mutate products", !db.ChangeTracker.Entries<Product>().Any());
             Check("Read does not create inventory movements", !await db.InventoryTransactions.AnyAsync());
+            if (fixture.IsSql) await SchemaContractChecks.RunAsync(db, Check);
         }
         await app.StopAsync();
     }
@@ -105,6 +127,8 @@ try
         await ExpectStatus("Query failure returns 500 instead of demo data", HttpStatusCode.InternalServerError,
             await Send(failedClient, await Login(failedClient, "admin")));
         await failed.StopAsync();
+        if (fixture.IsSql)
+            await SchemaContractChecks.RunUpgradeGuardsAsync(Environment.GetEnvironmentVariable("INVENTORY_CHECKS_SQL_CONNECTION")!, Check);
         Console.WriteLine($"{checks} inventory checks passed ({(fixture.IsSql ? "SQL Server" : "InMemory; not migration evidence")}).");
     }
 }

@@ -10,6 +10,7 @@ public class InvoiceOrderConfiguration : IEntityTypeConfiguration<InvoiceOrder>
     {
         builder.ToTable("InvoiceOrders");
         builder.HasKey(x => new { x.InvoiceId, x.OrderId });
+        builder.HasIndex(x => x.OrderId).IsUnique();
 
         builder.HasOne(x => x.Invoice)
             .WithMany(x => x.InvoiceOrders)

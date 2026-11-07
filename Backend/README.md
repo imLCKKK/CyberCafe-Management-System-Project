@@ -88,8 +88,9 @@ Test gồm login đúng/sai/khóa, quyền nhân viên/khách, JWT sai chữ ký
 
 Kết quả review/bàn giao mới gửi trong chat; chỉ tạo file báo cáo khi được yêu cầu. [Quy trình nhóm](../planning/team-workflow.md) quy định Trưởng nhóm review rồi mới merge `dev`.
 
-## SCRUM-13: luồng đọc kho
+## SCRUM-13: schema contract và luồng đọc kho
 
+Sau bốn migration nền, SCRUM-13 bổ sung `20261107071954_IntegrateInventoryInvoiceVoucherContracts`: 38 bảng theo contract SCRUM-12; không sửa migration đã áp. Migration mới dừng nếu dữ liệu lịch sử cần đối soát hoặc tiền có phần lẻ, không tự reset/backfill giả.
 GET `/api/admin/inventory` đọc Products bằng JWT + `stockreceipt.view`.
 Seed test nằm trong `src/CyberManagement.Infrastructure/DataTest/InventoryReadSeed.sql`.
 SQL/DBML được xuất từ migrations/model hiện tại ở [database](database/).

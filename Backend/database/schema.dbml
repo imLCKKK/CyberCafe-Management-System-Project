@@ -54,7 +54,7 @@ Table dbo.ComputerTypes {
   CPU nvarchar(100) [null]
   Description nvarchar(255) [null]
   GPU nvarchar(100) [null]
-  PricePerHour decimal(12,2) [not null]
+  PricePerHour decimal(18,0) [not null]
   RAM nvarchar(50) [null]
   TypeName nvarchar(100) [not null]
   indexes {
@@ -68,7 +68,7 @@ Table dbo.Customers {
   PasswordHash nvarchar(255) [null]
   Phone nvarchar(20) [not null]
   Status nvarchar(50) [not null]
-  WalletBalance decimal(12,2) [not null]
+  WalletBalance decimal(18,0) [not null]
   indexes {
     (Phone) [name: 'IX_Customers_Phone', unique]
   }
@@ -125,7 +125,7 @@ Table dbo.GamingSessions {
   LastChargedAt datetime2 [null]
   StartTime datetime2 [not null]
   Status nvarchar(50) [not null]
-  TotalCost decimal(12,2) [not null]
+  TotalCost decimal(18,0) [not null]
   indexes {
     (ComputerId) [name: 'IX_GamingSessions_ComputerId']
     (CustomerId) [name: 'IX_GamingSessions_CustomerId']
@@ -133,16 +133,21 @@ Table dbo.GamingSessions {
 }
 Table dbo.InventoryTransactions {
   InvTransId int [not null, pk, increment]
-  CreatedAt datetime2 [not null]
-  EmployeeId int [not null]
+  After int [not null]
+  Before int [not null]
+  CreatedAt datetimeoffset [not null]
+  EmployeeId int [null]
+  OrderDetailId int [null]
   OrderId int [null]
   ProductId int [not null]
   Quantity int [not null]
+  Reason nvarchar(200) [not null]
   ReceiptId int [null]
   ReferenceType nvarchar(50) [not null]
   Type nvarchar(50) [not null]
   indexes {
     (EmployeeId) [name: 'IX_InventoryTransactions_EmployeeId']
+    (OrderDetailId, Type) [name: 'IX_InventoryTransactions_OrderDetailId_Type', unique]
     (OrderId) [name: 'IX_InventoryTransactions_OrderId']
     (ProductId) [name: 'IX_InventoryTransactions_ProductId']
     (ReceiptId) [name: 'IX_InventoryTransactions_ReceiptId']
@@ -150,14 +155,26 @@ Table dbo.InventoryTransactions {
 }
 Table dbo.InvoiceDetails {
   InvoiceDetailId int [not null, pk, increment]
-  Amount decimal(12,2) [not null]
+  Amount decimal(18,0) [not null]
   Description nvarchar(255) [not null]
   InvoiceId int [not null]
   ItemType nvarchar(50) [not null]
+  OrderDetailId int [null]
   Quantity int [not null]
-  UnitPrice decimal(12,2) [not null]
+  SessionChargeId int [null]
+  UnitPrice decimal(18,0) [not null]
   indexes {
     (InvoiceId) [name: 'IX_InvoiceDetails_InvoiceId']
+    (OrderDetailId) [name: 'IX_InvoiceDetails_OrderDetailId', unique]
+    (SessionChargeId) [name: 'IX_InvoiceDetails_SessionChargeId', unique]
+  }
+}
+Table dbo.InvoiceIssueRequests {
+  OperationKey nvarchar(100) [not null, pk]
+  InvoiceId int [not null]
+  RequestHash char(64) [not null]
+  indexes {
+    (InvoiceId) [name: 'IX_InvoiceIssueRequests_InvoiceId', unique]
   }
 }
 Table dbo.InvoiceOrders {
@@ -165,20 +182,20 @@ Table dbo.InvoiceOrders {
   OrderId int [not null]
   indexes {
     (InvoiceId, OrderId) [pk]
-    (OrderId) [name: 'IX_InvoiceOrders_OrderId']
+    (OrderId) [name: 'IX_InvoiceOrders_OrderId', unique]
   }
 }
 Table dbo.Invoices {
   InvoiceId int [not null, pk, increment]
   CustomerId int [not null]
-  Discount decimal(12,2) [not null]
+  Discount decimal(18,0) [not null]
   EmployeeId int [not null]
   GamingSessionId int [null]
   InvoiceDate datetime2 [not null]
   PromotionId int [null]
   Status nvarchar(50) [not null]
-  Subtotal decimal(12,2) [not null]
-  TotalAmount decimal(12,2) [not null]
+  Subtotal decimal(18,0) [not null]
+  TotalAmount decimal(18,0) [not null]
   indexes {
     (CustomerId) [name: 'IX_Invoices_CustomerId']
     (EmployeeId) [name: 'IX_Invoices_EmployeeId']
@@ -188,10 +205,12 @@ Table dbo.Invoices {
 }
 Table dbo.OrderDetails {
   OrderDetailId int [not null, pk, increment]
+  DiscountAmount decimal(18,0) [not null]
   OrderId int [not null]
   ProductId int [not null]
+  ProductNameSnapshot nvarchar(150) [not null]
   Quantity int [not null]
-  UnitPrice decimal(12,2) [not null]
+  UnitPrice decimal(18,0) [not null]
   indexes {
     (OrderId) [name: 'IX_OrderDetails_OrderId']
     (ProductId) [name: 'IX_OrderDetails_ProductId']
@@ -200,11 +219,15 @@ Table dbo.OrderDetails {
 Table dbo.Orders {
   OrderId int [not null, pk, increment]
   CustomerId int [not null]
+  DiscountAmount decimal(18,0) [not null]
   EmployeeId int [not null]
   GamingSessionId int [null]
   OrderTime datetime2 [not null]
   Status nvarchar(50) [not null]
-  TotalAmount decimal(12,2) [not null]
+  TotalAmount decimal(18,0) [not null]
+  VoucherCodeSnapshot nvarchar(50) [null]
+  VoucherDiscountTypeSnapshot nvarchar(10) [null]
+  VoucherDiscountValueSnapshot decimal(18,2) [null]
   indexes {
     (CustomerId) [name: 'IX_Orders_CustomerId']
     (EmployeeId) [name: 'IX_Orders_EmployeeId']
@@ -225,15 +248,35 @@ Table dbo.OrderStatusHistory {
 }
 Table dbo.Payments {
   PaymentId int [not null, pk, increment]
-  Amount decimal(12,2) [not null]
-  InvoiceId int [not null]
-  Method nvarchar(50) [not null]
-  PaymentTime datetime2 [not null]
-  Status nvarchar(50) [not null]
+  Amount decimal(18,0) [not null]
+  ConfirmedAt datetimeoffset [null]
+  CreatedAt datetimeoffset [not null]
+  GatewayTransactionId nvarchar(50) [null]
+  InvoiceId int [null]
+  MerchantTransactionId nvarchar(40) [null]
+  Method nvarchar(10) [not null]
+  OperationKey nvarchar(100) [not null]
+  OrderDetailId int [null]
+  OrderId int [null]
+  PaymentTime datetimeoffset [null]
+  PaymentTimeBasis nvarchar(12) [null]
+  ProviderOccurredAt datetimeoffset [null]
+  Reason nvarchar(250) [null]
+  RefundOfPaymentId int [null]
+  SessionChargeId int [null]
+  Status nvarchar(10) [not null]
+  Type nvarchar(10) [not null]
   WalletTransactionId int [null]
   indexes {
     (InvoiceId) [name: 'IX_Payments_InvoiceId']
-    (WalletTransactionId) [name: 'IX_Payments_WalletTransactionId']
+    (Method, GatewayTransactionId) [name: 'IX_Payments_Method_GatewayTransactionId', unique]
+    (Method, MerchantTransactionId) [name: 'IX_Payments_Method_MerchantTransactionId', unique]
+    (OperationKey) [name: 'IX_Payments_OperationKey', unique]
+    (OrderDetailId) [name: 'IX_Payments_OrderDetailId']
+    (OrderId) [name: 'IX_Payments_OrderId']
+    (RefundOfPaymentId, Status) [name: 'IX_Payments_RefundOfPaymentId_Status']
+    (SessionChargeId) [name: 'IX_Payments_SessionChargeId']
+    (WalletTransactionId) [name: 'IX_Payments_WalletTransactionId', unique]
   }
 }
 Table dbo.Permissions {
@@ -248,7 +291,7 @@ Table dbo.Products {
   ProductId int [not null, pk, increment]
   CategoryId int [not null]
   IsActive bit [not null]
-  Price decimal(12,2) [not null]
+  Price decimal(18,0) [not null]
   ProductName nvarchar(150) [not null]
   Stock int [not null]
   indexes {
@@ -257,13 +300,50 @@ Table dbo.Products {
 }
 Table dbo.Promotions {
   PromotionId int [not null, pk, increment]
-  DiscountType nvarchar(50) [not null]
-  DiscountValue decimal(12,2) [not null]
-  EndDate datetime2 [not null]
+  Code nvarchar(50) [not null]
+  DiscountType nvarchar(10) [not null]
+  DiscountValue decimal(18,2) [not null]
+  EndDate datetimeoffset [not null]
   IsActive bit [not null]
+  MaxDiscountAmount decimal(18,0) [null]
+  MinOrderAmount decimal(18,0) [not null]
+  PerCustomerUsageLimit int [null]
   PromoName nvarchar(150) [not null]
-  StartDate datetime2 [not null]
+  StartDate datetimeoffset [not null]
+  TotalUsageLimit int [null]
   indexes {
+    (Code) [name: 'IX_Promotions_Code', unique]
+  }
+}
+Table dbo.PromotionUsages {
+  PromotionUsageId int [not null, pk, increment]
+  CustomerId int [not null]
+  OrderId int [not null]
+  PromotionId int [not null]
+  ReleasedAt datetimeoffset [null]
+  UsedAt datetimeoffset [not null]
+  indexes {
+    (CustomerId) [name: 'IX_PromotionUsages_CustomerId']
+    (OrderId) [name: 'IX_PromotionUsages_OrderId', unique]
+    (PromotionId, CustomerId) [name: 'IX_PromotionUsages_PromotionId_CustomerId']
+  }
+}
+Table dbo.RefundAttempts {
+  RefundAttemptId int [not null, pk, increment]
+  CreatedAt datetimeoffset [not null]
+  GatewayRefundId nvarchar(50) [null]
+  LastApi nvarchar(12) [null]
+  LastQueriedAt datetimeoffset [null]
+  LastReturnCode int [null]
+  LastSubReturnCode int [null]
+  MerchantRefundId nvarchar(45) [not null]
+  PaymentId int [not null]
+  ProviderAppId int [not null]
+  Status nvarchar(10) [not null]
+  indexes {
+    (PaymentId) [name: 'IX_RefundAttempts_PaymentId']
+    (ProviderAppId, GatewayRefundId) [name: 'IX_RefundAttempts_ProviderAppId_GatewayRefundId', unique]
+    (ProviderAppId, MerchantRefundId) [name: 'IX_RefundAttempts_ProviderAppId_MerchantRefundId', unique]
   }
 }
 Table dbo.RolePermissions {
@@ -284,7 +364,7 @@ Table dbo.Roles {
 }
 Table dbo.SessionCharges {
   ChargeId int [not null, pk, increment]
-  Amount decimal(12,2) [not null]
+  Amount decimal(18,0) [not null]
   EndTime datetime2 [not null]
   GamingSessionId int [not null]
   StartTime datetime2 [not null]
@@ -306,7 +386,7 @@ Table dbo.StockReceiptDetails {
   ProductId int [not null]
   Quantity int [not null]
   ReceiptId int [not null]
-  UnitCost decimal(12,2) [not null]
+  UnitCost decimal(18,0) [not null]
   indexes {
     (ProductId) [name: 'IX_StockReceiptDetails_ProductId']
     (ReceiptId) [name: 'IX_StockReceiptDetails_ReceiptId']
@@ -317,7 +397,7 @@ Table dbo.StockReceipts {
   EmployeeId int [not null]
   ReceiptDate datetime2 [not null]
   SupplierId int [not null]
-  TotalAmount decimal(12,2) [not null]
+  TotalAmount decimal(18,0) [not null]
   indexes {
     (EmployeeId) [name: 'IX_StockReceipts_EmployeeId']
     (SupplierId) [name: 'IX_StockReceipts_SupplierId']
@@ -384,8 +464,8 @@ Table dbo.Tournaments {
 }
 Table dbo.WalletTransactions {
   TransactionId int [not null, pk, increment]
-  Amount decimal(12,2) [not null]
-  BalanceAfter decimal(12,2) [not null]
+  Amount decimal(18,0) [not null]
+  BalanceAfter decimal(18,0) [not null]
   CreatedAt datetime2 [not null]
   CustomerId int [not null]
   Description nvarchar(255) [null]
@@ -406,10 +486,14 @@ Ref: dbo.GameRanks.(GameId) > dbo.Games.(GameId)
 Ref: dbo.GamingSessions.(ComputerId) > dbo.Computers.(ComputerId)
 Ref: dbo.GamingSessions.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.InventoryTransactions.(EmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.InventoryTransactions.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)
 Ref: dbo.InventoryTransactions.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.InventoryTransactions.(ProductId) > dbo.Products.(ProductId)
 Ref: dbo.InventoryTransactions.(ReceiptId) > dbo.StockReceipts.(ReceiptId)
 Ref: dbo.InvoiceDetails.(InvoiceId) > dbo.Invoices.(InvoiceId)
+Ref: dbo.InvoiceDetails.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)
+Ref: dbo.InvoiceDetails.(SessionChargeId) > dbo.SessionCharges.(ChargeId)
+Ref: dbo.InvoiceIssueRequests.(InvoiceId) > dbo.Invoices.(InvoiceId)
 Ref: dbo.InvoiceOrders.(InvoiceId) > dbo.Invoices.(InvoiceId)
 Ref: dbo.InvoiceOrders.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.Invoices.(CustomerId) > dbo.Customers.(CustomerId)
@@ -424,8 +508,16 @@ Ref: dbo.Orders.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
 Ref: dbo.OrderStatusHistory.(ChangedBy) > dbo.Employees.(EmployeeId)
 Ref: dbo.OrderStatusHistory.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.Payments.(InvoiceId) > dbo.Invoices.(InvoiceId)
+Ref: dbo.Payments.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)
+Ref: dbo.Payments.(OrderId) > dbo.Orders.(OrderId)
+Ref: dbo.Payments.(RefundOfPaymentId) > dbo.Payments.(PaymentId)
+Ref: dbo.Payments.(SessionChargeId) > dbo.SessionCharges.(ChargeId)
 Ref: dbo.Payments.(WalletTransactionId) > dbo.WalletTransactions.(TransactionId)
 Ref: dbo.Products.(CategoryId) > dbo.Categories.(CategoryId)
+Ref: dbo.PromotionUsages.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.PromotionUsages.(OrderId) > dbo.Orders.(OrderId)
+Ref: dbo.PromotionUsages.(PromotionId) > dbo.Promotions.(PromotionId)
+Ref: dbo.RefundAttempts.(PaymentId) > dbo.Payments.(PaymentId)
 Ref: dbo.RolePermissions.(PermissionId) > dbo.Permissions.(PermissionId)
 Ref: dbo.RolePermissions.(RoleId) > dbo.Roles.(RoleId)
 Ref: dbo.SessionCharges.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
