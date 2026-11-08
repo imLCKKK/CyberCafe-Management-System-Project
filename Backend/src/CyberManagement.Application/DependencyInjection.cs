@@ -14,7 +14,7 @@ namespace CyberManagement.Application
             services.AddScoped<IIdentitySeeder, IdentitySeeder>();
             services.AddScoped<ICustomerIdentityService, CustomerIdentityService>();
             services.AddScoped<IComputerService, ComputerService>();
-            services.AddScoped<CatalogService>();
+            services.AddScoped<ICustomerService, CustomerService>();
             services.AddScoped<IRequestValidator<LoginCommand>, LoginCommandValidator>();
             services.AddScoped<IRequestValidator<CustomerLoginCommand>, CustomerLoginCommandValidator>();
             return services;

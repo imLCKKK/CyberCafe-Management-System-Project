@@ -21,7 +21,7 @@ using Microsoft.Extensions.Logging;
 // Test assembly only. Real HTTP/JWT/repositories/SQL, with a disposable database.
 internal static class ComputerBrowserHost
 {
-    public static async Task RunAsync(bool catalog = false)
+    public static async Task RunAsync()
     {
         var connection = Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION");
         if (string.IsNullOrWhiteSpace(connection))
@@ -43,9 +43,8 @@ internal static class ComputerBrowserHost
         builder.Services.AddApiServices(builder.Configuration);
         builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
         builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
+        builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
         builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
-        builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
-        builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
         builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
         builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
         builder.Services.AddControllers().AddApplicationPart(typeof(AuthController).Assembly);
@@ -67,20 +66,6 @@ internal static class ComputerBrowserHost
                     ComputerType = new ComputerType { TypeName = "SQL type", PricePerHour = 12345 }
                 });
                 await database.SaveChangesAsync();
-                if (catalog)
-                {
-                    var category = new Category { CategoryName = "TEST_Catalog", IsActive = true };
-                    database.Products.AddRange(
-                        new Product { ProductName = "TEST_Menu_Stocked", Category = category, Price = 30000, Stock = 7 },
-                        new Product { ProductName = "TEST_Menu_Empty", Category = category, Price = 10000, Stock = 0 },
-                        new Product { ProductName = "TEST_Menu_Inactive", Category = category, Price = 20000, Stock = 9, IsActive = false },
-                        new Product { ProductName = "TEST_Category_Inactive", Category = new Category { CategoryName = "TEST_Hidden", IsActive = false }, Price = 20000, Stock = 9 });
-                    var customer = new Customer { FullName = "Catalog Customer", Phone = "0900000010", Status = "Active" };
-                    customer.PasswordHash = scope.ServiceProvider.GetRequiredService<ICustomerPasswordHasher>()
-                        .HashPassword(customer, "Catalog-check-password-2026!");
-                    database.Customers.Add(customer);
-                    await database.SaveChangesAsync();
-                }
             }
             app.UseExceptionHandler();
             app.UseAuthentication();

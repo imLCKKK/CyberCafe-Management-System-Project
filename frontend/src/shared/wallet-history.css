@@ -1,0 +1,24 @@
+/* The shared ledger also appears inside the dark customer layout. */
+.client-shell .customer-wallet-history .cafe-table th {
+  color: #b8c9c0;
+  background: #18221e;
+  border-color: #35423b;
+}
+.client-shell .customer-wallet-history .cafe-table td {
+  color: #d0ded5;
+  border-color: #35423b;
+}
+.client-shell .customer-wallet-history .cafe-table td strong { color: #e5f0ff; }
+.client-shell .customer-wallet-history .client-table-sub { color: #a9bdb0; }
+.client-shell .customer-wallet-history .client-positive { color: #b7ee69; }
+.client-shell .customer-wallet-history .admin-pagination {
+  color: #b8c9c0;
+  border-color: #35423b;
+  flex-wrap: wrap;
+}
+.client-shell .customer-wallet-history .admin-pagination button {
+  color: #e5f0e9;
+  background: #27352d;
+  border-color: #43574a;
+}
+.client-shell .customer-wallet-history .admin-pagination button:disabled { opacity: .45; }

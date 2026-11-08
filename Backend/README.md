@@ -13,6 +13,10 @@ Quyết định của Trưởng nhóm ngày 02/11/2026: dùng **database SQL Ser
 
 Owner triển khai module xuyên các tầng và UI. Application/Domain không dùng DbContext/HttpContext; interface được implementation ở tầng ngoài. [Hợp đồng identity](docs/001-monorepo.md) quy định EmployeeId/CustomerId kiểu int, năm role nhân viên và customer principal. Frontend còn demo; nối login và nghiệp vụ khác theo [55 task](../codex/SPRINT_TASKS.md).
 
+SCRUM-5 đã nối tạo/đọc khách và đọc hồ sơ/ví chính chủ qua API/SQL; xem
+[contract hồ sơ và ví](docs/003-customer-wallet-contract.md). Không thay schema 35 bảng trong task này.
+Credit/debit/refund, nạp tại quầy và realtime writer thuộc S2; contract ghi rõ điểm gọi transaction chung.
+
 
 
 ## Build từ repository root
@@ -89,65 +93,3 @@ Remove-Item Env:AUTH_CHECKS_SQL_CONNECTION
 Test gồm login đúng/sai/khóa, quyền nhân viên/khách, JWT sai chữ ký/issuer/audience/hết hạn, seed lặp và giữ permission của role ngoài catalog. Key/password trong project checks chỉ phục vụ TestServer; không phải cấu hình để chạy API. Logout stateless giữ token hợp lệ tới lúc hết hạn theo contract đã có.
 
 Kết quả review/bàn giao mới gửi trong chat; chỉ tạo file báo cáo khi được yêu cầu. [Quy trình nhóm](../planning/team-workflow.md) quy định Trưởng nhóm review rồi mới merge `dev`.
-
-## SCRUM-13: schema contract và luồng đọc kho
-
-Sau bốn migration nền, SCRUM-13 bổ sung `20261107071954_IntegrateInventoryInvoiceVoucherContracts`: 38 bảng theo contract SCRUM-12; không sửa migration đã áp. Migration mới dừng nếu dữ liệu lịch sử cần đối soát hoặc tiền có phần lẻ, không tự reset/backfill giả.
-GET `/api/admin/inventory` đọc Products bằng JWT + `stockreceipt.view`.
-Seed test nằm trong `src/CyberManagement.Infrastructure/DataTest/InventoryReadSeed.sql`.
-SQL/DBML được xuất từ migrations/model hiện tại ở [database](database/).
-Hướng dẫn DB thử, seed, đăng nhập, màn hình và kiểm thử: [SCRUM-13](../docs/scrum-13-inventory-setup.md).
-
-## S1-K-1 / SCRUM-10: danh mục, sản phẩm và menu
-
-Module dùng `Categories`/`Products` và DbContext CyberManagement hiện có, bao gồm migration
-SCRUM-13 đã có trong base. Task này không tạo/sửa migration, không ghi tồn qua API danh mục.
-
-| Route | Quyền | Kết quả |
-| --- | --- | --- |
-| GET `/api/admin/categories` | Staff + `product.view` | Mảng `{id, name, isActive}` |
-| GET `/api/admin/products` | Staff + `product.view` | Mảng `{id, name, categoryId, currentPrice, stockQuantity, isActive}` |
-| POST `/api/admin/categories` | Staff + `product.manage` | Tạo danh mục, 201 |
-| PUT `/api/admin/categories/{id}` | Staff + `product.manage` | Sửa tên/trạng thái, 200 |
-| DELETE `/api/admin/categories/{id}` | Staff + `product.manage` | Ngừng dùng, 204; giữ bản ghi và quan hệ |
-| POST `/api/admin/products` | Staff + `product.manage` | Tạo sản phẩm tồn 0, 201 |
-| PUT `/api/admin/products/{id}` | Staff + `product.manage` | Sửa tên/danh mục/giá/trạng thái, 200; giữ tồn |
-| DELETE `/api/admin/products/{id}` | Staff + `product.manage` | Ngừng bán, 204; giữ lịch sử |
-| GET `/api/menu` | Customer JWT | `{categories: [...], products: [...]}` chỉ gồm danh mục và sản phẩm đang hoạt động |
-
-POST/PUT yêu cầu đủ các trường; trường ngoài DTO (kể cả tồn/tổng tiền) bị từ chối 400.
-Body danh mục: `{"name":"Đồ ăn","isActive":true}`.
-Body sản phẩm: `{"name":"Mì bò","categoryId":1,"currentPrice":30000,"isActive":true}`.
-Tên sau trim dài 1–150 ký tự, giá nguyên VND từ 0 đến 999.999.999. Danh mục phải còn hoạt động;
-không tồn tại/ngừng dùng trả 409. ID không tồn tại khi sửa/ngừng dùng trả 404; ID không dương trả 400.
-Thiếu đăng nhập trả 401; sai quyền/loại tài khoản trả 403. Quyền mặc định: Admin/Manager quản lý,
-Cashier/Waiter đọc, Technician không đọc danh mục. PUT có thể kích hoạt lại bản ghi đã ngừng dùng.
-
-`Products.Stock` là tồn khả dụng đã do SQL ghi nhận; menu vẫn hiển thị món hết hàng với nút thêm
-bị khóa, gợi ý và giỏ loại món hết tồn/ngừng bán/danh mục ngừng dùng. Không trừ tồn lần nữa từ đơn demo.
-Sản phẩm mới chưa có hàng vẫn xuất hiện trên menu; nhập/điều chỉnh tồn thuộc task kho.
-
-Admin `/admin/products`, phần món ở Home, `/client/ordering`, vòng quay và giỏ dùng API này.
-Có tìm/lọc, tải lại và tải lại khi cửa sổ nhận focus; lỗi/response sai không trả dữ liệu demo.
-Giỏ chỉ lưu lựa chọn tạm trong màn hình; reload toàn trang làm trống giỏ. Lịch sử demo còn được gắn nhãn riêng.
-Đường đặt ví/tiền mặt demo đã được gỡ khỏi menu SQL: nút gửi đơn chưa khả dụng cho đến khi
-task checkout triển khai; không dùng ProductId thật để tạo đơn/trừ tiền localStorage.
-Checkout tương lai phải lấy lại giá/tồn tại server theo [contract đơn](docs/004-order-checkout-contract.md).
-Không có event SignalR mới trong task catalog.
-
-Kiểm tra từ repo root (SQL checks luôn tạo và tự dọn DB ngẫu nhiên riêng; không áp vào DB ứng dụng):
-
-```powershell
-.\scripts\dotnet-local.cmd build Backend\CyberManagement.slnx -m:1
-.\scripts\npm-local.cmd --prefix frontend run build
-.\scripts\npm-local.cmd --prefix frontend run test:catalog
-.\scripts\npm-local.cmd --prefix frontend run test:frontend:render
-$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;TrustServerCertificate=True'
-.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks --no-build -- --catalog-only
-.\scripts\npm-local.cmd --prefix frontend run test:catalog:sql
-Remove-Item Env:AUTH_CHECKS_SQL_CONNECTION
-```
-
-`--catalog-only` chạy auth/seed + catalog, tách các ca máy tính ngoài phạm vi task. Không có flag này,
-API.Checks vẫn chạy cả máy tính. Browser SQL suite cần Chrome/Edge, có thể cấu hình `CHROME_PATH`;
-CRUD/auth/menu dùng host SQL thật, riêng loading/empty/error được tiêm response để kiểm tra giao diện.

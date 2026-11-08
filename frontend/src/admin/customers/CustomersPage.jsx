@@ -1,36 +1,66 @@
-import React, { useState } from 'react';
-import { Banknote, Plus, Users, WalletCards, UserCheck } from 'lucide-react';
-import { useAdminAction } from '../shared/AdminContext';
-import { AdminPage, StatCard, Panel, Table, Toolbar, Filter, Status, Notice, FormDialog, DetailDialog, Row, ExportButton } from '../shared/AdminUI';
-import { createTopUp, dateTime, matches, money, processTopUp, toggleAccount } from '../shared/adminModel';
-import PersonForm from '../shared/PersonForm';
-import { DonutChart } from '../shared/Charts';
+import React, { useCallback, useState } from 'react';
+import { Plus, Users } from 'lucide-react';
+import { PageHeading, StatCard } from '../computers/components/CafeUI';
+import { DetailDialog, FormDialog, Notice, Panel, Row } from '../shared/AdminUI';
+import { useAuth } from '../../shared/auth/AuthContext';
+import { createCustomer, customerDate, customerStatus, getCustomerProfile, getCustomers, getCustomerWallet, walletMoney } from '../../shared/customerWalletApi.js';
+import { useCustomerQuery } from '../../shared/useCustomerQuery.js';
+import { CustomerPagination, WalletHistory } from '../../shared/WalletHistory';
+
+function CustomerDetails({ customerId, canViewWallet, onClose }) {
+  const [page, setPage] = useState(1);
+  const loadProfile = useCallback((signal) => getCustomerProfile(customerId, signal), [customerId]);
+  const loadWallet = useCallback((signal) => getCustomerWallet({ customerId, page, signal }), [customerId, page]);
+  const profile = useCustomerQuery(`customer:${customerId}`, loadProfile);
+  const wallet = useCustomerQuery(`customer-wallet:${customerId}:${page}`, loadWallet, canViewWallet);
+  return <DetailDialog title="Hồ sơ khách hàng" onClose={onClose}>
+    {profile.loading ? <p role="status">Đang tải hồ sơ…</p> : profile.error ? <><p role="alert" className="cafe-error">{profile.error.message}</p><button className="cafe-button" onClick={profile.reload}>Thử lại hồ sơ</button></> : profile.data && <>
+      <Row label="Mã khách">KH{profile.data.customerId}</Row><Row label="Họ và tên">{profile.data.fullName}</Row><Row label="Số điện thoại">{profile.data.phone}</Row>
+      <Row label="Email">{profile.data.email || 'Chưa cung cấp'}</Row><Row label="Trạng thái">{customerStatus(profile.data.status)}</Row><Row label="Ngày tạo">{customerDate(profile.data.createdAtUtc)}</Row>
+    </>}
+    {canViewWallet && <><h3 className="admin-section-title">Ví khách hàng</h3>{wallet.loading ? <p role="status">Đang tải ví…</p> : wallet.error ? <><p role="alert" className="cafe-error">{wallet.error.message}</p><button className="cafe-button" onClick={wallet.reload}>Thử lại ví</button></> : wallet.data && <><Row label="Số dư ví">{walletMoney(wallet.data.balance)}</Row><WalletHistory wallet={wallet.data} onPage={setPage}/></>}</>}
+  </DetailDialog>;
+}
 
 export function CustomersPage() {
-  const { db, commit, run, notice, error, clear, setNotice, setError } = useAdminAction();
-  const [query, setQuery] = useState(''), [status, setStatus] = useState('all'), [tab, setTab] = useState('customers');
-  const [editing, setEditing] = useState(undefined), [selected, setSelected] = useState(null), [topUp, setTopUp] = useState(null), [collection, setCollection] = useState(null), [locking, setLocking] = useState(null);
-  const people = db.customers.map((customer) => ({ ...customer, account: db.accounts.find((row) => row.id === customer.account_id) }));
-  const name = (id) => people.find((row) => row.id === id)?.account.display_name || `KH${id}`;
-  const filtered = people.filter((row) => matches(query, row.id, row.account.display_name, row.account.phone) && (status === 'all' || row.account.is_active === (status === 'Active')));
-  const pending = db.top_ups.filter((row) => ['Pending', 'CreditedUnpaid'].includes(row.status));
-  const detail = people.find((row) => row.id === selected);
-  const topUps = [...db.top_ups].sort((a, b) => new Date(b.requested_at) - new Date(a.requested_at));
-  return <AdminPage title="Quản lý khách hàng" description="Hồ sơ, số dư ví và yêu cầu nạp tiền được quản lý tại một nơi." actions={<button className="cafe-button primary" onClick={() => setEditing(null)}><Plus size={16}/>Thêm khách hàng</button>}>
-    <Notice notice={notice} error={error} clear={clear}/>
-    <div className="cafe-stats"><StatCard label="Tổng khách hàng" value={people.length} icon={Users}/><StatCard label="Đang hoạt động" value={people.filter((row) => row.account.is_active).length} icon={UserCheck}/><StatCard label="Tổng số dư ví" value={money(people.reduce((sum, row) => sum + row.wallet_balance, 0))} icon={WalletCards}/><StatCard label="Yêu cầu cần xử lý" value={pending.length} icon={Banknote}/></div>
-    <div className="admin-tabs"><button aria-pressed={tab === 'customers'} onClick={() => setTab('customers')}>Khách hàng</button><button aria-pressed={tab === 'topups'} onClick={() => setTab('topups')}>Nạp ví & thu tiền ({pending.length})</button></div>
-    {tab === 'customers' ? <Panel title="Danh sách khách hàng" description="Chọn khách để xem ví và lịch sử sử dụng." actions={<ExportButton filename="khach-hang.csv" headers={['Mã', 'Họ tên', 'Điện thoại', 'Số dư', 'Trạng thái']} rows={filtered.map((row) => [row.id, row.account.display_name, row.account.phone, row.wallet_balance, row.account.is_active ? 'Hoạt động' : 'Đã khóa'])} onError={setError}/>}>
-      <Toolbar query={query} onQuery={setQuery} placeholder="Tìm tên, số điện thoại, mã khách…" onReset={() => { setQuery(''); setStatus('all'); }}><Filter label="Trạng thái khách" value={status} onChange={setStatus} options={['all', 'Active', 'Inactive'].map((value, index) => [value, ['Tất cả trạng thái', 'Hoạt động', 'Đã khóa'][index]])}/></Toolbar>
-      <Table rows={filtered} resetKey={query + status} columns={[{ key: 'name', label: 'Khách hàng', sortValue: (row) => row.account.display_name, render: (row) => <><button className="admin-link" onClick={() => setSelected(row.id)}>{row.account.display_name}</button><small>#KH{row.id} · {row.account.phone}</small></> }, { key: 'wallet', label: 'Số dư ví', sortValue: (row) => row.wallet_balance, render: (row) => <strong>{money(row.wallet_balance)}</strong> }, { key: 'status', label: 'Trạng thái', render: (row) => <><Status value={row.account.is_active ? 'Active' : 'Inactive'}/>{row.account.must_change_password && <small>Cần đổi mật khẩu lần đầu</small>}</> }, { key: 'actions', label: 'Thao tác', render: (row) => <div className="admin-actions"><button className="cafe-button" onClick={() => setEditing(row.account)}>Sửa</button><button className="cafe-button" onClick={() => setTopUp(row.id)}>Nạp ví</button><button className="cafe-button" onClick={() => setLocking(row.account)}>{row.account.is_active ? 'Khóa' : 'Mở khóa'}</button></div> }]}/>
-    </Panel> : <Panel title="Yêu cầu nạp ví" description="Duyệt nạp cộng ví một lần; xác nhận thu tiền không cộng thêm ví.">
-      <Table rows={topUps} columns={[{ key: 'id', label: 'Mã / Khách', render: (row) => <><strong>#NV{row.id}</strong><small>{name(row.customer_id)}</small></> }, { key: 'amount', label: 'Số tiền', sortValue: (row) => row.amount, render: (row) => money(row.amount) }, { key: 'date', label: 'Thời gian', render: (row) => dateTime(row.requested_at) }, { key: 'status', label: 'Trạng thái', render: (row) => <><Status value={row.status}/>{row.collection_method && <small>{row.collection_method === 'Cash' ? 'Tiền mặt' : 'Chuyển khoản'}</small>}</> }, { key: 'actions', label: 'Xử lý', render: (row) => <div className="admin-actions">{row.status === 'Pending' && <><button className="cafe-button primary" onClick={() => run((data) => processTopUp(data, row.id, 'credit'), 'Đã cộng tiền vào ví khách.')}>Duyệt nạp</button><button className="cafe-button" onClick={() => run((data) => processTopUp(data, row.id, 'reject'), 'Đã từ chối yêu cầu.')}>Từ chối</button></>}{row.status === 'CreditedUnpaid' && <button className="cafe-button primary" onClick={() => setCollection(row)}>Xác nhận đã thu</button>}</div> }]}/>
-    </Panel>}
-    <div className="admin-grid-two admin-grid-equal" style={{ marginTop: 22 }}><Panel title="Trạng thái khách hàng" description="Phân bổ theo tài khoản trong dữ liệu hiện tại."><DonutChart label="khách hàng" data={[{ name: 'Hoạt động', value: people.filter((row) => row.account.is_active).length }, { name: 'Đã khóa', value: people.filter((row) => !row.account.is_active).length }]}/></Panel><Panel title="Cần chú ý" description="Các khoản nạp đã cộng ví nhưng chưa thu tiền."><div className="admin-report-explanation"><h3>{money(pending.filter((row) => row.status === 'CreditedUnpaid').reduce((sum, row) => sum + row.amount, 0))}</h3><p>Thu xong khoản nạp trước khi tạo yêu cầu mới cho cùng khách. Khoản nạp ví là tiền ứng trước, không tính là doanh thu dịch vụ.</p><button className="cafe-button" onClick={() => setTab('topups')}>Xem yêu cầu nạp ví</button></div></Panel></div>
-    {editing !== undefined && <PersonForm account={editing} kind="customer" onClose={() => setEditing(undefined)} onSaved={() => setNotice('Đã lưu thông tin khách hàng.')}/>}
-    {topUp && <FormDialog title={`Nạp ví · ${name(topUp)}`} fields={[{ name: 'amount', label: 'Số tiền muốn nạp (VNĐ)', type: 'number', min: 10000, max: 2000000, step: 1000 }]} initial={{ amount: 100000 }} submit="Tạo yêu cầu nạp" onClose={() => setTopUp(null)} onSave={(form) => { commit((data) => createTopUp(data, topUp, form.amount)); setNotice('Đã tạo yêu cầu. Vào Nạp ví & thu tiền để duyệt.'); setTab('topups'); }}/>}
-    {collection && <FormDialog title={`Thu tiền nạp ví #NV${collection.id}`} description={`Xác nhận đã thực nhận ${money(collection.amount)}. Thao tác không cộng ví thêm lần nữa.`} fields={[{ name: 'method', label: 'Phương thức đã nhận', options: [['Cash', 'Tiền mặt'], ['BankTransfer', 'Chuyển khoản đã đối soát']] }]} initial={{ method: 'Cash' }} submit="Xác nhận đã thu tiền" onClose={() => setCollection(null)} onSave={(form) => { commit((data) => processTopUp(data, collection.id, 'collect', form.method)); setNotice('Đã ghi nhận thu tiền.'); }}/>}
-    {locking && <FormDialog title={`${locking.is_active ? 'Khóa' : 'Mở khóa'} ${locking.display_name}?`} description="Không thể khóa khách đang chơi hoặc quản trị viên hoạt động cuối cùng." submit="Xác nhận" onClose={() => setLocking(null)} onSave={() => { commit((data) => toggleAccount(data, locking.id)); setNotice('Đã cập nhật trạng thái tài khoản.'); }}/>}
-    {detail && <DetailDialog title={detail.account.display_name} onClose={() => setSelected(null)}><Row label="Số điện thoại">{detail.account.phone}</Row><Row label="Số dư ví">{money(detail.wallet_balance)}</Row><Row label="Ngày tạo">{dateTime(detail.account.created_at)}</Row><h3 className="admin-section-title">Lịch sử ví</h3><div className="admin-detail-list">{db.wallet_transactions.filter((row) => row.customer_id === detail.id).sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at)).map((row) => <div className="admin-detail-line" key={row.id}><div>{row.transaction_type}<small>{dateTime(row.recorded_at)} · Số dư {money(row.balance_after)}</small></div><strong>{row.amount > 0 ? '+' : ''}{money(row.amount)}</strong></div>)}</div></DetailDialog>}
-  </AdminPage>;
+  const { principal } = useAuth();
+  const permissions = principal?.permissions || [];
+  const canView = principal?.type === 'employee' && permissions.includes('customer.view');
+  const canCreate = permissions.includes('customer.create');
+  const canViewWallet = permissions.includes('wallet.view');
+  const [query, setQuery] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [creating, setCreating] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [notice, setNotice] = useState('');
+  const load = useCallback((signal) => getCustomers({ page, search, signal }), [page, search]);
+  const { data, loading, error, reload } = useCustomerQuery(`customers:${principal?.employeeId}:${page}:${search}`, load, canView);
+  return <section className="cafe-page admin-module">
+    <PageHeading eyebrow="QUẢN TRỊ / KHÁCH HÀNG" title="Quản lý khách hàng" description="Tạo và tra cứu hồ sơ khách hàng, số dư cùng lịch sử ví.">
+      {canCreate && <button className="cafe-button primary" onClick={() => setCreating(true)}><Plus size={16}/>Thêm khách hàng</button>}
+    </PageHeading>
+    <Notice notice={notice} clear={() => setNotice('')}/>
+    {!canView ? <p className="cafe-error" role="alert">Bạn không có quyền xem khách hàng.</p> : <>
+      <Panel title="Danh sách khách hàng" actions={<button className="cafe-button" disabled={loading} onClick={reload}>Tải lại danh sách</button>}>
+        <form className="admin-toolbar" onSubmit={(event) => { event.preventDefault(); setPage(1); setSearch(query.trim()); }}>
+          <label className="cafe-search"><input aria-label="Tìm tên, số điện thoại khách hàng" placeholder="Tìm tên, số điện thoại…" value={query} onChange={(event) => setQuery(event.target.value)} maxLength={150}/></label>
+          <button className="cafe-button" type="submit">Tìm kiếm</button><button className="cafe-button" type="button" onClick={() => { setQuery(''); setSearch(''); setPage(1); }}>Xóa tìm kiếm</button>
+        </form>
+        {loading ? <div className="cafe-empty" role="status">Đang tải khách hàng…</div> : error ? <div className="cafe-empty"><p className="cafe-error" role="alert">{error.message}</p><button className="cafe-button" onClick={reload}>Thử lại</button></div> : data && <>
+          <div className="cafe-stats"><StatCard label="Khách hàng phù hợp" value={data.totalCount} icon={Users}/></div>
+          <div className="cafe-table-wrap"><table className="cafe-table admin-table"><thead><tr><th>Khách hàng</th><th>Điện thoại</th><th>Email</th><th>Trạng thái</th><th>Ngày tạo</th></tr></thead><tbody>{data.items.map((row) => <tr key={row.customerId}>
+            <td><button className="admin-link" onClick={() => setSelected(row.customerId)}>{row.fullName}</button><small>#KH{row.customerId}</small></td><td>{row.phone}</td><td>{row.email || '—'}</td><td>{customerStatus(row.status)}</td><td>{customerDate(row.createdAtUtc)}</td>
+          </tr>)}</tbody></table></div>
+          {!data.items.length && <div className="cafe-empty"><h3>Chưa có khách hàng phù hợp</h3><p>Thử tìm kiếm khác hoặc thêm hồ sơ khách hàng.</p></div>}
+          <CustomerPagination data={data} onPage={setPage}/>
+        </>}
+      </Panel>
+    </>}
+    {creating && canCreate && <FormDialog title="Thêm khách hàng" description="Tài khoản mới có số dư ví bằng 0. Đặt mật khẩu ban đầu và giao trực tiếp cho khách."
+      fields={[{ name: 'fullName', label: 'Họ và tên', maxLength: 150 }, { name: 'phone', label: 'Số điện thoại', type: 'tel', maxLength: 20 }, { name: 'email', label: 'Email', type: 'email', maxLength: 150, required: false }, { name: 'password', label: 'Mật khẩu ban đầu', type: 'password', maxLength: 128, help: '12–128 ký tự.' }]}
+      initial={{ fullName: '', phone: '', email: '', password: '' }} onClose={() => setCreating(false)} submit="Tạo khách hàng"
+      onSave={async (form) => { const saved = await createCustomer(form); setNotice(`Đã tạo khách hàng ${saved.fullName}.`); setQuery(''); setSearch(''); setPage(1); reload(); }}/>}
+    {selected && <CustomerDetails key={selected} customerId={selected} canViewWallet={canViewWallet} onClose={() => setSelected(null)}/>}
+  </section>;
 }
