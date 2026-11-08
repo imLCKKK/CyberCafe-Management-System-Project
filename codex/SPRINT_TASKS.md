@@ -234,6 +234,10 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 
 #### S1-K-1 — Implement-Catalog-API-Menu
 
+**Tài liệu triển khai:** [API danh mục/menu và cách kiểm tra](../Backend/README.md#s1-k-1--scrum-10-danh-mục-sản-phẩm-và-menu).
+Code trên nhánh SCRUM-10 dùng chung Products/Categories; giỏ chọn món từ API,
+gửi đơn/thanh toán chờ task checkout. Checklist giữ chưa tick cho đến khi Trưởng nhóm duyệt.
+
 **Description:**
 
 - Port danh mục/sản phẩm phù hợp vào API SQL Server chung, giữ kiểm tra quyền và dữ liệu giá.
