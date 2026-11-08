@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { cdp, evaluate, until, socket, errors, go, input, press, sleep } from './cdp.mjs';
+import { cdp, evaluate, until, socket, errors, go, input, click, press, sleep } from './cdp.mjs';
 import { computerFixture } from './computer-fixture.mjs';
 
 // Browser UI checks use controlled SDK/HTTP fixtures. Actual hub authorization is checked in API.Checks.
@@ -8,8 +8,10 @@ const sdkFixture = await readFile(new URL('./realtime-signalr-fixture.mjs', impo
 const fixture = computerFixture();
 const requests = [];
 const interceptionErrors = [];
+const canceledRequests = new Set();
 const heldReads = [];
 let holdReads = false;
+let loginToken = 'browser-test-token';
 async function handleRequest({ requestId, request }) {
   if (request.url.includes('microsoft_signalr.js') || request.url.includes('/@microsoft/signalr/')) {
     await cdp('Fetch.fulfillRequest', { requestId, responseCode: 200,
@@ -19,7 +21,9 @@ async function handleRequest({ requestId, request }) {
   }
   const path = new URL(request.url).pathname;
   requests.push(path);
-  const body = structuredClone(path === '/api/auth/me'
+  const body = structuredClone(path === '/api/auth/login'
+    ? { accessToken: loginToken, expiresAtUtc: new Date(Date.now() + 3600000).toISOString() }
+    : path === '/api/auth/logout' ? null : path === '/api/auth/me'
     ? { employeeId: '7', username: 'fixture-staff', role: 'Admin', permissions: fixture.permissions }
     : path.endsWith('/computer-types') ? fixture.types
       : path.endsWith('/computer-rooms') ? fixture.rooms : fixture.computers);
@@ -31,7 +35,9 @@ async function handleRequest({ requestId, request }) {
 }
 const onMessage = ({ data }) => {
   const message = JSON.parse(data);
-  if (message.method === 'Fetch.requestPaused') handleRequest(message.params).catch((error) => interceptionErrors.push(error.message));
+  if (message.method === 'Network.loadingFailed' && message.params.canceled) canceledRequests.add(message.params.requestId);
+  if (message.method === 'Fetch.requestPaused') handleRequest(message.params).catch((error) =>
+    interceptionErrors.push({message:error.message, networkId:message.params.networkId}));
 };
 const reads = () => requests.filter((path) => path === '/api/admin/computers').length;
 async function waitForNode(predicate) {
@@ -40,6 +46,11 @@ async function waitForNode(predicate) {
 }
 const idle = () => until('document.querySelector(".cafe-computers")?.getAttribute("aria-busy") === "false"');
 const emit = () => evaluate('globalThis.__realtimeConnections.at(-1).emit("ComputerChanged", {eventId:"fixture-event",type:"ComputerChanged",entityId:101})');
+async function login() {
+  await input('#auth-identifier', 'fixture-staff');
+  await input('#auth-password', 'Fixture-Only-2026!');
+  await click('Đăng nhập', 'form.auth-form button[type="submit"]');
+}
 
 try {
   await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Network.enable');
@@ -50,9 +61,9 @@ try {
     { urlPattern: '*microsoft_signalr.js*', requestStage: 'Request' },
     { urlPattern: '*/@microsoft/signalr/*', requestStage: 'Request' },
   ] });
-  await go('/client/home');
-  await evaluate(`(async () => { (await import('/src/shared/staffSession.js')).setStaffAccessToken('browser-test-token'); })()`);
-  await go('/admin/computers');
+  await go('/admin/auth', 'document.querySelector(".auth-form")');
+  await evaluate("sessionStorage.setItem('nexora.staff.accessToken', 'obsolete-token')");
+  await login();
   await until('document.querySelectorAll(".cafe-station").length === 4 && document.querySelector("[data-realtime-status]")?.dataset.realtimeStatus === "connected"');
   await idle();
   assert.equal(await evaluate('globalThis.__realtimeConnections.length'), 1);
@@ -99,7 +110,13 @@ try {
   await evaluate('globalThis.__extraRelease()');
   assert.equal(await evaluate('globalThis.__realtimeConnections[0].stops'), 0);
 
-  await evaluate(`(async () => { globalThis.__oldCallback = globalThis.__realtimeConnections[0].handler('ComputerChanged'); (await import('/src/shared/staffSession.js')).setStaffAccessToken('browser-new-token'); })()`);
+  await evaluate(`(() => {
+    globalThis.__oldCallback = globalThis.__realtimeConnections[0].handler('ComputerChanged');
+    const key = 'cybermanagement.auth.v1', oldValue = localStorage.getItem(key);
+    const newValue = JSON.stringify({accessToken:'browser-new-token',accountType:'employee'});
+    localStorage.setItem(key, newValue);
+    dispatchEvent(new StorageEvent('storage', {key, oldValue, newValue, storageArea:localStorage}));
+  })()`);
   await until('globalThis.__realtimeConnections.length === 2 && document.querySelector("[data-realtime-status]")?.dataset.realtimeStatus === "connected"');
   await idle();
   assert.equal(await evaluate('globalThis.__realtimeConnections[0].stops'), 1);
@@ -107,33 +124,38 @@ try {
   const afterNewToken = reads();
   await evaluate('globalThis.__oldCallback({entityId:101}); globalThis.__realtimeConnections[0].closed({statusCode:401})');
   assert.equal(reads(), afterNewToken);
-  assert.equal(await evaluate(`sessionStorage.getItem('nexora.staff.accessToken')`), 'browser-new-token');
+  assert.equal(await evaluate(`JSON.parse(localStorage.getItem('cybermanagement.auth.v1')).accessToken`), 'browser-new-token');
 
   await evaluate('globalThis.__realtimeConnections[1].policy.nextRetryDelayInMilliseconds({previousRetryCount:0,retryReason:{statusCode:401}})');
   await until('document.body.innerText.includes("Phiên đăng nhập đã hết hạn")');
-  assert.equal(await evaluate(`sessionStorage.getItem('nexora.staff.accessToken')`), null);
+  assert.equal(await evaluate(`localStorage.getItem('cybermanagement.auth.v1')`), null);
   assert.equal(await evaluate('globalThis.__realtimeConnections[1].stops'), 1);
   assert.equal(await evaluate('document.querySelectorAll(".cafe-station").length'), 0);
 
-  await evaluate(`(async () => { (await import('/src/shared/staffSession.js')).setStaffAccessToken('browser-third-token'); })()`);
+  loginToken = 'browser-third-token';
+  await login();
   await until('globalThis.__realtimeConnections.length === 3 && document.querySelector("[data-realtime-status]")?.dataset.realtimeStatus === "connected"'); await idle();
   await evaluate('globalThis.__realtimeConnections[2].policy.nextRetryDelayInMilliseconds({previousRetryCount:0,retryReason:{statusCode:403}})');
   await until('document.querySelector("[data-realtime-status]")?.dataset.realtimeStatus === "forbidden"'); await idle();
   assert.equal(await evaluate('globalThis.__realtimeConnections.length'), 3);
-  assert.equal(await evaluate(`sessionStorage.getItem('nexora.staff.accessToken')`), 'browser-third-token');
+  assert.equal(await evaluate(`JSON.parse(localStorage.getItem('cybermanagement.auth.v1')).accessToken`), 'browser-third-token');
   await evaluate('globalThis.__realtimeConnections[2].emit("ComputerChanged", {entityId:101})');
   assert.equal(await evaluate('globalThis.__realtimeConnections.length'), 3);
-  await go('/client/home');
-  assert.deepEqual(interceptionErrors, []);
+  await evaluate(`document.querySelector('[aria-label="Đăng xuất"]').click()`);
+  await until('location.pathname === "/admin/auth" && Boolean(document.querySelector(".auth-form"))');
+  assert.equal(await evaluate('globalThis.__realtimeConnections[2].stops'), 1);
+  assert.equal(await evaluate(`localStorage.getItem('cybermanagement.auth.v1')`), null);
+  assert.deepEqual(interceptionErrors.filter(error =>
+    !(error.message.includes('Invalid InterceptionId') && canceledRequests.has(error.networkId))), []);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ passed: true, source: 'SDK and HTTP fixtures; not LAN', checks: [
     'RealtimeReady and event refetch without F5 or dialog loss', 'single connection per token/shared subscribers',
     '20-event burst coalesces into one trailing read', 'reconnect/refetch keeps filters',
-    'token change stops old client/late callbacks ignored', '401 clears session/403 stops retries',
+    'UI login uses shared auth session and ignores legacy token', 'account change/logout stops old client/late callbacks ignored', '401 clears session/403 stops retries',
   ] }));
 } finally {
   holdReads = false; heldReads.splice(0).forEach((resolve) => resolve());
-  await evaluate(`(async () => { (await import('/src/shared/staffSession.js')).clearStaffAccessToken(); })()`).catch(() => {});
+  await evaluate("localStorage.removeItem('cybermanagement.auth.v1'); sessionStorage.removeItem('nexora.staff.accessToken')").catch(() => {});
   await cdp('Fetch.disable').catch(() => {});
   await cdp('Network.setCacheDisabled', { cacheDisabled: false }).catch(() => {});
   socket.removeEventListener('message', onMessage);

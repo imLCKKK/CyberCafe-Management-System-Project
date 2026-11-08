@@ -3,9 +3,10 @@ import { test } from 'node:test';
 import { createServer as createHttpServer } from 'node:http';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { createServer, preview } from 'vite';
 
-test('Vite forwards auth/admin and realtime WebSockets while keeping OP.GG middleware local', async () => {
+for (const mode of ['legacy-dev', 'auth-dev', 'preview']) {
+test(`Vite ${mode} forwards auth/admin/menu and realtime WebSockets while keeping OP.GG middleware local`, async () => {
   const backendRequests = [];
   const upgrades = [];
   const upgradedSockets = new Set();
@@ -23,17 +24,25 @@ test('Vite forwards auth/admin and realtime WebSockets while keeping OP.GG middl
   });
   await new Promise((resolve) => backend.listen(0, '127.0.0.1', resolve));
   const previousTarget = process.env.API_PROXY_TARGET;
+  const previousAuthTarget = process.env.VITE_API_PROXY_TARGET;
   let vite;
   try {
     process.env.API_PROXY_TARGET = `http://127.0.0.1:${backend.address().port}`;
-    vite = await createServer({
+    delete process.env.VITE_API_PROXY_TARGET;
+    if (mode !== 'legacy-dev') {
+      process.env.VITE_API_PROXY_TARGET = process.env.API_PROXY_TARGET;
+      process.env.API_PROXY_TARGET = 'http://127.0.0.1:1'; // S1-D-2 setting takes precedence.
+    }
+    const config = {
       root: fileURLToPath(new URL('..', import.meta.url)),
       server: { host: '127.0.0.1', port: 0 },
+      preview: { host: '127.0.0.1', port: 0 },
       optimizeDeps: { noDiscovery: true, include: [] },
-    });
-    await vite.listen();
+    };
+    vite = mode === 'preview' ? await preview(config) : await createServer(config);
+    if (mode !== 'preview') await vite.listen();
     const origin = vite.resolvedUrls.local[0].replace(/\/$/, '');
-    for (const [path, method] of [['/api/auth/me', 'GET'], ['/api/admin/computers', 'GET'], ['/api/admin/computers/101/status', 'PATCH']]) {
+    for (const [path, method] of [['/api/auth/me', 'GET'], ['/api/admin/computers', 'GET'], ['/api/admin/computers/101/status', 'PATCH'], ['/api/menu', 'GET']]) {
       const response = await fetch(`${origin}${path}`, { method, headers: { Authorization: 'Bearer proxy-test-token' } });
       assert.equal(response.status, 200);
       assert.deepEqual(await response.json(), { proxied: true });
@@ -42,7 +51,7 @@ test('Vite forwards auth/admin and realtime WebSockets while keeping OP.GG middl
     const opgg = await fetch(`${origin}/api/valorant/opgg/stats`, { method: 'POST' });
     assert.equal(opgg.status, 405);
     assert.equal(opgg.headers.get('Allow'), 'GET');
-    assert.equal(backendRequests.length, 3, 'OP.GG must not be forwarded to .NET');
+    assert.equal(backendRequests.length, 4, 'OP.GG must not be forwarded to .NET');
     const negotiate = await fetch(`${origin}/hubs/realtime/negotiate?negotiateVersion=1`, { method: 'POST' });
     assert.equal(negotiate.status, 200);
     assert.equal(backendRequests.at(-1).path, '/hubs/realtime/negotiate?negotiateVersion=1');
@@ -61,8 +70,12 @@ test('Vite forwards auth/admin and realtime WebSockets while keeping OP.GG middl
   } finally {
     if (previousTarget === undefined) delete process.env.API_PROXY_TARGET;
     else process.env.API_PROXY_TARGET = previousTarget;
-    await vite?.close();
     for (const upgraded of upgradedSockets) upgraded.destroy();
+    if (previousAuthTarget === undefined) delete process.env.VITE_API_PROXY_TARGET;
+    else process.env.VITE_API_PROXY_TARGET = previousAuthTarget;
+    if (vite && mode === 'preview') await new Promise(resolve => vite.httpServer.close(resolve));
+    else await vite?.close();
     await new Promise((resolve, reject) => backend.close((error) => error ? reject(error) : resolve()));
   }
 });
+}

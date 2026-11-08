@@ -27,6 +27,18 @@ if (args.Contains("--realtime-host", StringComparer.Ordinal))
     return;
 }
 
+if (args.Contains("--computer-browser-host"))
+{
+    await ComputerBrowserHost.RunAsync();
+    return;
+}
+
+if (args.Contains("--catalog-browser-host"))
+{
+    await ComputerBrowserHost.RunAsync(catalog: true);
+    return;
+}
+
 var databaseFixture = new AuthCheckDatabase(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"));
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -55,6 +67,7 @@ builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
+builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
 builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
 builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
 builder.Services
@@ -201,8 +214,12 @@ try
             await SendWithToken(HttpMethod.Get, "/api/admin/roles", login.AccessToken));
     }
 
-    checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
-    checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+    if (!args.Contains("--catalog-only"))
+    {
+        checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
+        checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+    }
+    checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
 
     await CheckStatus("Expired token is rejected", HttpStatusCode.Unauthorized,
         await SendWithToken(HttpMethod.Get, "/api/auth/me",

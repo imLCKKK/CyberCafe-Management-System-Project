@@ -1,19 +1,27 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { apiRequest, ApiError } from '../src/shared/apiClient.js';
-import { STAFF_TOKEN_KEY, getStaffAccessToken, setStaffAccessToken, clearStaffAccessToken, subscribeStaffSession } from '../src/shared/staffSession.js';
+import { AUTH_STORAGE_KEY, readStoredSession, storeSession, markSessionVerified, clearVerifiedSession } from '../src/shared/auth/api.js';
 import { getComputerData, updateComputerStatus } from '../src/admin/computers/computerApi.js';
 import { computerFixture } from './computer-fixture.mjs';
 
 const originalFetch = globalThis.fetch;
-const originalStorage = globalThis.sessionStorage;
+const originalStorage = globalThis.localStorage;
+const originalWindow = globalThis.window;
+function signIn(accessToken) {
+  const session = { accessToken, accountType: 'employee' };
+  storeSession(session);
+  markSessionVerified(session);
+}
 let fixture;
 let requests;
 beforeEach(() => {
+  clearVerifiedSession();
+  globalThis.window = new EventTarget();
   fixture = computerFixture();
   requests = [];
   const values = new Map();
-  globalThis.sessionStorage = {
+  globalThis.localStorage = {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
     removeItem: (key) => values.delete(key),
@@ -25,10 +33,10 @@ beforeEach(() => {
     return Response.json(result);
   };
 });
-afterEach(() => { globalThis.fetch = originalFetch; globalThis.sessionStorage = originalStorage; });
+afterEach(() => { globalThis.fetch = originalFetch; globalThis.localStorage = originalStorage; globalThis.window = originalWindow; clearVerifiedSession(); });
 
 test('SQL-shaped arrays preserve IDs, nullable specs, prices and flags without generating demo rows', async () => {
-  setStaffAccessToken('test-only-token');
+  signIn('test-only-token');
   const result = await getComputerData();
   assert.deepEqual(result.computers.map((row) => row.ComputerId), [101, 102, 103, 104]);
   assert.equal(result.computers[1].HasOpenSession, true);
@@ -38,7 +46,7 @@ test('SQL-shaped arrays preserve IDs, nullable specs, prices and flags without g
   assert.equal(result.types[0].PricePerHour, 12345);
   assert.equal(result.rooms[0].RoomName, 'API Room A');
   assert.equal(requests.length, 3);
-  assert.ok(requests.every((request) => request.headers.Authorization === 'Bearer test-only-token'));
+  assert.ok(requests.every((request) => request.headers.get('Authorization') === 'Bearer test-only-token'));
 });
 
 test('empty SQL arrays stay empty', async () => {
@@ -83,36 +91,27 @@ test('PATCH rejects wrong IDs and uncommitted target states', async () => {
 
 test('401 with no body expires the token; 403 preserves it', async () => {
   for (const status of [403, 401]) {
-    setStaffAccessToken('old-token');
+    signIn('old-token');
     globalThis.fetch = async () => new Response(null, { status });
     await assert.rejects(apiRequest('/auth/me'), (error) => error.status === status);
-    assert.equal(getStaffAccessToken(), status === 401 ? null : 'old-token');
+    assert.equal(readStoredSession()?.accessToken ?? null, status === 401 ? null : 'old-token');
   }
 });
 
 test('an older failed request cannot delete a new login token', async () => {
-  setStaffAccessToken('old-token');
+  signIn('old-token');
   globalThis.fetch = async () => {
-    setStaffAccessToken('new-token');
+    signIn('new-token');
     return new Response(null, { status: 401 });
   };
   await assert.rejects(apiRequest('/auth/me'), ApiError);
-  assert.equal(globalThis.sessionStorage.getItem(STAFF_TOKEN_KEY), 'new-token');
-});
-
-test('session subscribers observe login/logout and can unsubscribe', () => {
-  const tokens = [];
-  const unsubscribe = subscribeStaffSession(() => tokens.push(getStaffAccessToken()));
-  setStaffAccessToken('first-session');
-  setStaffAccessToken('second-session');
-  clearStaffAccessToken();
-  unsubscribe();
-  setStaffAccessToken('later-session');
-  assert.deepEqual(tokens, ['first-session', 'second-session', null]);
+  assert.equal(JSON.parse(globalThis.localStorage.getItem(AUTH_STORAGE_KEY)).accessToken, 'new-token');
 });
 
 test('ProblemDetails conflicts surface; internal server details stay hidden', async () => {
-  globalThis.fetch = async () => Response.json({ detail: 'Trạng thái máy đã thay đổi.' }, { status: 409 });
+  globalThis.fetch = async () => Response.json({ detail: 'Trạng thái máy đã thay đổi.' }, {
+    status: 409, headers: { 'Content-Type': 'application/problem+json' },
+  });
   await assert.rejects(apiRequest('/admin/computers/101/status'), (error) => error.status === 409 && error.message.includes('đã thay đổi'));
   globalThis.fetch = async () => Response.json({ detail: 'SQL secret connection detail' }, { status: 500 });
   await assert.rejects(apiRequest('/admin/computers'), (error) => error.status === 500 && !error.message.includes('secret'));
@@ -125,4 +124,9 @@ test('network/invalid JSON fail explicitly, cancellation is preserved', async ()
   await assert.rejects(apiRequest('/admin/computers'), ApiError);
   globalThis.fetch = async () => { throw new DOMException('Aborted', 'AbortError'); };
   await assert.rejects(apiRequest('/admin/computers'), (error) => error.name === 'AbortError');
+});
+test('computer requests wait for the shared session to be verified', async () => {
+  storeSession({ accessToken: 'unverified-token', accountType: 'employee' });
+  await assert.rejects(getComputerData(), (error) => error.code === 'AUTH_SESSION_UNVERIFIED');
+  assert.equal(requests.length, 0);
 });

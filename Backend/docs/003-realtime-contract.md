@@ -1,8 +1,8 @@
 # SCRUM-8 — SignalR backend dùng chung
 
-Ngày cập nhật: 04/11/2026. Task tham chiếu `S1-P-2 — Implement-SignalR-LAN-Sync` trong [backlog](../../codex/SPRINT_TASKS.md), phụ thuộc SCRUM-7/`S1-P-1`. Base: commit `c0aae97`, nhánh `SCRUM-8-implement-signal-r-lan-sync`.
+Ngày cập nhật: 08/11/2026. Task tham chiếu `S1-P-2 — Implement-SignalR-LAN-Sync` trong [backlog](../../codex/SPRINT_TASKS.md), phụ thuộc SCRUM-7/`S1-P-1`. Nhánh `SCRUM-8-implement-signal-r-lan-sync`, PR #9; baseline realtime `7505a29`, tích hợp lại với dev `93cf457`.
 
-Phạm vi đã duyệt: **bước 1 backend, bước 2 frontend, bước 3 kiểm chứng**, cùng phê duyệt riêng thêm `@microsoft/signalr@10.0.11` và dependency bắt buộc. Hub, thông báo máy, hook/reconnect/refetch và proxy WebSocket đã có. Người dùng xác nhận chỉ có một máy: chuẩn bị kịch bản LAN và ghi **chưa nghiệm thu hai máy LAN**. Schema giữ nguyên; login tiếp tục thuộc S1-D-2 theo quyết định trước đó.
+Phạm vi: Hub, thông báo máy sau commit, hook/reconnect/refetch, proxy WebSocket và tích hợp session login S1-D-2. Giữ `@microsoft/signalr@10.0.11`, không thêm dependency hoặc migration trong bản sửa SCRUM-8. Người dùng xác nhận ngày 08/11 chưa có máy B: **chưa nghiệm thu hai máy LAN**.
 
 ## 1. Kết nối và xác thực
 
@@ -56,6 +56,18 @@ Payload `ComputerChanged` dùng cùng envelope [RealtimeEvent](../src/CyberManag
 - Bản này dùng một API process cho demo hai máy LAN. Chưa có backplane cho nhiều API instance; không suy ra các nhóm/thông báo được chia sẻ giữa nhiều host.
 
 ## 5. Kiểm chứng và phần còn lại
+
+### Tích hợp lại với dev ngày 08/11/2026
+
+- Máy, API và Hub dùng cùng phiên `cybermanagement.auth.v1`; token chỉ được đưa cho Hub sau khi AuthProvider xác minh `/auth/me`. Xóa helper session riêng. Đổi tài khoản/logout/hết phiên dừng kết nối cũ; phản hồi 401 muộn không xóa phiên mới.
+- HTTP adapter lưu trạng thái 401/403 cho retry policy trước khi SDK bọc lỗi negotiate. Hai ca SDK thật đã tái hiện lỗi trước bản sửa (negotiate lặp sau khoảng 2 giây), sau sửa dừng retry và cho phép phiên mới kết nối.
+- Giữ cấu hình proxy auth/admin/menu, Hub HTTP/WebSocket và OP.GG; cả hai biến `VITE_API_PROXY_TARGET`/`API_PROXY_TARGET` dùng cùng target. `planning/team-delivery-plan.md` khớp nội dung dev sau merge.
+- Đạt **34 kiểm tra Node**, build frontend/backend, ba render smoke scripts và browser suites `realtime`, `computers-api`, `auth-area`. Build backend không có cảnh báo; build frontend còn hai cảnh báo annotation `PURE` từ SDK, render còn cảnh báo SSR `useLayoutEffect` có sẵn.
+- Đạt **258 kiểm tra HTTP/persistence trên SQL Server** với code dev hiện tại. Dev đã có **5 migration/38 bảng nghiệp vụ**, khác baseline 4 migration/35 bảng dưới đây. Chỉ migrate DB fixture ngẫu nhiên rồi dọn; không sửa migration hoặc DB nghiệp vụ. Fixture giá giờ được đổi sang số nguyên phù hợp precision trên dev, test host bổ sung repository catalog đã có trên dev.
+- Bộ live đăng nhập bằng **form UI** trên hai browser context tách localStorage, không gán token bằng helper. 10 lượt click → DOM: **90, 54, 52, 55, 98, 53, 48, 53, 54, 53 ms**, tối đa **98 ms**, cùng đồng hồ driver; dialog/list cập nhật không F5. Restart giữ SQL, reconnect refetch thay đổi bỏ lỡ; Waiter chỉ xem/PATCH 403, customer không nhận event máy; logout đóng transport Hub cũ và tài khoản mới mở transport đúng quyền.
+- Artifact local: `.tools/frontend-retest/2026-11-08T12-50-05-804Z/realtime-live.json`, ảnh và summary; `lanAccepted: false`. Các DB fixture đã dọn. Lượt đầu gặp lỗi sandbox Chrome/SQL, selector và request CDP bị hủy, thiếu DI catalog trong test host, giả định chỉ có WebSocket sau restart; đã sửa harness và chạy lại đạt. SDK có thể dùng transport dự phòng sau restart, nên kiểm tra logout theo dõi cả WebSocket/SSE/LongPolling.
+
+Các số liệu bên dưới là **lịch sử baseline trước lần tích hợp lại**, không phải kết quả chạy trên dev hiện tại.
 
 Lệnh từ repository root, mặc định InMemory:
 

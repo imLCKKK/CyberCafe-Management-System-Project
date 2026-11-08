@@ -44,7 +44,7 @@ namespace CyberManagement.API
                     new IdentitySeedOptions(app.Environment.IsDevelopment(), accountPasswords),
                     CancellationToken.None);
             }
-                
+
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {

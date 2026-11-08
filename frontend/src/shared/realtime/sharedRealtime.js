@@ -6,6 +6,13 @@ const hubUrl = import.meta.env?.VITE_REALTIME_URL?.trim() || '/hubs/realtime';
 
 export function createSignalRClient(token, url = hubUrl) {
   let client;
+  let authenticationStatus = null;
+  function authenticationFailed(error) {
+    const status = authFailureStatus(error);
+    if (!status) return;
+    authenticationStatus = status;
+    client.authenticationFailed(error);
+  }
   const http = new DefaultHttpClient({ log() {} });
   const connection = new HubConnectionBuilder()
     .withUrl(url, {
@@ -15,10 +22,10 @@ export function createSignalRClient(token, url = hubUrl) {
           // The SDK wraps negotiate errors and drops statusCode; observe HTTP auth failures first.
           try {
             const response = await http.send(request);
-            if ([401, 403].includes(response.statusCode)) client.authenticationFailed(response);
+            authenticationFailed(response);
             return response;
           } catch (error) {
-            if (authFailureStatus(error)) client.authenticationFailed(error);
+            authenticationFailed(error);
             throw error;
           }
         },
@@ -28,7 +35,8 @@ export function createSignalRClient(token, url = hubUrl) {
     .configureLogging(LogLevel.None)
     .withAutomaticReconnect({
       nextRetryDelayInMilliseconds({ previousRetryCount, retryReason }) {
-        if (authFailureStatus(retryReason)) { client.authenticationFailed(retryReason); return null; }
+        authenticationFailed(retryReason);
+        if (authenticationStatus) return null;
         return [0, 2000, 10000, 30000][previousRetryCount] ?? null;
       },
     }).build();

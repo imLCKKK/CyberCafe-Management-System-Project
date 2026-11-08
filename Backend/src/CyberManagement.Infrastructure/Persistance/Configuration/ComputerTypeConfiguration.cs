@@ -15,7 +15,7 @@ public class ComputerTypeConfiguration : IEntityTypeConfiguration<ComputerType>
         builder.Property(x => x.CPU).HasMaxLength(100);
         builder.Property(x => x.RAM).HasMaxLength(50);
         builder.Property(x => x.GPU).HasMaxLength(100);
-        builder.Property(x => x.PricePerHour).HasPrecision(12, 2);
+        builder.Property(x => x.PricePerHour).HasPrecision(18, 0);
         builder.Property(x => x.Description).HasMaxLength(255);
     }
 }

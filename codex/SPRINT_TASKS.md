@@ -51,7 +51,7 @@ Các task backend dùng nền mới sau khi Trưởng nhóm review/tích hợp; 
 1. Mỗi tiêu đề có mã dạng **S1-D-1** là một thẻ Jira độc lập. Copy nguyên tên tiếng Anh nối bằng dấu gạch ngang sau dấu “—” vào **Summary**, không đưa mã kế hoạch vào tên Jira. Người phụ trách và reviewer ghi ở đầu nhóm, sprint ghi ở đầu phần; chọn các trường này trên Jira, không lặp lại trong Description. Jira key thực tế chỉ ghi sau khi tạo issue.
 2. Copy **Description**, **Dependencies** và **Done khi** vào nội dung Jira; giữ cả căn cứ/ranh giới nếu thẻ có. Description là phạm vi cần làm, Done khi là kết quả cần chứng minh. Chỉ tick khi có bằng chứng; không tạo Sub-task hoặc lượt review riêng cho từng dòng.
 3. Có thể chia nhiều commit/PR nhỏ cùng tham chiếu một Task khi cần bàn giao code dùng chung sớm. Ghi mốc/PR đã cung cấp để người phụ thuộc tích hợp; Task chỉ Done khi đủ checklist và được Trưởng nhóm duyệt, không đợi cuối sprint mới đẩy toàn bộ code.
-4. Gửi **một báo cáo review tổng hợp theo Task**: checklist đạt/chưa đạt, diff/PR liên quan và kiểm tra. Lượt sau tập trung vào phần đã sửa; không buộc Trưởng nhóm đọc lại toàn bộ phần không đổi.
+4. Gửi **kết quả review tổng hợp theo Task trực tiếp trong chat**, theo mẫu tin nhắn ở mục 6 của [REVIEW_GUIDE.md](REVIEW_GUIDE.md), để Trưởng nhóm copy gửi người làm: lỗi/thiếu sót, hướng sửa và kết quả cần kiểm tra; nêu ngắn diff/PR và bằng chứng liên quan. Chỉ tạo file báo cáo khi người dùng yêu cầu rõ. Lượt sau tập trung vào phần đã sửa; không buộc Trưởng nhóm đọc lại toàn bộ phần không đổi.
 5. Các phụ thuộc là điều kiện để hoàn tất tích hợp. Có thể phát triển theo contract đã chốt trước khi chúng Done, nhưng phải có bằng chứng tích hợp thật để nghiệm thu. Khi đã tạo issue, ánh xạ mã kế hoạch sang Jira key và liên kết “is blocked by” phù hợp; không dùng Parent.
 6. Workflow: To Do → In Progress → Review → Done, ánh xạ vào board hiện có. Mỗi người tập trung một luồng chính; chỉ tách thêm thẻ khi có kết quả độc lập hoặc blocker riêng cần theo dõi, không tách vì mỗi bước mất một ngày.
 7. Tên Task dùng dạng `Build-Admin-Client-Login` để dùng trực tiếp khi tạo branch từ Jira theo flow của nhóm. Không cần trường Branch riêng trong backlog hoặc Description. Giữ mã kế hoạch để tra phụ thuộc trong tài liệu; ánh xạ với key thật sau khi tạo issue.
@@ -234,6 +234,10 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 
 #### S1-K-1 — Implement-Catalog-API-Menu
 
+**Tài liệu triển khai:** [API danh mục/menu và cách kiểm tra](../Backend/README.md#s1-k-1--scrum-10-danh-mục-sản-phẩm-và-menu).
+Code trên nhánh SCRUM-10 dùng chung Products/Categories; giỏ chọn món từ API,
+gửi đơn/thanh toán chờ task checkout. Checklist giữ chưa tick cho đến khi Trưởng nhóm duyệt.
+
 **Description:**
 
 - Port danh mục/sản phẩm phù hợp vào API SQL Server chung, giữ kiểm tra quyền và dữ liệu giá.
@@ -252,16 +256,23 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 
 #### S1-K-2 — Define-Order-Checkout-Contracts
 
+**Tài liệu bàn giao:** [Hợp đồng đơn món và checkout](../Backend/docs/004-order-checkout-contract.md),
+phiên bản 0.4 ngày 08/11/2026; sau review 66f1a29, người dùng ủy quyền AI chốt các lựa chọn còn mở.
+Mục 11.2 ghi D01–D11 cùng căn cứ/lý do; việc chốt thiết kế không còn chờ phản hồi riêng của owner.
+Mục 11.3 tách phụ thuộc code/migration/kiểm chứng và duyệt cuối; chưa ghi các owner đã đồng ý,
+chưa đánh dấu Done. Trưởng nhóm review bản 0.4 trước khi duyệt cuối.
+
 **Description:**
 
 - Chốt DTO đặt/xử lý/hủy đơn, trạng thái, snapshot giá/giảm và cách tính tiền tại server.
-- Thống nhất ví/tiền mặt/ZaloPay, giữ tồn/lượt voucher, hết hạn và hoàn tiền với Minh/Trường trước khi tích hợp checkout.
+- Chốt ví/tiền mặt/ZaloPay, giữ tồn/lượt voucher, hết hạn và hoàn tiền theo quyết định 08/11/2026;
+  bàn giao hợp đồng cho Minh/Trường và Phúc ở giao điểm phí phiên để tích hợp cùng một phương án.
 
 **Dependencies:** `S1-M-1`, `S1-T-1`
 
 **Done khi:**
 
-- [ ] **Chốt vòng đời đơn và phương thức thu.** Có DTO đặt/xử lý/hủy, snapshot giá/giảm giá, ví/tiền mặt/gateway, giữ tồn/hết hạn và policy hoàn; Minh/Trường cùng đối chiếu hợp đồng.
+- [ ] **Chốt vòng đời đơn và phương thức thu.** Có DTO đặt/xử lý/hủy, snapshot giá/giảm giá, ví/tiền mặt/gateway, giữ tồn/hết hạn và policy hoàn; ghi căn cứ chốt theo ủy quyền 08/11/2026, đầu vào bàn giao liên module và được Trưởng nhóm duyệt theo điều kiện Done chung.
 
 **Gom từ mã cũ:** `S1-K-02`. Đây là mã tra cứu, không tạo lại các thẻ cũ.
 
@@ -270,6 +281,12 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 Assignee: **Trường**. Reviewer: **Trưởng nhóm**. Phối hợp: Khang; Minh đối chiếu tiền, Đại đối chiếu contract voucher.
 
 #### S1-T-1 — Define-Inventory-Invoice-Voucher-Contracts
+
+**Trạng thái đối chiếu 05/11/2026:** PR #8 đã merge vào `dev` tại `229d7af`, chưa phải nghiệm thu của
+Trưởng nhóm. [Contract kho/chứng từ/voucher](../docs/contracts/inventory-invoice-voucher.md) có bổ sung
+đề xuất về giờ xác nhận hoàn ZaloPay (mục 6.1.1) và khóa phát hành hóa đơn lưu bền vững (mục 6.3.1).
+Các phần bổ sung chờ review; phản hồi liên module và P1 tại mục 6.5/9 vẫn còn mở. Giữ các tiêu chí Done
+chưa đánh dấu cho đến khi đủ bằng chứng và Trưởng nhóm duyệt.
 
 **Description:**
 

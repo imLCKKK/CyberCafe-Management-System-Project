@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createSignalRClient } from '../src/shared/realtime/sharedRealtime.js';
-import { cdp, evaluate, until, socket, go, sleep, origin, outputDir, screenshot } from './cdp.mjs';
+import { cdp, evaluate, until, socket, go, input, click, sleep, origin, outputDir, screenshot } from './cdp.mjs';
 
 // Real browser SDK -> Vite WebSocket proxy -> Kestrel -> isolated SQL. No Fetch interception.
 const api = process.env.REALTIME_LIVE_API_URL;
@@ -24,9 +24,26 @@ async function waitFor(predicate, label, timeout = 30000) {
   while (Date.now() < deadline) { if (await predicate()) return; await sleep(40); }
   throw Error(`Timed out: ${label}`);
 }
-// Second independent tab/CDP socket; sessionStorage and hub connection stay separate.
+// Separate browser context so shared auth localStorage does not replace A's session.
 async function openPeer() {
-  const { targetId } = await cdp('Target.createTarget', { url: 'about:blank' });
+  const version = await fetch(`http://127.0.0.1:${process.env.FRONTEND_CDP_PORT}/json/version`).then(r => r.json());
+  const browser = new WebSocket(version.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => { browser.onopen = resolve; browser.onerror = reject; });
+  let browserSerial = 0;
+  const browserPending = new Map();
+  browser.onmessage = ({ data }) => {
+    const message = JSON.parse(data), task = browserPending.get(message.id);
+    if (!task) return;
+    browserPending.delete(message.id); clearTimeout(task.timer);
+    message.error ? task.reject(Error(message.error.message)) : task.resolve(message.result);
+  };
+  const browserCommand = (method, params = {}) => new Promise((resolve, reject) => {
+    const id = ++browserSerial;
+    const timer = setTimeout(() => { browserPending.delete(id); reject(Error(`Browser CDP timeout: ${method}`)); }, 15000);
+    browserPending.set(id, { resolve, reject, timer }); browser.send(JSON.stringify({ id, method, params }));
+  });
+  const { browserContextId } = await browserCommand('Target.createBrowserContext');
+  const { targetId } = await browserCommand('Target.createTarget', { url: 'about:blank', browserContextId });
   const targets = await fetch(`http://127.0.0.1:${process.env.FRONTEND_CDP_PORT}/json/list`).then(r => r.json());
   const ws = new WebSocket(targets.find(target => target.id === targetId).webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
@@ -50,17 +67,37 @@ async function openPeer() {
     return result.result.value;
   };
   await send('Runtime.enable'); await send('Page.enable'); await send('Network.enable');
-  return { send, read, close: async () => { ws.close(); await cdp('Target.closeTarget', { targetId }); } };
+  return { send, read, close: async () => {
+    ws.close();
+    try { await browserCommand('Target.disposeBrowserContext', { browserContextId }); }
+    finally { browser.close(); }
+  } };
 }
 const connected = 'document.querySelector("[data-realtime-status]")?.dataset.realtimeStatus === "connected" && document.querySelector(".cafe-computers")?.getAttribute("aria-busy") === "false"';
 const statusIs = status => `document.querySelector(".cafe-station")?.classList.contains(${JSON.stringify(status.toLowerCase())})`;
-const bootstrap = token => `(async () => { (await import('/src/shared/staffSession.js')).setStaffAccessToken(${JSON.stringify(token)}); })()`;
+async function loginThroughUi(role) {
+  await go('/admin/auth', 'document.querySelector(".auth-form")');
+  await input('#auth-identifier', role === 'Waiter' ? 'waiter01' : 'admin');
+  await input('#auth-password', `${role}-check-password-2026!`);
+  await click('Đăng nhập', 'form.auth-form button[type="submit"]');
+  await until('Boolean(document.querySelector(".admin-shell"))');
+  await go('/admin/computers');
+  await until(connected);
+}
 let peer, customer;
 let patchAck = null;
 let observerReads = 0;
 const samples = [];
+const activeHubTransports = new Set();
 const onMessage = ({ data }) => {
   const message = JSON.parse(data);
+  if (message.method === 'Network.webSocketCreated' && new URL(message.params.url).pathname === '/hubs/realtime')
+    activeHubTransports.add(message.params.requestId);
+  if (message.method === 'Network.requestWillBeSent' && message.params.request.method === 'GET'
+    && new URL(message.params.request.url).pathname === '/hubs/realtime')
+    activeHubTransports.add(message.params.requestId);
+  if (['Network.webSocketClosed', 'Network.loadingFinished', 'Network.loadingFailed'].includes(message.method))
+    activeHubTransports.delete(message.params.requestId);
   if (message.method === 'Network.responseReceived' && /\/api\/admin\/computers\/\d+\/status$/.test(message.params.response.url)
     && message.params.response.status === 200) patchAck = performance.now();
 };
@@ -80,14 +117,22 @@ try {
 
   await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Network.enable');
   socket.addEventListener('message', onMessage);
-  await go('/client/home'); await evaluate(bootstrap(admin)); await go('/admin/computers'); await until(connected);
+  await loginThroughUi('Admin');
   const rows = (await request('/api/admin/computers', admin)).body;
   assert.equal(rows.length, 1);
   const computerId = rows[0].computerId;
   peer = await openPeer();
-  await peer.send('Page.navigate', { url: origin + '/client/home' });
-  await waitFor(() => peer.read('Boolean(document.querySelector(".home-heading"))'), 'peer page loaded');
-  await peer.read(bootstrap(waiter));
+  await peer.send('Page.navigate', { url: origin + '/admin/auth' });
+  await waitFor(() => peer.read('Boolean(document.querySelector(".auth-form"))'), 'peer login form');
+  await peer.read(`(() => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    for (const [id, value] of [['auth-identifier','waiter01'],['auth-password','Waiter-check-password-2026!']]) {
+      const element = document.getElementById(id); set.call(element, value);
+      element.dispatchEvent(new Event('input', {bubbles:true}));
+    }
+  })()`);
+  await peer.read('document.querySelector("form.auth-form button[type=submit]").click()');
+  await waitFor(() => peer.read('Boolean(document.querySelector(".admin-shell"))'), 'peer verified UI login');
   await peer.send('Page.navigate', { url: origin + '/admin/computers' });
   await waitFor(() => peer.read(connected), 'peer real hub connected');
   await peer.read(`globalThis.__pageMarker = 'no-f5'; globalThis.__realtimeStates = [];
@@ -149,10 +194,24 @@ try {
   await evaluate('document.querySelector("dialog .cafe-dialog-actions button").click()');
   await waitFor(() => peer.read(statusIs('Available')), 'post restart live event');
   await screenshot('realtime-live-admin.png');
-  const result = { passed: true, source: 'Two browser tabs on ONE PC, real SDK/Kestrel/SQL; NOT physical LAN acceptance',
+  await until(connected);
+  await waitFor(() => activeHubTransports.size === 1, 'Admin has one real Hub transport');
+  const oldTransports = [...activeHubTransports];
+  await evaluate(`document.querySelector('[aria-label="Đăng xuất"]').click()`);
+  await until('location.pathname === "/admin/auth" && Boolean(document.querySelector(".auth-form"))');
+  await waitFor(() => activeHubTransports.size === 0, 'logout closes the previous Hub transport');
+  assert.equal(await evaluate("localStorage.getItem('cybermanagement.auth.v1')"), null);
+  await loginThroughUi('Waiter');
+  await waitFor(() => activeHubTransports.size === 1, 'new account opens a new Hub transport');
+  assert.ok([...activeHubTransports].every(id => !oldTransports.includes(id)));
+  await evaluate('document.querySelector(".cafe-station").click()');
+  await until('Boolean(document.querySelector("dialog[open]"))');
+  assert.equal(await evaluate('Boolean(document.querySelector(".cafe-dialog-actions"))'), false);
+  const result = { passed: true, source: 'Two isolated browser contexts on ONE PC, real SDK/Kestrel/SQL; NOT physical LAN acceptance',
     rounds: samples, maxClickToVisibleMs: Math.max(...samples.map(sample => sample.clickToVisibleMs)),
     restart: 'SQL persisted, B refetched missed change and received next event without F5',
     authorization: 'Waiter observes but PATCH 403; customer gets no computer event; anonymous negotiate 401',
+    authentication: 'Both accounts log in through UI; logout closes old Hub transport; new account connects with read-only permissions',
     reconnectStates: states, lanAccepted: false };
   await writeFile(path.join(outputDir, 'realtime-live.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));
@@ -161,6 +220,6 @@ try {
   socket.removeEventListener('message', onMessage);
   await peer?.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 }).catch(() => {});
   await peer?.close();
-  await evaluate(`(async () => { (await import('/src/shared/staffSession.js')).clearStaffAccessToken(); })()`).catch(() => {});
+  await evaluate(`document.querySelector('[aria-label="Đăng xuất"]')?.click()`).catch(() => {});
   socket.close();
 }

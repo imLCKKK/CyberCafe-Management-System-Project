@@ -25,9 +25,9 @@ const connectionStatus = useRealtime({
 
 SDK tự reconnect theo các mốc 0/2/10/30 giây. Initial start thất bại hoặc SDK hết lượt reconnect thì lifecycle thử lại sau 2/5/10/30 giây, tối đa 30 giây giữa các lượt; unmount sẽ hủy retry. `401/403` dừng retry và báo về consumer.
 
-Adapter HTTP đọc mã lỗi trước khi SDK bọc lỗi negotiate và làm mất `statusCode`. `401` của trang máy chỉ xóa token nếu vẫn là token hiện tại; `403` giữ token và đọc lại quyền API. Phiên hết hạn giữ thông báo yêu cầu đăng nhập lại. Logic này có kiểm thử bằng SDK chính thức trên HTTP host cục bộ.
+Adapter HTTP đọc mã lỗi trước khi SDK bọc lỗi negotiate và làm mất `statusCode`, lưu trạng thái 401/403 để retry policy của SDK cũng dừng. `401` của trang máy chỉ xóa phiên nếu vẫn là phiên hiện tại; `403` giữ phiên và refetch API. Phiên hết hạn giữ thông báo yêu cầu đăng nhập lại. Test SDK thật kết nối thành công trước, ngắt transport rồi trả 401/403 lúc reconnect; đợi qua mốc retry 2 giây, xác nhận không negotiate tiếp và token của phiên mới vẫn kết nối được.
 
-Login `S1-D-2` dùng `setStaffAccessToken`/`clearStaffAccessToken` trong [staffSession](../staffSession.js), không ghi sessionStorage trực tiếp rồi mong React tự cập nhật. Helper thông báo login/logout cho consumer; quyền vẫn do `/api/auth/me` và backend quyết định. Hook dùng chung nhận token qua tham số để module khách sau này có thể dùng cùng cơ chế với nguồn token của mình.
+Login `S1-D-2`, API máy và Hub dùng cùng phiên `localStorage['cybermanagement.auth.v1']` do [auth client](../auth/api.js) sở hữu. `AuthProvider` chỉ cấp `accessToken` trong `useAuth()` sau khi `/auth/me` xác minh phiên. Module máy dùng principal/quyền đã xác minh, không giữ kho session riêng hoặc đọc token legacy `nexora.staff.accessToken`. Logout, hết phiên hoặc đổi tài khoản qua storage event dọn kết nối cũ; callback/response muộn không làm hỏng phiên mới. Hook dùng chung nhận token qua tham số để module khách cũng sử dụng được.
 
 ## Màn hình máy
 
@@ -38,7 +38,7 @@ Event, reconnect và `RealtimeReady` đều đọc lại API. Bộ lọc và dia
 ## URL và proxy
 
 - Mặc định `/hubs/realtime` cùng origin với frontend; cấu hình `VITE_REALTIME_URL` khi build nếu dùng URL khác.
-- Vite dev/preview chuyển `/hubs/realtime`, negotiate, SSE và WebSocket đến `API_PROXY_TARGET` (mặc định `http://127.0.0.1:5088`). Regex proxy nhận cả dấu `?` của query token/connection ID; `ws: true` giữ HTTP Upgrade.
+- Vite dev/preview chuyển API và `/hubs/realtime`, negotiate, SSE, WebSocket đến cùng target: ưu tiên `VITE_API_PROXY_TARGET`, sau đó `API_PROXY_TARGET`, mặc định `http://127.0.0.1:5088`. Regex Hub nhận cả dấu `?` của query token/connection ID; `ws: true` giữ HTTP Upgrade. Các route auth/admin/menu được giữ cùng middleware OP.GG.
 - OP.GG vẫn ở middleware riêng. Build production cần reverse proxy hỗ trợ `/hubs/realtime` và WebSocket, hoặc host có CORS phù hợp khi khác origin; chưa thay cấu hình CORS/firewall trong bước này.
 - SDK được tách thành chunk build riêng. Contract event/quyền và giới hạn một API process nằm trong [backend contract](../../../../Backend/docs/003-realtime-contract.md).
 
@@ -47,18 +47,18 @@ Event, reconnect và `RealtimeReady` đều đọc lại API. Bộ lọc và dia
 Từ repository root:
 
 ```powershell
-node --test frontend/tests/realtime-client.test.mjs frontend/tests/realtime-sdk.test.mjs frontend/tests/computer-api.test.mjs frontend/tests/computer-proxy.test.mjs
+node --test frontend/tests/realtime-client.test.mjs frontend/tests/realtime-sdk.test.mjs frontend/tests/computer-api.test.mjs frontend/tests/computer-proxy.test.mjs frontend/src/shared/auth/api.test.js
 npm.cmd --prefix frontend run build
 npm.cmd --prefix frontend run test:frontend:render
-npm.cmd --prefix frontend run test:frontend -- realtime computers-api admin-controls routes
+npm.cmd --prefix frontend run test:frontend -- realtime computers-api auth-area
 ```
 
-19 kiểm tra Node gồm lifecycle/session/API, negotiate 401/403 với SDK thật, HTTP proxy và WebSocket upgrade. Browser suite `realtime` dùng SDK và HTTP fixtures để kiểm tra event/refetch không F5, burst 20 event, giữ filter/dialog, reconnect, client dùng chung và đổi token. Suite máy dùng HTTP fixtures với client chính thức nhận 503 ở negotiate để cô lập dữ liệu test. Lỗi CDP do request đã được Network xác nhận hủy không coi là lỗi ứng dụng; các lỗi interception khác vẫn fail test.
+34 kiểm tra Node gồm lifecycle/session/API, negotiate và reconnect 401/403 với SDK thật, HTTP proxy và WebSocket upgrade ở dev/preview với cả hai biến cấu hình proxy. Browser suite `realtime` đăng nhập bằng UI với SDK/HTTP fixtures để kiểm tra event/refetch không F5, burst 20 event, giữ filter/dialog, reconnect, client dùng chung, đổi tài khoản và logout. Suite máy dùng HTTP fixtures với client chính thức nhận 503 ở negotiate để cô lập dữ liệu test. Lỗi CDP do request đã được Network xác nhận hủy không coi là lỗi ứng dụng; các lỗi interception khác vẫn fail test.
 
 Build và render đạt; build còn hai cảnh báo annotation `PURE` từ mã SDK, render Home/Tournaments còn cảnh báo SSR `useLayoutEffect` có sẵn. Không sửa thư viện hoặc các trang ngoài phạm vi để che cảnh báo.
 
-Kiểm thử bước 3 `node frontend/tests/run-realtime-live.mjs` cần `AUTH_CHECKS_SQL_CONNECTION`: tự build host thử, tạo/migrate DB riêng, chạy hai tab Chrome với SDK/Hub/Kestrel/SQL thật rồi dừng và xóa DB do fixture sở hữu. Không nằm trong suite mặc định để tránh tự tạo DB. Host và các endpoint `/api/admin/__checks/*` chỉ có trong project test, không có trong API production. Không thêm form login; test gọi API identity và helper session đã có.
+Kiểm thử `node frontend/tests/run-realtime-live.mjs` cần `AUTH_CHECKS_SQL_CONNECTION`: tự build host thử, tạo/migrate DB riêng, chạy hai browser context Chrome tách localStorage với SDK/Hub/Kestrel/SQL thật rồi dừng và xóa DB do fixture sở hữu. Cả hai tài khoản đăng nhập bằng form UI đã tích hợp; test không gán token qua helper. Có kiểm tra socket cũ đóng khi logout và tài khoản mới mở kết nối đúng quyền. Không nằm trong suite mặc định để tránh tự tạo DB. Host và các endpoint `/api/admin/__checks/*` chỉ có trong project test, không có trong API production.
 
-Đã đạt trên một máy: 10 lượt A đổi trạng thái, B refetch/cập nhật dialog không F5 (44–163 ms từ click đến DOM ở lượt chạy cuối, đồng hồ driver); API restart giữ SQL, B offline bỏ lỡ event rồi reconnect/refetch và nhận event tiếp theo; Waiter không sửa được máy, customer không nhận event máy. Bộ checks backend cũng đạt 182 kiểm tra SQL thật. Chi tiết và cách tái hiện trong [contract](../../../../Backend/docs/003-realtime-contract.md).
+Số đo và lịch sử kiểm chứng local trong [contract](../../../../Backend/docs/003-realtime-contract.md). Kết quả ở `7505a29` (182 kiểm tra SQL, 44–163 ms loopback) là baseline trước khi hợp nhất dev mới, không tự coi là kết quả chạy lại trên schema/phiên đăng nhập hiện tại.
 
 **Chưa nghiệm thu hai máy LAN:** người dùng hiện chỉ có một máy; số đo loopback không chứng minh mục tiêu LAN 2 giây. Dùng [kịch bản LAN](../../../../Backend/docs/004-realtime-lan-checks.md) khi có máy B. Hướng dẫn reconnect/start dựa trên [Microsoft SignalR JavaScript client](https://learn.microsoft.com/en-us/aspnet/core/signalr/javascript-client?view=aspnetcore-10.0).

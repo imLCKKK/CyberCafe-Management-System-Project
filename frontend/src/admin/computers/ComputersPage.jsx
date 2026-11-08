@@ -5,7 +5,7 @@ import { statusLabels, currency } from './mockData';
 import { PageHeading, StatCard, Station, StatusBadge, Modal } from './components/CafeUI';
 import { updateComputerStatus } from './computerApi';
 import { useComputerData } from './useComputerData';
-import { getStaffAccessToken } from '../../shared/staffSession';
+import { getAccessToken } from '../../shared/auth/api';
 import '../shared/cafe.css';
 
 const realtimeLabels = {
@@ -55,20 +55,20 @@ export function ComputersPage() {
   async function updateMaintenance() {
     if (pending.current || !selected || !canUpdate) return;
     const controller = new AbortController();
-    const requestToken = getStaffAccessToken();
+    const requestToken = getAccessToken();
     pending.current = controller;
     setSaving(true);
     setNotice('');
     setActionError('');
     try {
       const saved = await updateComputerStatus(selected, controller.signal);
-      if (!controller.signal.aborted && getStaffAccessToken() === requestToken) {
+      if (!controller.signal.aborted && getAccessToken() === requestToken) {
         applyComputer(saved);
         select(null);
         setNotice(`Đã cập nhật trạng thái ${saved.ComputerName}.`);
       }
     } catch (failure) {
-      if (!controller.signal.aborted && getStaffAccessToken() === requestToken) {
+      if (!controller.signal.aborted && getAccessToken() === requestToken) {
         setActionError(failure.message);
         if ([401, 403, 404, 409, 200].includes(failure.status)) reload();
       }

@@ -1,6 +1,6 @@
 # SCRUM-8 — Kịch bản nghiệm thu hai máy LAN
 
-Cập nhật 04/11/2026. **Chưa nghiệm thu LAN:** người dùng xác nhận hiện chỉ có một máy. Hai tab trên một máy đã kiểm tra SDK/Hub/SQL thật, restart và quyền; kết quả trong [contract](003-realtime-contract.md). Tài liệu này chuẩn bị lần chạy hai máy vật lý, không thay bằng chứng nghiệm thu hoặc duyệt của Trưởng nhóm.
+Cập nhật 08/11/2026. **Chưa nghiệm thu LAN:** người dùng xác nhận chưa có máy B. Kiểm thử local dùng hai browser context tách biệt trên một máy để mỗi tài khoản có localStorage riêng; không thay bằng chứng hai máy vật lý hoặc duyệt của Trưởng nhóm.
 
 ## 1. Tái hiện kiểm thử tự động trên một máy
 
@@ -40,22 +40,9 @@ $env:API_PROXY_TARGET = 'http://127.0.0.1:5089'
 npm.cmd --prefix frontend run dev -- --host 0.0.0.0 --port 5173 --strictPort
 ```
 
-Mở `http://<IP-LAN-A>:5173/client/home` trên cả hai máy. Login UI thuộc S1-D-2; chỉ trong lần thử này dùng DevTools Console gọi identity API và helper sẵn có:
+Mở `http://<IP-LAN-A>:5173/admin/auth` trên cả hai máy và đăng nhập bằng form UI: A dùng `admin` / `Admin-check-password-2026!`; B dùng `waiter01` / `Waiter-check-password-2026!`. Chọn trang **Máy** sau khi đăng nhập. Auth, request máy và Hub cùng dùng phiên `cybermanagement.auth.v1`; không gán token qua helper hoặc sessionStorage để bỏ qua bước tích hợp.
 
-```javascript
-// A: admin / Admin-check-password-2026!
-// B: waiter01 / Waiter-check-password-2026!
-const r = await fetch('/api/auth/login', {
-  method: 'POST', headers: {'Content-Type': 'application/json'},
-  body: JSON.stringify({username: 'admin', password: 'Admin-check-password-2026!'})
-});
-if (!r.ok) throw Error(`Login HTTP ${r.status}`);
-const {accessToken} = await r.json();
-(await import('/src/shared/staffSession.js')).setStaffAccessToken(accessToken);
-location.assign('/admin/computers');
-```
-
-B thay đúng username/password theo comment. Không in/copy token vào log hoặc biên bản. Hai máy phải thấy `LAN-PC-01` và nhãn đã kết nối trực tiếp; B chỉ xem, không có nút đổi trạng thái. Ghi `globalThis.__lanMarker = 'no-f5'` vào Console B để kiểm tra trang không reload.
+Không in/copy token vào log hoặc biên bản. Hai máy phải thấy `LAN-PC-01` và nhãn đã kết nối trực tiếp; B chỉ xem, không có nút đổi trạng thái. Ghi `globalThis.__lanMarker = 'no-f5'` vào Console B để kiểm tra trang không reload.
 
 ## 3. Đo 10 lượt bằng cùng đồng hồ
 
@@ -95,15 +82,14 @@ __customerClient.subscribe({events:['ComputerChanged','CheckBarrier'],
 Console A để gửi marker qua đúng Vite proxy:
 
 ```javascript
-const session = await import('/src/shared/staffSession.js');
-const marker = await fetch('/api/admin/__checks/customer-barrier', {
-  method:'POST', headers:{Authorization:`Bearer ${session.getStaffAccessToken()}`}
-});
-if (!marker.ok) throw Error(`Marker HTTP ${marker.status}`);
-console.log((await marker.json()).eventId); // Chỉ event ID, không in token.
+const {apiRequest} = await import('/src/shared/auth/api.js');
+const marker = await apiRequest('/admin/__checks/customer-barrier', {method:'POST'});
+console.log(marker.eventId); // Chỉ event ID, không in token.
 ```
 
 Các endpoint `/api/admin/__checks/*` chỉ nằm trong test project và yêu cầu Admin; không có trong production API. Kiểm tra tách account cùng ID, client không tự join nhóm và JWT hết hạn đã có trong bộ backend checks; kết quả LAN bổ sung bằng chứng môi trường thật.
+
+4. Đăng xuất trên B và xác nhận socket Hub cũ đóng trong Network. Đăng nhập tài khoản khác bằng UI, mở trang Máy và xác nhận kết nối mới cùng đúng quyền của tài khoản mới. Không có event từ kết nối cũ. Lỗi 401/403 trong reconnect được kiểm tra riêng bằng SDK thật trong `frontend/tests/realtime-sdk.test.mjs`; retry phải dừng, chỉ phiên mới mới mở kết nối mới.
 
 ## 5. Kết thúc và bàn giao
 

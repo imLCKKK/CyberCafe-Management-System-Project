@@ -11,6 +11,8 @@ public class OrderDetail
     public int Quantity { get; set; }
 
     public decimal UnitPrice { get; set; }
+    public string ProductNameSnapshot { get; set; } = null!;
+    public decimal DiscountAmount { get; set; }
 
     public Order Order { get; set; } = null!;
 

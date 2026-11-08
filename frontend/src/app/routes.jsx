@@ -2,6 +2,9 @@ import React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { ClientLayout } from './ClientLayout';
+import { AuthProvider, getPrincipalDestination, useAuth } from '../shared/auth/AuthContext';
+import { AdminAuthPage } from '../admin/auth/AdminAuthPage';
+import { AuthPage as ClientAuthPage } from '../client/auth/AuthPage';
 import HomePage from '../client/home/HomePage';
 import { OrderingPage } from '../client/ordering/OrderingPage';
 import { TournamentsPage } from '../client/tournaments/TournamentsPage';
@@ -18,7 +21,6 @@ import { InvoicesPage as AdminInvoicesPage } from '../admin/invoices/InvoicesPag
 import { TournamentsPage as AdminTournamentsPage } from '../admin/tournaments/TournamentsPage';
 import { StaffPage } from '../admin/staff/StaffPage';
 import { ReportsPage } from '../admin/reports/ReportsPage';
-import ClientPlaceholder from '../client/ClientPlaceholder';
 
 const admin={
   dashboard:['Tổng quan','C'],computers:['Máy','C'],customers:['Khách hàng','B'],orders:['Order','D'],products:['Sản phẩm','D'],inventory:['Kho','E'],invoices:['Hóa đơn & thanh toán','E'],tournaments:['Giải đấu','B'],staff:['Nhân viên','A'],reports:['Báo cáo','E']
@@ -34,24 +36,51 @@ const clientPages={
 
 const clientComponents = { tournaments: TournamentsPage, ordering: OrderingPage, wallet: WalletPage, invoices: InvoicesPage, account: AccountPage };
 const adminComponents = { dashboard: DashboardPage, computers: ComputersPage, customers: CustomersPage, orders: OrdersPage, products: ProductsPage, inventory: InventoryPage, invoices: AdminInvoicesPage, tournaments: AdminTournamentsPage, staff: StaffPage, reports: ReportsPage };
+const adminPermissions = {
+  computers: 'computer.view', customers: 'customer.view', orders: 'order.view', products: 'product.view',
+  inventory: 'stockreceipt.view', invoices: 'invoice.view', tournaments: 'tournament.view',
+  staff: 'employee.view', reports: 'report.view',
+};
 
 const adminPage=(title,owner)=><div className="page"><div className="placeholder"><h2>{title}</h2><p>Module của thành viên {owner}. Hãy triển khai tại thư mục tương ứng.</p><span>CHƯA TRIỂN KHAI</span></div></div>;
 
-export function AppRoutes(){
+function AuthArea({ accountType, children }) {
+  const { principal, loading } = useAuth();
+  if (loading) return <div className="auth-loading" aria-label="Đang kiểm tra phiên"/>;
+  if (!principal) return <Navigate to={accountType === 'customer' ? '/client/auth' : '/admin/auth'} replace/>;
+  if (principal && principal.type !== accountType) return <Navigate to={getPrincipalDestination(principal)} replace/>;
+  return children;
+}
+
+function PermissionRoute({ permission, children }) {
+  const { principal, loading } = useAuth();
+  if (loading) return <div className="auth-loading" aria-label="Đang kiểm tra phiên"/>;
+  if (principal?.type === 'employee' && permission) {
+    const required = Array.isArray(permission) ? permission : [permission];
+    if (!required.some((item) => principal.permissions.includes(item))) return <Navigate to={getPrincipalDestination(principal)} replace/>;
+  }
+  return children;
+}
+
+function RouteTree() {
   return <Routes>
     <Route path="/" element={<Navigate to="/client/home" replace/>}/>
-    <Route path="/admin" element={<AdminLayout/>}>
+    <Route path="/admin/auth" element={<AdminAuthPage/>}/>
+    <Route path="/client/auth" element={<ClientAuthPage/>}/>
+    <Route path="/admin" element={<AuthArea accountType="employee"><AdminLayout/></AuthArea>}>
       <Route index element={<Navigate to="dashboard" replace/>}/>
-      {Object.keys(admin).map((path) => { const Page = adminComponents[path]; return <Route key={path} path={path} element={<Page/>}/>; })}
-      <Route path="auth" element={adminPage('Admin Auth','A')}/>
-      <Route path="promotions" element={adminPage('Khuyến mãi','B')}/>
+      {Object.keys(admin).map((path) => { const Page = adminComponents[path]; return <Route key={path} path={path} element={<PermissionRoute permission={adminPermissions[path]}><Page/></PermissionRoute>}/>; })}
+      <Route path="promotions" element={<PermissionRoute permission="promotion.manage">{adminPage('Khuyến mãi','B')}</PermissionRoute>}/>
     </Route>
-    <Route path="/client" element={<ClientLayout/>}>
+    <Route path="/client" element={<AuthArea accountType="customer"><ClientLayout/></AuthArea>}>
       <Route index element={<Navigate to="home" replace/>}/>
       <Route path="home" element={<HomePage/>}/>
       {Object.keys(clientPages).map((path) => { const Page = clientComponents[path]; return <Route key={path} path={path} element={<Page/>}/>; })}
-      <Route path="auth" element={<ClientPlaceholder title="Đăng nhập" description="Khung xác thực client."/>}/>
     </Route>
     <Route path="*" element={<Navigate to="/client/home" replace/>}/>
   </Routes>
+}
+
+export function AppRoutes() {
+  return <AuthProvider><RouteTree/></AuthProvider>;
 }

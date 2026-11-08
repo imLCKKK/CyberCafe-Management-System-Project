@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Utensils, WalletCards, Trophy, ReceiptText, UserRound, Bell, Monitor, Zap, LifeBuoy } from 'lucide-react';
+import { Home, Utensils, WalletCards, Trophy, ReceiptText, UserRound, Bell, Monitor, Zap, LifeBuoy, LogOut } from 'lucide-react';
 import { ClientDemoProvider, useClientDemo } from '../client/shared/ClientDemoContext';
 import { dateTime, money } from '../client/shared/demoModel';
 import HomeDialog from '../client/shared/Dialog';
 import './client.css';
 import '../client/home/home.css';
 import '../client/shared/client-pages.css';
+import { useAuth } from '../shared/auth/AuthContext';
 
 const menu = [
   ['/client/home', 'Trang chủ', Home],
@@ -23,13 +24,16 @@ export function ClientLayout() {
 
 function ClientShell() {
   const { account, computer, db, customer } = useClientDemo();
+  const { principal, signOut } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [now, setNow] = useState(() => new Date());
   const [dialog, setDialog] = useState(null);
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(timer); }, []);
   const pageTitle = menu.find(([path]) => path === pathname)?.[1] || 'Khu vực người chơi';
-  const initials = account.display_name.split(' ').filter(Boolean).slice(-2).map((part) => part[0]).join('');
+  const displayName = principal?.type === 'customer' ? principal.fullName : account.display_name;
+  const displayPhone = principal?.type === 'customer' ? principal.phone : account.phone;
+  const initials = displayName.split(' ').filter(Boolean).slice(-2).map((part) => part[0]).join('');
   const waiting = db.top_ups.filter((r) => r.customer_id === customer.id && ['Pending', 'CreditedUnpaid'].includes(r.status));
   return (
     <div className="client-shell">
@@ -68,9 +72,10 @@ function ClientShell() {
         <div className="client-user">
           <div className="client-avatar">{initials}</div>
           <div>
-            <strong>{account.display_name}</strong>
-            <span>{account.phone}</span>
+            <strong>{displayName}</strong>
+            <span>{displayPhone}</span>
           </div>
+          {principal?.type === 'customer' && <button className="client-profile-button" aria-label="Đăng xuất" title="Đăng xuất" onClick={() => void signOut()}><LogOut size={16}/></button>}
           <button className="client-profile-button" aria-label="Mở tài khoản" onClick={() => navigate('/client/account')}><UserRound size={16}/></button>
         </div>
       </aside>

@@ -11,7 +11,7 @@ public class StockReceiptDetailConfiguration : IEntityTypeConfiguration<StockRec
         builder.ToTable("StockReceiptDetails");
         builder.HasKey(x => x.ReceiptDetailId);
 
-        builder.Property(x => x.UnitCost).HasPrecision(12, 2);
+        builder.Property(x => x.UnitCost).HasPrecision(18, 0);
 
         builder.HasOne(x => x.StockReceipt)
             .WithMany(x => x.Details)

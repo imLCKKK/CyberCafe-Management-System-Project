@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ApiError, apiRequest } from '../../shared/apiClient';
-import { clearStaffAccessToken, getStaffAccessToken, getStaffSessionReason, subscribeStaffSession } from '../../shared/staffSession';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ApiError } from '../../shared/apiClient';
+import { useAuth } from '../../shared/auth/AuthContext';
+import { expireSession, getAccessToken } from '../../shared/auth/api';
 import { useRealtime } from '../../shared/realtime/useRealtime';
 import { getComputerData } from './computerApi';
 
 const empty = { computers: [], rooms: [], types: [], permissions: [] };
 const initial = { ...empty, loading: true, refreshing: false, error: null };
 const computerEvents = ['ComputerChanged'];
-const noServerToken = () => null;
 
 export function useComputerData() {
-  const token = useSyncExternalStore(subscribeStaffSession, getStaffAccessToken, noServerToken);
+  const { principal, loading: authLoading, accessToken: token } = useAuth();
   const [state, setState] = useState(initial);
   const stateToken = useRef(token);
   const refresh = useRef(null);
@@ -23,9 +23,10 @@ export function useComputerData() {
     let running = false;
     let queued = false;
     let hasData = false;
-    const active = () => !controller.signal.aborted && getStaffAccessToken() === token;
+    const active = () => !controller.signal.aborted && getAccessToken() === token;
     stateToken.current = token;
     setState(initial);
+    if (authLoading) return () => controller.abort();
 
     // Serialize refetches and keep one trailing read so event bursts cannot starve a request.
     function request() {
@@ -39,18 +40,13 @@ export function useComputerData() {
       const readRevision = revision.current;
       setState((current) => ({ ...current, loading: !hasData, refreshing: hasData, error: null }));
       try {
-        if (!token) throw new ApiError(getStaffSessionReason() === 'expired'
-          ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
-          : 'Vui lòng đăng nhập nhân viên để xem danh sách máy.', 401);
-        const identity = await apiRequest('/auth/me', { signal: controller.signal });
-        if (!active()) return;
-        if (!Array.isArray(identity?.permissions)) throw new ApiError('Thông tin quyền truy cập không hợp lệ.', 200);
-        if (!identity.permissions.includes('computer.view')) throw new ApiError('Bạn không có quyền xem máy tính.', 403);
+        if (!token || principal?.type !== 'employee') throw new ApiError('Vui lòng đăng nhập nhân viên để xem danh sách máy.', 401);
+        if (!principal.permissions.includes('computer.view')) throw new ApiError('Bạn không có quyền xem máy tính.', 403);
         const data = await getComputerData(controller.signal);
         if (!active()) return;
         if (readRevision !== revision.current) { queued = true; return; }
         hasData = true;
-        setState({ ...data, permissions: identity.permissions, loading: false, refreshing: false, error: null });
+        setState({ ...data, permissions: principal.permissions, loading: false, refreshing: false, error: null });
       } catch (error) {
         if (active()) {
           const denied = [401, 403].includes(error.status);
@@ -71,15 +67,15 @@ export function useComputerData() {
       if (refresh.current === request) refresh.current = null;
       if (markPending.current === onMutation) markPending.current = null;
     };
-  }, [token]);
+  }, [token, principal, authLoading]);
 
   const current = stateToken.current === token ? state : initial;
   const realtimeStatus = useRealtime({
     enabled: current.permissions.includes('computer.view'), accessToken: token, events: computerEvents,
     onEvent: reload, onReady: reload,
     onAuthFailure: (status) => {
-      if (getStaffAccessToken() !== token) return;
-      if (status === 401) clearStaffAccessToken('expired');
+      if (getAccessToken() !== token) return;
+      if (status === 401) expireSession({ accessToken: token, accountType: 'employee' });
       else reload();
     },
   });
