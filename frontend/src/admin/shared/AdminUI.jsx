@@ -7,8 +7,8 @@ import './cafe.css';
 import './admin.css';
 
 export { StatCard };
-export function AdminPage({ title, description, actions, children }) {
-  return <section className="cafe-page admin-module"><PageHeading eyebrow="NET CAFE / QUẢN TRỊ" title={title} description={description}>{actions || <span className="cafe-system"><i/>Dữ liệu mẫu dùng chung</span>}</PageHeading>{children}<p className="cafe-demo-note">Bản demo · Thay đổi được lưu trên trình duyệt. Chưa kết nối API quản trị.</p></section>;
+export function AdminPage({ title, description, actions, children, live = false }) {
+  return <section className="cafe-page admin-module"><PageHeading eyebrow="NET CAFE / QUẢN TRỊ" title={title} description={description}>{actions || <span className="cafe-system"><i/>{live ? 'Danh mục sản phẩm' : 'Dữ liệu mẫu dùng chung'}</span>}</PageHeading>{children}{!live && <p className="cafe-demo-note">Bản demo · Thay đổi được lưu trên trình duyệt. Chưa kết nối API quản trị.</p>}</section>;
 }
 export function Notice({ notice, error, clear }) { return <>{error && <div className="admin-message error" role="alert">{error}{clear && <button onClick={clear} aria-label="Đóng lỗi"><X size={15}/></button>}</div>}{notice && <div className="admin-message" role="status">{notice}{clear && <button onClick={clear} aria-label="Đóng thông báo"><X size={15}/></button>}</div>}</>; }
 export function Status({ value, children }) {

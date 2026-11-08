@@ -8,6 +8,8 @@
     "test:frontend:render": "node src/admin/shared/render-smoke.mjs && node src/client/home/render-smoke.mjs && node src/client/tournaments/render-smoke.mjs",
     "test:frontend:models": "node --test ../Backend/integrations/opgg/opgg.test.js src/admin/shared/adminModel.test.js src/client/shared/demoModel.test.js src/client/home/homeModel.test.js src/client/ordering/recommendation.test.js src/client/invoices/invoiceModel.test.js src/client/tournaments/tournamentModel.test.js",
     "test:auth": "node --test src/shared/auth/api.test.js",
+    "test:catalog": "node --test src/shared/catalog/catalog.test.js",
+    "test:catalog:sql": "node tests/catalog-sql-runner.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
