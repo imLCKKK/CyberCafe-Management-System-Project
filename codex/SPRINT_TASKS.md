@@ -214,6 +214,9 @@ Assignee: **Phúc**. Reviewer: **Trưởng nhóm**. Phối hợp: Đại; Minh �
 
 #### S1-P-3 — Define-ML-Team-Balancing-Pipeline
 
+**Jira / đặc tả:** SCRUM-9 — [Pipeline ML chia đội v1](../docs/contracts/ml-team-balancing-pipeline.md).
+Đã kiểm kê adapter/baseline và định nghĩa contract, dữ liệu, đánh giá, runtime; model/dataset có nhãn và giao điểm S1-D-3 còn blocker. Checklist giữ nguyên, chưa có bằng chứng Đại đối chiếu hoặc Trưởng nhóm nghiệm thu.
+
 **Description:**
 
 - Kiểm kê code/model/dataset đã có và dữ liệu OP.GG để tận dụng phần Phúc đã làm.
