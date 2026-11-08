@@ -278,6 +278,12 @@ Assignee: **Trường**. Reviewer: **Trưởng nhóm**. Phối hợp: Khang; Min
 
 #### S1-T-1 — Define-Inventory-Invoice-Voucher-Contracts
 
+**Trạng thái đối chiếu 05/11/2026:** PR #8 đã merge vào `dev` tại `229d7af`, chưa phải nghiệm thu của
+Trưởng nhóm. [Contract kho/chứng từ/voucher](../docs/contracts/inventory-invoice-voucher.md) có bổ sung
+đề xuất về giờ xác nhận hoàn ZaloPay (mục 6.1.1) và khóa phát hành hóa đơn lưu bền vững (mục 6.3.1).
+Các phần bổ sung chờ review; phản hồi liên module và P1 tại mục 6.5/9 vẫn còn mở. Giữ các tiêu chí Done
+chưa đánh dấu cho đến khi đủ bằng chứng và Trưởng nhóm duyệt.
+
 **Description:**
 
 - Đối chiếu schema cũ, entity/quan hệ/ràng buộc và chia phần migration cho từng owner.

@@ -371,12 +371,24 @@ hoặc Trưởng nhóm đã duyệt; việc tích hợp code/migration/kiểm ch
 | Quyết định | Chịu trách nhiệm |
 | --- | --- |
 | Mapping tài khoản khách/nhân viên và quyền từng endpoint; quy tắc khóa tài khoản | Đại + Minh |
-| Phiên/giao điểm chi ví: D09 chọn phí tích lũy theo giây, ceil tổng tiền, worker 60 giây và quyết toán trước debit món; không thu trả trước chu kỳ song song. Owner triển khai cùng quy tắc hết tiền/restart trong contract phiên | Phúc + Minh + Trường; Khang gọi điểm tích hợp |
+| Phiên/giao điểm chi ví: D09 chọn phí tích lũy theo giây, ceil tổng tiền, worker 60 giây và quyết toán trước debit món; không thu trả trước chu kỳ song song. Điều kiện mở/đóng, hết tiền/restart và công thức theo [contract SCRUM-7](../Backend/docs/002-computer-session-contract.md) | Trưởng nhóm điều phối/duyệt cuối; Phúc + Minh + Trường phối hợp; Khang gọi điểm tích hợp |
 | Nạp tại quầy: thời điểm thu/cộng ví; xử lý trạng thái demo `CreditedUnpaid` khi chuyển dữ liệu | Minh + Trường |
 | Đơn: D01–D03/D05–D08 chốt trừ ví khi tạo, cash thu sau confirm, chỉ hủy dòng Pending, tồn khả dụng Sale/Return một lần; ZaloPay giữ 15 phút, thu muộn không hồi sinh đơn, hoàn về nguồn gốc sau duyệt; Refund Failed có đường thay thế | Khang + Minh + Trường |
 | Voucher trong checkout: D04 chốt một mã, ngưỡng trước giảm, hiệu lực server, AwayFromZero/phân bổ snapshot; usage chiếm lượt khi tạo, partial không nhả, full cancel/expired nhả một lần; không giảm vượt tiền món | Trường + Khang + Đại |
 | Giải đấu: UI đang miễn phí nhưng DBML có phí; chọn policy nhất quán, thời hạn đăng ký/hủy và điều kiện đủ đội | Đại + Minh + Phúc |
 | ML chia đội: kiểm kê phần Phúc đã làm; chốt bài toán, dataset/đặc trưng, ràng buộc đội, baseline, chỉ số/ngưỡng đánh giá và cách chạy model | Phúc + Đại |
+| Chứng từ/doanh thu dùng chung: thời điểm ghi nhận, hoàn tiền, giảm giá, phân biệt nạp ví và doanh thu | Trường + Khang + Phúc |
 | Chứng từ/checkout: D11 chọn thiết kế 1.7 ghim trong hợp đồng, Payments neo nguồn trước hóa đơn, khóa phát hành bền vững và mốc nguồn/xác nhận; thu/hoàn theo nguồn, không cộng đôi ví/Payment và không tính nạp ví thành doanh thu | Trường + Minh + Khang + Phúc |
+| Giờ hoàn ZaloPay khi Query Refund không trả thời điểm: phân biệt thời điểm provider và thời điểm hệ thống xác nhận, ngày báo cáo theo mục 6.1.1 của [contract SCRUM-12](../docs/contracts/inventory-invoice-voucher.md); là đề xuất tại nguồn 05/11, được D11 chọn cho checkout ngày 08/11 | Minh + Trường; Trưởng nhóm review tích hợp |
+| Khóa phát hành hóa đơn qua retry/restart và hóa đơn 0 đồng: InvoiceIssueRequests lưu cùng transaction theo mục 6.3.1 của [contract SCRUM-12](../docs/contracts/inventory-invoice-voucher.md); là đề xuất tại nguồn 05/11, được D11 chọn cho checkout ngày 08/11 | Trường; Khang/Phúc đối chiếu caller; Trưởng nhóm review tích hợp |
 
 Credentials ZaloPay và callback HTTPS là **task phụ thuộc S1-M**, không phải lựa chọn cần người dùng xác nhận lại. Kết quả kickoff phải được ghi vào hợp đồng/schema trước khi các module triển khai khác nhau.
+
+Ngày 03/11/2026, người dùng cho phép soạn contract bước 1 của SCRUM-7 (`S1-P-1`). [Contract máy/phiên](../Backend/docs/002-computer-session-contract.md) ghi phương án trạng thái, tiền giờ tính theo giây/làm tròn tổng lên một đồng, thu chênh lệch mỗi 60 giây/khi đóng/trước debit khác, giới hạn hết tiền và phục hồi SQL sau restart; đồng thời mô tả API đọc máy/loại/phòng và sửa trạng thái theo permission. Snapshot giá, liên kết khoản thu–ledger, khóa chống lặp và các ràng buộc phiên/hóa đơn cần migration riêng ở S2; SCRUM-7 không triển khai thu tiền hoặc đổi schema. Login `S1-D-2` đã được tích hợp vào nhánh SCRUM-7 tại `903e055`.
+
+Ngày 05/11/2026, Trưởng nhóm yêu cầu giữ merge SCRUM-12 (`229d7af`, PR #8) và bổ sung phần thiếu để
+review tiếp. [Contract SCRUM-12](../docs/contracts/inventory-invoice-voucher.md) mục 6.1.1/6.3.1/9.4
+ghi phương án thời gian hoàn và lưu khóa phát hành, cùng trách nhiệm giao nhận. Đây là đề xuất bổ sung,
+chưa phải phản hồi đồng thuận của Đại/Minh/Phúc/Khang hoặc quyết định nghiệm thu; P1 liên module còn mở.
+
+Ngày 06/11/2026, Trưởng nhóm yêu cầu hoàn tất kiểm chứng UI–API–SQL và giải quyết conflict với `dev`, giữ cả ghi chú SCRUM-7/SCRUM-12. Trưởng nhóm điều phối và chốt phương án chung; bàn giao code SCRUM-7 không phải chờ từng owner xác nhận. Các điểm giao nhau cần xử lý trước S2 (thời điểm tạo Payment theo từng khoản thu, actor tự đóng và phạm vi hóa đơn tiền giờ/gộp món) được ghi cụ thể ở mục 5 của contract SCRUM-7, không coi chúng là lỗi của API đổi trạng thái máy.

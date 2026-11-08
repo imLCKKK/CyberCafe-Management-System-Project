@@ -14,7 +14,12 @@ const candidates = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/App
 const executable = candidates.find(candidate => existsSync(candidate));
 if (!executable) throw Error('Set CHROME_PATH to a Chrome or Edge executable.');
 const port = await new Promise(resolve => { const server = createTcpServer(); server.listen(0, '127.0.0.1', () => { const value = server.address().port; server.close(() => resolve(value)); }); });
-const server = await createServer({ root: frontendRoot, server: { host: '127.0.0.1', port: 0, open: false } });
+const server = await createServer({
+  root: frontendRoot,
+  cacheDir: path.resolve(frontendRoot, '../.tools/vite-browser-cache'),
+  optimizeDeps: { include: ['react', 'react-dom/client', 'react-router-dom', 'lucide-react'] },
+  server: { host: '127.0.0.1', port: 0, open: false },
+});
 await server.listen();
 const origin = server.resolvedUrls.local[0].replace(/\/$/, '');
 const profile = await mkdtemp(path.join(tmpdir(), 'cybercafe-frontend-'));
@@ -25,7 +30,7 @@ const browser = spawn(executable, args, { windowsHide: true, stdio: ['ignore', '
 let browserLog = '';
 browser.stderr.on('data', data => { browserLog += data; });
 const suites = process.argv.slice(2);
-const selected = suites.length ? suites : ['routes', 'admin-workflows', 'admin-controls', 'invoices', 'suggestion-checkout', 'client-workflows', 'opgg', 'cross-tab', 'resilience'];
+const selected = suites.length ? suites : ['routes', 'computers-api', 'admin-workflows', 'admin-controls', 'invoices', 'suggestion-checkout', 'client-workflows', 'opgg', 'cross-tab', 'resilience'];
 const results = [];
 try {
   let ready = false;

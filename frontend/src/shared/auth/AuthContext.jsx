@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, startTransition, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AUTH_EXPIRED_EVENT,
@@ -82,7 +82,7 @@ export function AuthProvider({ children }) {
       return null;
     } finally {
       if (version === verificationVersion.current && (!readStoredSession() || isStoredSession(session))) {
-        setLoading(false);
+        startTransition(() => setLoading(false));
       }
     }
   }
@@ -91,16 +91,18 @@ export function AuthProvider({ children }) {
     const session = readStoredSession();
     if (!session) {
       clearVerifiedSession();
-      setLoading(false);
+      startTransition(() => setLoading(false));
       return undefined;
     }
     if (session.expiresAtUtc && new Date(session.expiresAtUtc).getTime() <= Date.now()) {
       if (clearStoredSessionIfMatches(session)) {
         clearVerifiedSession(session);
-        setLoading(false);
-        navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
-          replace: true,
-          state: { sessionExpired: true },
+        startTransition(() => {
+          setLoading(false);
+          navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
+            replace: true,
+            state: { sessionExpired: true },
+          });
         });
       }
       return undefined;
@@ -115,12 +117,15 @@ export function AuthProvider({ children }) {
       const expiredType = principal?.type || event.detail?.accountType || readStoredSession()?.accountType;
       verificationVersion.current += 1;
       clearVerifiedSession();
-      setPrincipal(null);
-      setExpiresAtUtc(null);
-      setLoading(false);
-      if (expiredType) navigate(expiredType === 'customer' ? '/client/auth' : '/admin/auth', {
-        replace: true,
-        state: { sessionExpired: true },
+      // Match BrowserRouter's transition so AuthArea cannot overwrite the expiry redirect.
+      startTransition(() => {
+        setPrincipal(null);
+        setExpiresAtUtc(null);
+        setLoading(false);
+        if (expiredType) navigate(expiredType === 'customer' ? '/client/auth' : '/admin/auth', {
+          replace: true,
+          state: { sessionExpired: true },
+        });
       });
     };
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
@@ -136,12 +141,14 @@ export function AuthProvider({ children }) {
       if (!clearStoredSessionIfMatches(session)) return undefined;
       verificationVersion.current += 1;
       clearVerifiedSession(session);
-      setPrincipal(null);
-      setExpiresAtUtc(null);
-      setLoading(false);
-      navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
-        replace: true,
-        state: { sessionExpired: true },
+      startTransition(() => {
+        setPrincipal(null);
+        setExpiresAtUtc(null);
+        setLoading(false);
+        navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
+          replace: true,
+          state: { sessionExpired: true },
+        });
       });
       return undefined;
     }
@@ -149,12 +156,14 @@ export function AuthProvider({ children }) {
       if (!clearStoredSessionIfMatches(session)) return;
       verificationVersion.current += 1;
       clearVerifiedSession(session);
-      setPrincipal(null);
-      setExpiresAtUtc(null);
-      setLoading(false);
-      navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
-        replace: true,
-        state: { sessionExpired: true },
+      startTransition(() => {
+        setPrincipal(null);
+        setExpiresAtUtc(null);
+        setLoading(false);
+        navigate(session.accountType === 'customer' ? '/client/auth' : '/admin/auth', {
+          replace: true,
+          state: { sessionExpired: true },
+        });
       });
     }, delay);
     return () => window.clearTimeout(timer);
