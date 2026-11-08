@@ -133,3 +133,12 @@ test('request API dùng chung tự gắn bearer token đã lưu', async () => {
   assert.equal(lastRequest.url, '/api/computers');
   assert.equal(lastRequest.options.headers.get('Authorization'), 'Bearer staff-token');
 });
+
+test('ProblemDetails +json returns a readable error and preserves HTTP status', async () => {
+  const session = { accessToken: 'staff-token', accountType: 'employee' };
+  storeSession(session);
+  markSessionVerified(session);
+  globalThis.fetch = async () => new Response(JSON.stringify({ title: 'Database unavailable', detail: 'Please retry.' }),
+    { status: 503, headers: { 'Content-Type': 'application/problem+json' } });
+  await assert.rejects(apiRequest('/admin/inventory'), { status: 503, message: 'Please retry.' });
+});

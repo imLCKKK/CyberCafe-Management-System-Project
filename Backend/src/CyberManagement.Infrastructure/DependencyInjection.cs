@@ -1,4 +1,4 @@
-﻿using CyberManagement.Application.Interfaces.Repositories;
+using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Infrastructure.Persistance;
 using CyberManagement.Infrastructure.Repositories;
@@ -25,6 +25,7 @@ public static class DependencyInjection
             options.UseSqlServer(connectionString, b =>
                 b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
+        services.AddScoped<IInventoryQueries, InventoryQueries>();
         services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
         services.AddScoped<IComputerRepository, ComputerRepository>();
         services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();

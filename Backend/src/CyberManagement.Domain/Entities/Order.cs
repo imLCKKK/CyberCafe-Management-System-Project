@@ -16,6 +16,12 @@ public class Order
 
     public decimal TotalAmount { get; set; }
 
+    // Giữ giá trị voucher tại lúc đặt, không đọc lại voucher hiện tại để tính đơn cũ.
+    public string? VoucherCodeSnapshot { get; set; }
+    public string? VoucherDiscountTypeSnapshot { get; set; }
+    public decimal? VoucherDiscountValueSnapshot { get; set; }
+    public decimal DiscountAmount { get; set; }
+
     public Customer Customer { get; set; } = null!;
 
     public GamingSession? GamingSession { get; set; }

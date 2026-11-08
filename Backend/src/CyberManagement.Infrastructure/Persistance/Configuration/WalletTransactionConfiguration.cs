@@ -11,8 +11,8 @@ public class WalletTransactionConfiguration : IEntityTypeConfiguration<WalletTra
         builder.ToTable("WalletTransactions");
         builder.HasKey(x => x.TransactionId);
 
-        builder.Property(x => x.Amount).HasPrecision(12, 2);
-        builder.Property(x => x.BalanceAfter).HasPrecision(12, 2);
+        builder.Property(x => x.Amount).HasPrecision(18, 0);
+        builder.Property(x => x.BalanceAfter).HasPrecision(18, 0);
         builder.Property(x => x.Type).HasMaxLength(50).IsRequired();
         builder.Property(x => x.Description).HasMaxLength(255);
 

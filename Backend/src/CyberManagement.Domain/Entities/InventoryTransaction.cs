@@ -6,7 +6,7 @@ public class InventoryTransaction
 
     public int ProductId { get; set; }
 
-    public int EmployeeId { get; set; }
+    public int? EmployeeId { get; set; }
 
     public string Type { get; set; } = null!;
 
@@ -18,11 +18,16 @@ public class InventoryTransaction
 
     public int? OrderId { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public int Before { get; set; }
+    public int After { get; set; }
+    public string Reason { get; set; } = null!;
+    public int? OrderDetailId { get; set; }
+    public OrderDetail? OrderDetail { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Product Product { get; set; } = null!;
 
-    public Employee Employee { get; set; } = null!;
+    public Employee? Employee { get; set; } = null!;
 
     public StockReceipt? StockReceipt { get; set; }
 

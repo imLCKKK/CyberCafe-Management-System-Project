@@ -11,7 +11,7 @@ public class SessionChargeConfiguration : IEntityTypeConfiguration<SessionCharge
         builder.ToTable("SessionCharges");
         builder.HasKey(x => x.ChargeId);
 
-        builder.Property(x => x.Amount).HasPrecision(12, 2);
+        builder.Property(x => x.Amount).HasPrecision(18, 0);
 
         builder.HasOne(x => x.GamingSession)
             .WithMany(x => x.Charges)

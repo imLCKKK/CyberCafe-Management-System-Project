@@ -42,7 +42,7 @@ function AdminShell() {
     ? menu.filter(([path]) => {
       const permissions = {
         '/admin/computers': ['computer.view'], '/admin/customers': ['customer.view'], '/admin/orders': ['order.view'],
-        '/admin/products': ['product.view'], '/admin/inventory': ['stockreceipt.view', 'inventory.adjust'],
+        '/admin/products': ['product.view'], '/admin/inventory': ['stockreceipt.view'],
         '/admin/invoices': ['invoice.view'], '/admin/tournaments': ['tournament.view'], '/admin/staff': ['employee.view'],
         '/admin/reports': ['report.view'],
       }[path];
