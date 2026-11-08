@@ -21,6 +21,10 @@ let patchMode = 'success';
 let malformed = false;
 
 async function handleRequest({ requestId, request }) {
+  if (new URL(request.url).pathname.startsWith('/hubs/realtime')) {
+    await cdp('Fetch.fulfillRequest', { requestId, responseCode: 503, body: '' });
+    return;
+  }
   const path = new URL(request.url).pathname;
   requests.push({ path, method: request.method, body: request.postData });
   let status = 200;
@@ -98,7 +102,10 @@ const close = async () => {
 try {
   await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Network.enable');
   socket.addEventListener('message', onMessage);
-  await cdp('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
+  await cdp('Fetch.enable', { patterns: [
+    { urlPattern: '*/api/*', requestStage: 'Request' },
+    { urlPattern: '*/hubs/realtime/*', requestStage: 'Request' },
+  ] });
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await go('/admin/auth', 'document.querySelector(".auth-form")');
   await evaluate(`localStorage.removeItem(${JSON.stringify(tokenKey)}); localStorage.setItem('net-cafe.admin.computers.v1', JSON.stringify([{ComputerId:1,ComputerName:'LOCAL-DEMO-SHOULD-NOT-APPEAR',RoomId:1,ComputerTypeId:1,Status:'Available'}]));`);

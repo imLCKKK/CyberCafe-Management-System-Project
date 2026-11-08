@@ -4,6 +4,7 @@ using CyberManagement.Infrastructure.Persistance;
 using CyberManagement.Application.DTOs.Identity;
 using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Security;
+using CyberManagement.API.Realtime;
 using Microsoft.EntityFrameworkCore;
 
 namespace CyberManagement.API
@@ -60,6 +61,7 @@ namespace CyberManagement.API
 
             app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
             app.MapControllers();
+            app.MapHub<RealtimeHub>(RealtimeHub.Endpoint, options => options.CloseOnAuthenticationExpiration = true);
 
             await app.RunAsync();
         }

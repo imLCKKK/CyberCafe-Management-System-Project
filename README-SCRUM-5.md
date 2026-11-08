@@ -11,9 +11,10 @@ khỏi source vì không còn mô tả nhánh hiện tại; đánh giá thay đ�
 ## Tích hợp
 
 - Application/Infrastructure DI giữ đồng thời catalog, kho, máy, auth và khách hàng.
-- Vite chuyển tiếp đủ `/api/auth`, `/api/admin`, `/api/menu`, `/api/customers`; OP.GG dùng middleware riêng.
+- Ghép `dev` tại `4948b15` vào bản sửa SCRUM-5 `4816802`, giữ policy khách hàng và `RealtimeConnect`, cùng các kiểm thử realtime/catalog/khách.
+- Vite dev/preview chuyển tiếp đủ `/api/auth`, `/api/admin`, `/api/menu`, `/api/customers` và HTTP/WebSocket `/hubs/realtime`; OP.GG dùng middleware riêng.
 - Base đã có migration SCRUM-13 với 38 bảng, tiền `decimal(18,0)`; SCRUM-5 không thêm migration.
-- Writer ví và realtime thuộc S2-M-1; xem [contract](Backend/docs/003-customer-wallet-contract.md).
+- Writer ví và realtime số dư thuộc S2-M-1; Hub/hook realtime chung được nhận từ SCRUM-8 trên dev. Xem [contract ví](Backend/docs/003-customer-wallet-contract.md).
 
 ## Kiểm tra từ gốc repo
 
@@ -28,10 +29,14 @@ $env:AUTH_CHECKS_SQL_CONNECTION = '<SQL Server thử, không dùng DB ứng dụ
 .\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks --no-build -- --customer-only
 .\scripts\npm-local.cmd --prefix frontend run test:catalog:sql
 node frontend/tests/run-customers-live.mjs
+node frontend/tests/run-realtime-live.mjs
 Remove-Item Env:AUTH_CHECKS_SQL_CONNECTION
 ```
 
 Hướng dẫn kho và browser SQL đã có được giữ tại [Backend README](Backend/README.md).
+Runner realtime dùng SQL thật và hai browser context trên một máy; hướng dẫn hai máy LAN ở
+[SCRUM-8](Backend/docs/004-realtime-lan-checks.md). Host realtime kiểm thử giữ đủ DI khách/kho sau khi ghép.
 Các chế độ focused tách catalog/khách để kiểm chứng độc lập; chế độ mặc định vẫn chạy đầy đủ,
-không bỏ qua `ComputerChecks`. Lỗi của bộ máy tính đã có trong base phải được báo riêng;
+không bỏ qua `ComputerChecks` hoặc `RealtimeChecks`. Dev `4948b15` đã đổi fixture giá máy sang VND nguyên,
+phù hợp `decimal(18,0)`, khắc phục lỗi phần lẻ đã ghi ở lượt review trước. Vẫn phải chạy bộ đầy đủ riêng;
 không suy từ focused pass thành toàn bộ suite pass. Kết quả chạy lại gửi trực tiếp trong chat review.

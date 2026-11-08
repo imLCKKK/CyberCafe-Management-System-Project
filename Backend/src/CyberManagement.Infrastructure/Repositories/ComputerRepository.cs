@@ -35,7 +35,7 @@ public sealed class ComputerRepository(ApplicationDbContext database) : ICompute
             .Select(room => new ComputerRoomDto(room.RoomId, room.RoomName, room.Floor, room.Description))
             .ToListAsync(cancellationToken);
 
-    public async Task<ComputerDto> UpdateStatusAsync(
+    public async Task<ComputerStatusUpdateResult> UpdateStatusAsync(
         int computerId, UpdateComputerStatusCommand command, CancellationToken cancellationToken)
     {
         // InMemory is only for functional checks; it cannot verify SQL locking or rollback.
@@ -66,7 +66,8 @@ public sealed class ComputerRepository(ApplicationDbContext database) : ICompute
             throw new BusinessRuleException("Cần kết thúc hồ sơ bảo trì trước khi đưa máy về trạng thái trống.");
 
         // A retry is a no-op only after all safety checks, including inconsistent session data.
-        if (computer.Status != command.Status)
+        var changed = computer.Status != command.Status;
+        if (changed)
         {
             if (computer.Status != command.ExpectedStatus)
                 throw new BusinessRuleException("Trạng thái máy đã thay đổi. Vui lòng tải lại dữ liệu.");
@@ -78,7 +79,8 @@ public sealed class ComputerRepository(ApplicationDbContext database) : ICompute
         if (transaction is not null)
             await transaction.CommitAsync(cancellationToken);
 
-        return new ComputerDto(computer.ComputerId, computer.ComputerName, computer.RoomId,
-            computer.ComputerTypeId, computer.Status, hasOpenSession, hasOpenMaintenance);
+        return new ComputerStatusUpdateResult(
+            new ComputerDto(computer.ComputerId, computer.ComputerName, computer.RoomId,
+                computer.ComputerTypeId, computer.Status, hasOpenSession, hasOpenMaintenance), changed);
     }
 }

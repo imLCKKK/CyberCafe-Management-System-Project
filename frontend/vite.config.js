@@ -5,9 +5,11 @@ import { createStatsMiddleware } from '../Backend/integrations/opgg/statsMiddlew
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), '');
+  const target = env.VITE_API_PROXY_TARGET || env.API_PROXY_TARGET || 'http://127.0.0.1:5088';
   const proxy = {
     // Keep OP.GG middleware local; forward all integrated .NET routes.
-    '^/api/(auth|admin|menu|customers)(/|$)': { target: env.VITE_API_PROXY_TARGET || env.API_PROXY_TARGET || 'http://127.0.0.1:5088', changeOrigin: true },
+    '^/api/(auth|admin|menu|customers)(/|$)': { target, changeOrigin: true },
+    '^/hubs/realtime([/?]|$)': { target, changeOrigin: true, ws: true },
   };
   return {
     plugins: [react(), {
@@ -22,5 +24,6 @@ export default defineConfig(({ mode }) => {
       },
     },
     preview: { proxy },
+    build: { rollupOptions: { output: { manualChunks: { signalr: ['@microsoft/signalr'] } } } },
   };
 });

@@ -5,10 +5,21 @@ import { statusLabels, currency } from './mockData';
 import { PageHeading, StatCard, Station, StatusBadge, Modal } from './components/CafeUI';
 import { updateComputerStatus } from './computerApi';
 import { useComputerData } from './useComputerData';
+import { getAccessToken } from '../../shared/auth/api';
 import '../shared/cafe.css';
 
+const realtimeLabels = {
+  idle: 'Cập nhật trực tiếp chưa kết nối',
+  connecting: 'Đang kết nối cập nhật trực tiếp...',
+  connected: 'Đã kết nối cập nhật trực tiếp',
+  reconnecting: 'Mất kết nối trực tiếp, đang kết nối lại...',
+  disconnected: 'Chưa kết nối được cập nhật trực tiếp, đang thử lại...',
+  unauthorized: 'Cập nhật trực tiếp yêu cầu đăng nhập lại',
+  forbidden: 'Bạn không có quyền kết nối cập nhật trực tiếp',
+};
+
 export function ComputersPage() {
-  const { computers, rooms, types, permissions, loading, error, reload, applyComputer } = useComputerData();
+  const { computers, rooms, types, permissions, loading, refreshing, error, realtimeStatus, reload, applyComputer } = useComputerData();
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [room, setRoom] = useState('all');
@@ -20,6 +31,7 @@ export function ComputersPage() {
   const [actionError, setActionError] = useState('');
   const pending = useRef(null);
   useEffect(() => () => pending.current?.abort(), []);
+  useEffect(() => { if (loading) { setNotice(''); setActionError(''); } }, [loading]);
   const roomById = useMemo(() => new Map(rooms.map((row) => [row.RoomId, row])), [rooms]);
   const typeById = useMemo(() => new Map(types.map((row) => [row.ComputerTypeId, row])), [types]);
   const selected = computers.find((pc) => pc.ComputerId === Number(params.get('computer')));
@@ -43,19 +55,20 @@ export function ComputersPage() {
   async function updateMaintenance() {
     if (pending.current || !selected || !canUpdate) return;
     const controller = new AbortController();
+    const requestToken = getAccessToken();
     pending.current = controller;
     setSaving(true);
     setNotice('');
     setActionError('');
     try {
       const saved = await updateComputerStatus(selected, controller.signal);
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && getAccessToken() === requestToken) {
         applyComputer(saved);
         select(null);
         setNotice(`Đã cập nhật trạng thái ${saved.ComputerName}.`);
       }
     } catch (failure) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && getAccessToken() === requestToken) {
         setActionError(failure.message);
         if ([401, 403, 404, 409, 200].includes(failure.status)) reload();
       }
@@ -66,12 +79,15 @@ export function ComputersPage() {
   }
 
   return (
-    <section className="cafe-page cafe-computers">
+    <section className="cafe-page cafe-computers" aria-busy={loading || refreshing}>
       <PageHeading eyebrow="KHÔNG GIAN LÀM VIỆC / MÁY TÍNH" title="Quản lý máy tính"
         description="Theo dõi trạng thái và quản lý toàn bộ máy tại quán.">
-        <button className="cafe-button" onClick={() => { setNotice(''); reload(); }} disabled={loading || saving}>Tải lại</button>
+        <button className="cafe-button" onClick={() => { setNotice(''); reload(); }} disabled={loading || refreshing || saving}>Tải lại</button>
       </PageHeading>
-      {notice && <div className="cafe-notice" role="status">{notice}
+      <p className="cafe-muted" role="status" aria-live="polite" data-realtime-status={realtimeStatus}>
+        {realtimeLabels[realtimeStatus]}{refreshing ? ' · Đang cập nhật danh sách máy...' : ''}
+      </p>
+      {notice && !loading && !error && <div className="cafe-notice" role="status">{notice}
         <button className="cafe-text-button" onClick={() => setNotice('')}>Đóng</button>
       </div>}
       {actionError && !selected && !error && <p className="cafe-error" role="alert">{actionError}</p>}

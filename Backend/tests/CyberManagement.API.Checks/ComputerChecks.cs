@@ -76,7 +76,7 @@ internal static class ComputerChecks
         var listedTypes = await ReadAsync<ComputerTypeDto[]>(listPaths[1]);
         Check("Computer types retain SQL IDs, prices and nullable specs",
             listedTypes.Select(row => row.ComputerTypeId).SequenceEqual(types.Select(row => row.ComputerTypeId))
-            && listedTypes[0].TypeName == types[0].TypeName && listedTypes[0].PricePerHour == 10000.50m
+            && listedTypes[0].TypeName == types[0].TypeName && listedTypes[0].PricePerHour == 10001m
             && listedTypes[0].CPU is null && listedTypes[0].RAM is null && listedTypes[0].GPU is null
             && listedTypes[0].Description is null && listedTypes[1].CPU == "Test CPU");
         using (var response = await SendAsync(HttpMethod.Get, listPaths[1], adminToken))
@@ -256,7 +256,7 @@ internal static class ComputerChecks
         };
         var types = new[]
         {
-            new ComputerType { TypeName = "Standard", PricePerHour = 10000.50m },
+            new ComputerType { TypeName = "Standard", PricePerHour = 10001m },
             new ComputerType { TypeName = "Premium", PricePerHour = 20000, CPU = "Test CPU", RAM = "32 GB", GPU = "Test GPU" }
         };
         database.AddRange(rooms);

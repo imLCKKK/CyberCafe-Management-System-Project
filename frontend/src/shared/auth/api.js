@@ -49,6 +49,16 @@ export function markSessionVerified(session) {
   return true;
 }
 
+export function getAccessToken() {
+  const session = readStoredSession();
+  return session && isSessionVerified(session) ? session.accessToken : null;
+}
+
+export function expireSession(session) {
+  if (!session?.accessToken || !clearStoredSessionIfMatches(session)) return;
+  window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: { accountType: session.accountType } }));
+}
+
 export async function apiRequest(path, options = {}) {
   const { auth, session: requestedSession, allowUnverifiedSession, ...requestOptions } = options;
   const session = auth === false ? null : requestedSession || readStoredSession();
@@ -68,9 +78,7 @@ export async function apiRequest(path, options = {}) {
     ? await response.json()
     : await response.text();
 
-  if (response.status === 401 && session?.accessToken && clearStoredSessionIfMatches(session)) {
-    window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: { accountType: session.accountType } }));
-  }
+  if (response.status === 401) expireSession(session);
   if (!response.ok) {
     const message = body?.detail || body?.message || body?.title || (typeof body === 'string' && body) || `Yêu cầu thất bại (${response.status}).`;
     const error = new Error(message);

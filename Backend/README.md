@@ -164,7 +164,7 @@ Chạy riêng auth/seed và hồ sơ/ví khách trên cùng cơ chế DB thử:
 .\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --customer-only
 ```
 
-`--customer-only` tách các ca khách hàng khỏi máy tính/catalog; `--catalog-only` giữ phạm vi auth/seed
-và catalog như trước. Không truyền flag thì chạy máy tính, catalog và khách hàng; lỗi của suite đầy đủ
+`--customer-only` tách các ca khách hàng khỏi máy tính/realtime/catalog; `--catalog-only` giữ phạm vi auth/seed
+và catalog như trước. Không truyền flag thì chạy máy tính, realtime, catalog và khách hàng; lỗi của suite đầy đủ
 vẫn được trả về, không được coi kết quả focused là toàn bộ suite pass. Dùng `AUTH_CHECKS_SQL_CONNECTION`
 như hướng dẫn trên để chạy lại cùng các ca khách hàng với SQL Server thử riêng.

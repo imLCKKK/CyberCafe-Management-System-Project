@@ -5,6 +5,8 @@ import {
   apiRequest,
   clearStoredSession,
   clearVerifiedSession,
+  expireSession,
+  getAccessToken,
   getCurrentPrincipal,
   loginCustomer,
   loginEmployee,
@@ -89,6 +91,29 @@ test('clearStoredSession xóa access token đã lưu', () => {
   storeSession({ accessToken: 'token', accountType: 'employee' });
   clearStoredSession();
   assert.equal(readStoredSession(), null);
+});
+
+test('token cho Hub chỉ được cấp sau khi phiên hiện tại được xác minh', () => {
+  const first = { accessToken: 'first-token', accountType: 'employee' };
+  storeSession(first);
+  assert.equal(getAccessToken(), null);
+  markSessionVerified(first);
+  assert.equal(getAccessToken(), 'first-token');
+  storeSession({ accessToken: 'second-token', accountType: 'employee' });
+  assert.equal(getAccessToken(), null);
+});
+
+test('401 muộn từ Hub cũ không làm hết phiên đăng nhập mới', () => {
+  const first = { accessToken: 'first-token', accountType: 'employee' };
+  const second = { accessToken: 'second-token', accountType: 'employee' };
+  storeSession(second);
+  markSessionVerified(second);
+  expireSession(first);
+  assert.equal(getAccessToken(), 'second-token');
+  assert.equal(dispatchedEvent, null);
+  expireSession(second);
+  assert.equal(readStoredSession(), null);
+  assert.equal(dispatchedEvent.type, AUTH_EXPIRED_EVENT);
 });
 
 test('API client không gửi token mới trước khi phiên được xác minh', async () => {
