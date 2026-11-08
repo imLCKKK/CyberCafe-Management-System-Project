@@ -5,6 +5,7 @@ import {
   AUTH_STORAGE_KEY,
   clearStoredSessionIfMatches,
   clearVerifiedSession,
+  getAccessToken,
   getCurrentPrincipal,
   isSessionVerified,
   loginCustomer,
@@ -226,7 +227,8 @@ export function AuthProvider({ children }) {
     }
   }
 
-  return <AuthContext.Provider value={{ principal, loading, signIn, signOut }}>{children}</AuthContext.Provider>;
+  const accessToken = !loading && principal ? getAccessToken() : null;
+  return <AuthContext.Provider value={{ principal, loading, accessToken, signIn, signOut }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

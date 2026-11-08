@@ -17,6 +17,8 @@ Form `/admin/auth` dùng `signIn('employee', credentials)` của S1-D-2, lưu ph
 
 [apiClient](../../shared/apiClient.js) giữ việc chuyển JSON body, kiểm tra dữ liệu và thông báo lỗi cho module máy, nhưng giao request/token/hết phiên cho [client chung](../../shared/auth/api.js). Không có kho phiên thứ hai. `401` xóa đúng phiên của request và quay về login, không xóa phiên mới khi request cũ trả lỗi muộn. `403` giữ phiên và báo thiếu quyền. Quyền ghi luôn được API kiểm tra; người chỉ có `computer.view` không thấy nút đổi trạng thái.
 
+SCRUM-8 dùng `accessToken` đã xác minh từ `useAuth()` cho Hub và cùng auth client cho API. Logout/đổi tài khoản dọn kết nối cũ; event/reconnect đọc lại API, giữ bộ lọc và dialog. Test live phải đăng nhập bằng UI; xem [hướng dẫn realtime](../../shared/realtime/README.md) và [kiểm chứng hiện tại](../../../../Backend/docs/003-realtime-contract.md).
+
 ## Hành vi và kiểm tra
 
 - Search/lọc phòng/loại/trạng thái, dạng lưới/bảng và thông số nullable lấy từ response. Trạng thái không biết vẫn hiển thị, không cho đổi.

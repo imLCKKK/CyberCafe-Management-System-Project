@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using CyberManagement.API;
 using CyberManagement.API.Controller;
+using CyberManagement.API.Realtime;
 using CyberManagement.Application;
 using CyberManagement.Application.DTOs.Identity;
 using CyberManagement.Application.Interfaces.Repositories;
@@ -19,6 +20,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+
+if (args.Contains("--realtime-host", StringComparer.Ordinal))
+{
+    await RealtimeIntegrationHost.RunAsync();
+    return;
+}
 
 if (args.Contains("--computer-browser-host"))
 {
@@ -49,7 +56,12 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     ["SeedAccounts:Waiter:Password"] = "Waiter-check-password-2026!",
     ["SeedAccounts:Technician:Password"] = "Technician-check-password-2026!"
 });
-builder.Services.AddDbContext<ApplicationDbContext>(databaseFixture.Configure);
+var realtimeSaveFailure = new RealtimeSaveFailure();
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+{
+    databaseFixture.Configure(options);
+    options.AddInterceptors(realtimeSaveFailure);
+});
 builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
@@ -112,6 +124,7 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
+    app.MapHub<RealtimeHub>(RealtimeHub.Endpoint, options => options.CloseOnAuthenticationExpiration = true);
     await app.StartAsync();
     started = true;
     client = app.GetTestClient();
@@ -202,7 +215,10 @@ try
     }
 
     if (!args.Contains("--catalog-only"))
+    {
         checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
+        checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+    }
     checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
 
     await CheckStatus("Expired token is rejected", HttpStatusCode.Unauthorized,
