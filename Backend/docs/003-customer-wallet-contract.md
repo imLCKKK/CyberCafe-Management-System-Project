@@ -5,8 +5,9 @@ Owner: Minh; Phúc/Khang/Trường tích hợp nguồn phiên/đơn/chứng từ
 
 ## 1. Phạm vi và căn cứ
 
-SCRUM-5 triển khai tạo/đọc hồ sơ, đọc số dư và lịch sử ví qua API/SQL trên CyberManagement 35 bảng,
-CustomerId int. Không nhập backend CyberCafe/ID long từ bản cũ. Auth trong ZIP SCRUM-2 đã có trong workspace.
+SCRUM-5 triển khai tạo/đọc hồ sơ, đọc số dư và lịch sử ví qua API/SQL trên CyberManagement,
+CustomerId int. Base PR #17 là `93cf457`, đã tích hợp migration SCRUM-13 mở rộng nền 35 thành 38 bảng
+và tiền VND `decimal(18,0)`. Không nhập backend CyberCafe/ID long từ bản cũ.
 Không thay schema/migration hoặc thực thi nạp/chi/hoàn ví trong task này; writer ví thuộc `S2-M-1`.
 
 Nguồn thiết kế liên quan: [identity và quyền](001-monorepo.md),
@@ -57,7 +58,8 @@ WalletEntry = { transactionId, amount, balanceAfter, type, description, createdA
 - ID/payload/phân trang sai trả 400; không có khách trả 404; lỗi SQL/hệ thống trả 500 ProblemDetails
   không lộ thông tin nội bộ. Tài khoản khách đã Locked bị từ chối đọc `/me` với 403 kể cả JWT còn hạn.
 - Khách chưa có ledger trả `transactions=[]`, `totalCount=0`, balance lấy nguyên từ SQL.
-  Tiền có sẵn giữ độ chính xác decimal(12,2); không tự làm tròn hoặc suy balance từ riêng trang ledger.
+  Tiền VND đọc nguyên giá trị đã lưu ở schema `decimal(18,0)` của base hiện tại;
+  query không làm tròn lại hoặc suy balance từ riêng trang ledger.
 - Query ví đọc số dư/count/trang ledger trong một transaction Serializable SQL; InMemory chỉ phục vụ
   kiểm tra hành vi, không thay thế bằng chứng isolation. Query không ghi tiền hoặc tạo ledger.
 
@@ -111,10 +113,9 @@ Quy tắc tiền:
 - Hoàn ví chỉ cho khoản debit ví đã commit có nguồn hợp lệ; tổng hoàn thành công + phần đang giữ
   không vượt khoản thu hoặc giá trị hủy hợp lệ. Khách Locked vẫn được nhận hoàn; retry không hoàn hai lần.
   Cash/ZaloPay hoàn về phương thức gốc theo contract checkout, không tự đổi thành hoàn ví.
-- Trong query hiện tại, giữ nguyên phần lẻ decimal(12,2); trước migration chung, phí phiên dùng `floor(balance)`
-  làm ngân sách nguyên đồng theo contract phiên. Số dư không vượt precision hiện tại và hạn mức nghiệp vụ đã chốt.
-  S2 phối hợp migration tiền đích `decimal(18,0)` theo D10, đối soát dữ liệu lẻ trước khi đổi kiểu,
-  không âm thầm làm tròn hoặc tự nâng hạn mức API 999_999_999 theo precision mới.
+- Base hiện tại đã chuyển tiền sang `decimal(18,0)` theo D10/SCRUM-13; fixture SQL dùng số nguyên VND.
+  Dữ liệu lẻ của schema lịch sử phải được đối soát trước migration, không âm thầm làm tròn hoặc nâng
+  hạn mức API 999_999_999 theo precision mới. Công thức ngân sách phí phiên giữ theo contract phiên.
 - Khóa SQL bắt đầu tại Customer, rồi Computer → GamingSession/SessionCharge khi liên quan,
   tiếp đến nguồn đơn/chi tiết và ledger/Payment theo thứ tự thống nhất của contract chứng từ.
   Mọi writer ví dùng cùng thứ tự/khóa trên DB để chạy nhiều API instance an toàn.

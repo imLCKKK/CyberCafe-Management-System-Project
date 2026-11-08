@@ -25,6 +25,8 @@ public static class DependencyInjection
             options.UseSqlServer(connectionString, b =>
                 b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
+        services.AddScoped<IInventoryQueries, InventoryQueries>();
+        services.AddScoped<ICatalogRepository, CatalogRepository>();
         services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
         services.AddScoped<IComputerRepository, ComputerRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();

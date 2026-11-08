@@ -120,12 +120,12 @@ internal static class CustomerChecks
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var current = await db.Customers.SingleAsync(row => row.CustomerId == customerId);
             current.FullName = "Updated SQL profile";
-            current.WalletBalance = 125000.50m;
+            current.WalletBalance = 125000m;
             var instant = new DateTime(2026, 11, 8, 8, 0, 0, DateTimeKind.Utc);
             db.WalletTransactions.AddRange(
-                new WalletTransaction { CustomerId = customerId, Amount = 100000.50m, BalanceAfter = 100000.50m, Type = "TopUp", CreatedAt = instant.AddDays(-1) },
-                new WalletTransaction { CustomerId = customerId, Amount = -25000m, BalanceAfter = 75000.50m, Type = "OrderPayment", Description = "SQL debit", CreatedAt = instant },
-                new WalletTransaction { CustomerId = customerId, Amount = 50000m, BalanceAfter = 125000.50m, Type = "OrderRefund", Description = "SQL refund", CreatedAt = instant });
+                new WalletTransaction { CustomerId = customerId, Amount = 100000m, BalanceAfter = 100000m, Type = "TopUp", CreatedAt = instant.AddDays(-1) },
+                new WalletTransaction { CustomerId = customerId, Amount = -25000m, BalanceAfter = 75000m, Type = "OrderPayment", Description = "SQL debit", CreatedAt = instant },
+                new WalletTransaction { CustomerId = customerId, Amount = 50000m, BalanceAfter = 125000m, Type = "OrderRefund", Description = "SQL refund", CreatedAt = instant });
             await db.SaveChangesAsync();
         }
         using (var fresh = await Read(own, customerToken))
@@ -134,17 +134,17 @@ internal static class CustomerChecks
         using var adminWallet = await Read($"{list}/{customerId}/wallet?pageSize=2", admin);
         Check("Staff and customer see identical wallet snapshot", wallet.RootElement.ToString() == adminWallet.RootElement.ToString());
         var entries = wallet.RootElement.GetProperty("transactions");
-        Check("SQL balance, count and ledger page are returned", wallet.RootElement.GetProperty("balance").GetDecimal() == 125000.50m
+        Check("SQL balance, count and ledger page are returned", wallet.RootElement.GetProperty("balance").GetDecimal() == 125000m
             && wallet.RootElement.GetProperty("totalCount").GetInt32() == 3 && entries.GetArrayLength() == 2);
         Check("Ledger sorting handles equal timestamps with descending ID", entries[0].GetProperty("type").GetString() == "OrderRefund"
             && entries[1].GetProperty("type").GetString() == "OrderPayment");
-        Check("Ledger preserves signed amounts and decimal balances", entries[0].GetProperty("amount").GetDecimal() == 50000m
+        Check("Ledger preserves signed amounts and whole-VND balances", entries[0].GetProperty("amount").GetDecimal() == 50000m
             && entries[1].GetProperty("amount").GetDecimal() == -25000m
-            && entries[0].GetProperty("balanceAfter").GetDecimal() == 125000.50m);
+            && entries[0].GetProperty("balanceAfter").GetDecimal() == 125000m);
         Check("Ledger timestamp explicitly identifies UTC", entries[0].GetProperty("createdAtUtc").GetString()!.EndsWith('Z'));
         using (var page2 = await Read(own + "/wallet?page=2&pageSize=2", customerToken))
             Check("Ledger page two is stable", page2.RootElement.GetProperty("transactions").GetArrayLength() == 1
-                && page2.RootElement.GetProperty("transactions")[0].GetProperty("amount").GetDecimal() == 100000.50m);
+                && page2.RootElement.GetProperty("transactions")[0].GetProperty("amount").GetDecimal() == 100000m);
         using (var noLeak = await Read(own + "/wallet", login.AccessToken))
             Check("Other customer's ledger stays private", noLeak.RootElement.GetProperty("customerId").GetInt32() == createdId
                 && noLeak.RootElement.GetProperty("transactions").GetArrayLength() == 0);

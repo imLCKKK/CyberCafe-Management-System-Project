@@ -32,6 +32,17 @@ if (args.Contains("--customer-browser-host"))
     return;
 }
 
+if (args.Contains("--catalog-browser-host"))
+{
+    await ComputerBrowserHost.RunAsync(catalog: true);
+    return;
+}
+
+var catalogOnly = args.Contains("--catalog-only");
+var customerOnly = args.Contains("--customer-only");
+if (catalogOnly && customerOnly)
+    throw new ArgumentException("Select either --catalog-only or --customer-only, not both.");
+
 var databaseFixture = new AuthCheckDatabase(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"));
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -56,6 +67,8 @@ builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
+builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
+builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
 builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
 builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
 builder.Services
@@ -201,8 +214,12 @@ try
             await SendWithToken(HttpMethod.Get, "/api/admin/roles", login.AccessToken));
     }
 
-    checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
-    checks += await CustomerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
+    if (!catalogOnly && !customerOnly)
+        checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
+    if (!customerOnly)
+        checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
+    if (!catalogOnly)
+        checks += await CustomerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
 
     await CheckStatus("Expired token is rejected", HttpStatusCode.Unauthorized,
         await SendWithToken(HttpMethod.Get, "/api/auth/me",

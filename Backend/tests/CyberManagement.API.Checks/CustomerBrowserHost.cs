@@ -46,6 +46,8 @@ internal static class CustomerBrowserHost
         builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
         builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
         builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+        builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
+        builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
         builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
         builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
         builder.Services.AddControllers().AddApplicationPart(typeof(AuthController).Assembly);
