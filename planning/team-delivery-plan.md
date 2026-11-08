@@ -68,7 +68,7 @@ Phúc sở hữu SignalR Hub, hook kết nối dùng chung và hợp đồng s�
 - Dùng một adapter thanh toán cho hai mục đích `TopUp` và `Order`. Tạo đơn sandbox ở server, lưu ID, tài khoản/đơn liên quan, số tiền và trạng thái dự kiến; xác minh callback theo tài liệu chính thức trước khi cập nhật ví hoặc xác nhận đơn đã trả tiền.
 - Trang redirect hay thông báo thành công ở browser không đủ để ghi nhận thanh toán. Đối chiếu callback đã xác minh hoặc kết quả truy vấn trạng thái chính thức với giao dịch đang chờ.
 - Callback lặp/đến muộn hoặc truy vấn đồng thời không được cộng ví, xác nhận đơn, trừ tồn hay dùng voucher lần hai. Sai chữ ký, sai giao dịch hoặc sai số tiền không được ghi nhận thành công.
-- Với đơn món ăn: giữ snapshot giá/giảm giá và quy định thời hạn giữ tồn/lượt voucher khi chờ thanh toán. Chốt cách giải phóng khi hết hạn và xử lý callback thành công đến sau khi hết hạn; không tự giao món nếu không còn tồn. Chính sách hủy/hoàn theo phương thức gốc phải được chốt cùng Minh/Khang/Trường, không tự cộng ví thay cho hoàn gateway hoặc hoàn hai lần.
+- Với đơn món ăn: quyết định ngày 08/11/2026 tại hợp đồng checkout D05/D06 giữ tồn/lượt 15 phút, hết hạn giải phóng một lần; thu muộn ghi tiền và tạo nghĩa vụ hoàn có duyệt, không hồi sinh đơn. Hoàn theo phương thức gốc, không tự cộng ví thay cho hoàn gateway hoặc hoàn hai lần. Owner triển khai/kiểm chứng theo mục 11.3 của hợp đồng.
 - Kiểm thử chữ ký/trạng thái bằng fixture phải ghi là kiểm thử nội bộ. Nghiệm thu sandbox cần bằng chứng request/response/callback từ môi trường sandbox thật đã che khóa bí mật.
 - Nếu chưa có credentials hoặc callback chưa truy cập được, đánh dấu đúng phụ thuộc bị chặn; tiếp tục phần adapter/test độc lập. Không giả lập thành công rồi tính là đã tích hợp.
 - Không đưa khóa vào frontend, Git, ảnh demo hoặc log công khai. Không dùng môi trường live/tiền thật.
@@ -339,7 +339,7 @@ Mốc là mục tiêu kế hoạch, không bảo đảm tiến độ khi giờ t
 1. Mỗi gói S1-D…S4-T là một cụm phạm vi để đọc. Mỗi mục Task có mã như S1-D-1 trong [backlog chi tiết](../codex/SPRINT_TASKS.md) là một thẻ Jira độc lập, gán sprint/người phụ trách và nhận issue key thực tế khi tạo. Các bước nhỏ là checklist trong thẻ; không tạo Task cha/Sub-task hay issue cho từng bước.
 2. Nhánh theo thẻ Jira từ nhánh tích hợp mới nhất, ví dụ `feat/SCRUM-123-zalopay-callback` (key minh họa). PR nhỏ, tách di chuyển thư mục khỏi thay đổi nghiệp vụ; không giữ một nhánh cá nhân suốt lịch rồi merge một lần.
 3. Trước khi sửa giao điểm, ghi endpoint/payload/trạng thái/lỗi và event. Contract đủ rõ mới để hai người triển khai song song.
-4. PR chạy build/check liên quan. Tiền/quyền/tồn/promo/gateway cần kiểm tra nghiệp vụ và API/DB có ý nghĩa; browser smoke bảo vệ luồng đã tích hợp. Không đợi S4 mới kiểm thử. Một Task có thể chia commit/PR nhỏ để bàn giao sớm; gửi báo cáo review tổng hợp theo Task, không tách một thẻ chỉ vì có thêm bước test hoặc tài liệu.
+4. PR chạy build/check liên quan. Tiền/quyền/tồn/promo/gateway cần kiểm tra nghiệp vụ và API/DB có ý nghĩa; browser smoke bảo vệ luồng đã tích hợp. Không đợi S4 mới kiểm thử. Một Task có thể chia commit/PR nhỏ để bàn giao sớm; gửi kết quả review tổng hợp theo Task trực tiếp trong chat theo mẫu tin nhắn ở mục 6 của [hướng dẫn review](../codex/REVIEW_GUIDE.md), chỉ tạo file báo cáo khi người dùng yêu cầu rõ. Không tách một thẻ chỉ vì có thêm bước test hoặc tài liệu.
 5. Trường điều phối thứ tự migration; owner module viết entity/config của mình, Trưởng nhóm review và duyệt. Không sửa/xóa migration đã áp dụng ở DB chung; tạo migration tiếp theo.
 6. Đầu ngày cập nhật đã xong/vướng/phụ thuộc. Cuối ngày có thay đổi thì kiểm tra bản tích hợp; ưu tiên lỗi chặn người khác. Chuyển hỗ trợ theo tải quan sát được, không dựa vào số lượng tên task.
 7. Routes/layout/provider là phần chung có reviewer. Mỗi người chịu tích hợp module mình, không đẩy tất cả cho Đại hoặc Phúc.
@@ -362,15 +362,21 @@ PR / trạng thái / blocker:
 
 Đây là quyết định triển khai trong phạm vi đã duyệt, không hỏi lại stack, số người, ngày, giờ làm, LAN hay lựa chọn sandbox.
 
+**Cập nhật 08/11/2026 cho SCRUM-11:** theo yêu cầu trực tiếp của người dùng, AI được ủy quyền chọn
+phương án hợp lý cho các giao điểm checkout đang chờ. Các lựa chọn đã ghi tại
+[hợp đồng checkout, mục 11.2](../Backend/docs/004-order-checkout-contract.md#112-quyết-định-thiết-kế-đã-chốt).
+Đây là nguồn chốt thiết kế cho checkout và phí phiên trước chi ví, không ghi nhận các owner đã phản hồi đồng ý
+hoặc Trưởng nhóm đã duyệt; việc tích hợp code/migration/kiểm chứng theo mục 11.3 của hợp đồng.
+
 | Quyết định | Chịu trách nhiệm |
 | --- | --- |
 | Mapping tài khoản khách/nhân viên và quyền từng endpoint; quy tắc khóa tài khoản | Đại + Minh |
-| Phiên: làm tròn tiền giờ, thời điểm trừ ví, ví hết tiền/restart, điều kiện mở/đóng | Phúc + Minh + Trường |
+| Phiên/giao điểm chi ví: D09 chọn phí tích lũy theo giây, ceil tổng tiền, worker 60 giây và quyết toán trước debit món; không thu trả trước chu kỳ song song. Owner triển khai cùng quy tắc hết tiền/restart trong contract phiên | Phúc + Minh + Trường; Khang gọi điểm tích hợp |
 | Nạp tại quầy: thời điểm thu/cộng ví; xử lý trạng thái demo `CreditedUnpaid` khi chuyển dữ liệu | Minh + Trường |
-| Đơn: hủy từng món/cả đơn, thời điểm trừ/hoàn tồn, ví và khoản thu tiền mặt; checkout ZaloPay giữ chỗ/hết hạn, callback trễ và chính sách hoàn gateway | Khang + Minh + Trường |
-| Voucher: phần trăm hợp lệ, làm tròn, thời gian theo Việt Nam, ngưỡng tính trước giảm, giới hạn tổng/theo khách, một hay nhiều mã, hoàn lượt khi hủy; tiền giảm không vượt giá trị đơn | Trường + Khang + Đại |
+| Đơn: D01–D03/D05–D08 chốt trừ ví khi tạo, cash thu sau confirm, chỉ hủy dòng Pending, tồn khả dụng Sale/Return một lần; ZaloPay giữ 15 phút, thu muộn không hồi sinh đơn, hoàn về nguồn gốc sau duyệt; Refund Failed có đường thay thế | Khang + Minh + Trường |
+| Voucher trong checkout: D04 chốt một mã, ngưỡng trước giảm, hiệu lực server, AwayFromZero/phân bổ snapshot; usage chiếm lượt khi tạo, partial không nhả, full cancel/expired nhả một lần; không giảm vượt tiền món | Trường + Khang + Đại |
 | Giải đấu: UI đang miễn phí nhưng DBML có phí; chọn policy nhất quán, thời hạn đăng ký/hủy và điều kiện đủ đội | Đại + Minh + Phúc |
 | ML chia đội: kiểm kê phần Phúc đã làm; chốt bài toán, dataset/đặc trưng, ràng buộc đội, baseline, chỉ số/ngưỡng đánh giá và cách chạy model | Phúc + Đại |
-| Chứng từ/doanh thu: thời điểm ghi nhận, hoàn tiền, giảm giá, phân biệt nạp ví và doanh thu | Trường + Khang + Phúc |
+| Chứng từ/checkout: D11 chọn thiết kế 1.7 ghim trong hợp đồng, Payments neo nguồn trước hóa đơn, khóa phát hành bền vững và mốc nguồn/xác nhận; thu/hoàn theo nguồn, không cộng đôi ví/Payment và không tính nạp ví thành doanh thu | Trường + Minh + Khang + Phúc |
 
 Credentials ZaloPay và callback HTTPS là **task phụ thuộc S1-M**, không phải lựa chọn cần người dùng xác nhận lại. Kết quả kickoff phải được ghi vào hợp đồng/schema trước khi các module triển khai khác nhau.

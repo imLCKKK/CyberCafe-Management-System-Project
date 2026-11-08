@@ -5,25 +5,27 @@
 | Task | Define-Order-Checkout-Contracts / S1-K-2 / SCRUM-11 |
 | Owner | Khang; Minh đối chiếu ví/gateway, Trường đối chiếu tồn/voucher/chứng từ |
 | Reviewer cuối | Trưởng nhóm |
-| Phiên bản | 0.3, ngày 07/11/2026, bổ sung đường đọc/duyệt và thay thế Refund sau review 06ba492; đề nghị re-review |
+| Phiên bản | 0.4, ngày 08/11/2026, chốt phương án thiết kế theo ủy quyền trực tiếp của người dùng; chờ Trưởng nhóm duyệt cuối |
 | Backend đích | CyberManagement .NET 10 / SQL Server, nền 35 bảng |
 | Phụ thuộc | S1-M-1 và S1-T-1; giao diện gateway bàn giao tiếp cho S1-M-2 |
 
-**Trạng thái:** sẵn sàng để Trưởng nhóm review bản thiết kế sau đối chiếu tĩnh với các nguồn tại mục 1.
-Kết quả đối chiếu kỹ thuật và các quyết định còn cần nhóm xác nhận được tách rõ ở mục 11;
-chưa có phản hồi chấp thuận của Minh/Trường/Phúc hoặc quyết định duyệt của Trưởng nhóm.
-Các endpoint, DTO, trạng thái và phần bổ sung schema bên dưới là thiết kế đề xuất, chưa phải API đang chạy.
-Quyết định chung đã có trong PROJECT_GUIDE được giữ; các lựa chọn cụ thể cần đối chiếu được gom tại mục 11.
+**Trạng thái:** đã chốt các lựa chọn thiết kế tại mục 11.2 theo chỉ dẫn trực tiếp ngày 08/11/2026:
+người dùng giao AI tự chọn phương án hợp lý cho các điểm đang chờ. Mỗi quyết định ghi lựa chọn,
+lý do và owner phối hợp triển khai. Việc chốt thiết kế này không tiếp tục chờ phản hồi riêng của từng owner.
+Nguồn quyết định là ủy quyền trong cuộc trò chuyện; chưa có bằng chứng Minh/Trường/Phúc đã phản hồi đồng ý,
+và chưa có quyết định duyệt cuối của Trưởng nhóm. Đây là hợp đồng để triển khai, chưa phải API đang chạy.
+Phụ thuộc code/migration và kiểm chứng thực tế được tách ở mục 11.3; các quyết định chung trong PROJECT_GUIDE được giữ.
 S1-K-2 bàn giao thiết kế. Code checkout thuộc S2-K-1/S2-K-2; UI thuộc S2-K-3;
 hoàn thiện cạnh tranh/hủy/hoàn thuộc S3-K-1. Không tick Done chỉ vì đã có tài liệu.
 
 ## 1. Căn cứ và giới hạn hiện trạng
 
 - [PROJECT_GUIDE](../../codex/PROJECT_GUIDE.md), [task S1-K-2](../../codex/SPRINT_TASKS.md#s1-k-2--define-order-checkout-contracts)
-  và [các quyết định cần nhóm chốt](../../planning/team-delivery-plan.md#11-quyết-định-nghiệp-vụ-cần-nhóm-chốt-trong-s1).
+  và [lịch sử quyết định trong kế hoạch bàn giao](../../planning/team-delivery-plan.md#11-quyết-định-nghiệp-vụ-cần-nhóm-chốt-trong-s1).
 - Nhánh làm việc: `SCRUM-11-Define-Order-Checkout-Contracts`; base từ `dev` tại
-  `e14a362e5f635db62deebf7752493672e755a24e`. Bản 0.3 sửa tiếp hai finding của review
-  `06ba49289ea3d801ac120f47f980caa36ea8406f`; thay đổi sau commit này chưa được commit.
+  `e14a362e5f635db62deebf7752493672e755a24e`. Bản 0.3 tại
+  `66f1a29498c8bae860e49372802bf0f0b03ce548` đã sửa hai finding của review 06ba492.
+  Bản 0.4 bổ sung quyết định ngày 08/11/2026 theo ủy quyền người dùng; thay đổi sau 66f1a29 chưa commit.
   [Order](../src/CyberManagement.Domain/Entities/Order.cs),
   [OrderDetail](../src/CyberManagement.Domain/Entities/OrderDetail.cs),
   [Payment](../src/CyberManagement.Domain/Entities/Payment.cs) và EF configuration hiện có
@@ -40,11 +42,12 @@ hoàn thiện cạnh tranh/hủy/hoàn thuộc S3-K-1. Không tick Done chỉ v�
 - Đã kiểm tra thêm bản 1.6 của S1-T-1 tại `280ed713627d037d770f6e02bc1d248ef4f98a70`
   (`origin/SCRUM-12-Define-Inventory-Invoice-Voucher-Contracts` trong các ref local).
   Quy tắc hoàn từng phần và ngoại lệ thu muộn Failed của bản 1.6/1.7 khớp nhau; bổ sung
-  InvoiceIssueRequests và các mốc thời gian của bản 1.7 vẫn là phương án chưa được nhóm duyệt.
+  InvoiceIssueRequests và các mốc thời gian của bản 1.7 chưa được nhóm duyệt trong ảnh chụp nguồn.
+  Bản 0.4 chọn thiết kế 1.7 làm đầu vào chứng từ cho checkout theo D11 mục 11.2; không coi code/migration đã được tích hợp.
 - Đầu vào phiên đã đọc: `761333c4bc32fe3ae5f6bc524b6a2ba8526db864`, Git path
   `Backend/docs/002-computer-session-contract.md`, mục 3–5: quyết toán phí phiên trước debit ví khác.
-  Hợp đồng ví cùng thời điểm lại đề xuất thu trước theo chu kỳ; giao điểm này chưa có quyết định chung,
-  phương án checkout để review ghi tại mục 7.3 và 11.2.
+  Hợp đồng ví tại ảnh chụp cùng thời điểm đề xuất thu trước theo chu kỳ. Bản 0.4 chọn phí tích lũy
+  theo giây, quyết toán trước debit món theo mục 7.3/D09; owner đồng bộ contract/code khi tích hợp.
 - Các đầu vào trên chưa có trong cây base đang mở; tra bằng `git show <commit>:<path>` khi có ref.
   Nếu clone chưa có commit, cần owner cung cấp PR/commit trước tích hợp; không phụ thuộc đường dẫn `.tools` của máy người viết.
 - UI hiện dùng [demoModel](../../frontend/src/client/shared/demoModel.js) và
@@ -58,8 +61,9 @@ hoàn thiện cạnh tranh/hủy/hoàn thuộc S3-K-1. Không tick Done chỉ v�
   tính toán bằng một mốc `now` phía server cho mỗi transaction; UI hiển thị giờ Việt Nam (+07:00).
 - Tiền là số nguyên VND, C# decimal. Tạm giới hạn mỗi số tiền và tổng đơn ở `999_999_999` VND,
   phù hợp cột `decimal(12,2)` hiện tại và số nguyên JSON an toàn. Phần lẻ/tràn bị từ chối trước ghi.
-  S1-T-1 đề xuất tiền `decimal(18,0)`, DiscountValue `decimal(18,2)`; owner cần đối chiếu migration,
-  không âm thầm đổi precision hoặc nâng giới hạn API trong task thiết kế này.
+  Chốt kiểu SQL đích `decimal(18,0)` cho tiền VND, DiscountValue `decimal(18,2)` để giữ tỷ lệ lẻ;
+  migration do owner bảng điều phối theo S1-T-1. Giữ giới hạn API 999_999_999, không tự nâng theo precision mới.
+  Dữ liệu có phần lẻ VND phải được đối soát trước migration, không âm thầm làm tròn; task này chưa sửa schema.
 - Server lấy giá, tính giảm/tổng, kiểm tra tồn, khách, phiên, quyền và trạng thái hiện tại.
   Request chứa giá, tổng tiền, số dư, status, người xử lý hoặc trường ngoài DTO bị trả 400.
 - Mỗi đơn chọn một phương thức `Wallet`, `Cash` hoặc `ZaloPay`, không đổi phương thức hay sửa giỏ sau khi tạo.
@@ -85,7 +89,7 @@ không chỉ tin role/permission còn hạn trong token. Nhân viên bị vô hi
 Khách tạo đơn phải Active; hoàn theo nguồn đã được duyệt vẫn thực hiện được khi khách Locked.
 Khách đọc/yêu cầu hủy chỉ được thao tác dữ liệu của mình; route người khác trả 404.
 
-| Method / route đề xuất | Đầu vào / kết quả | Quyền server |
+| Method / route | Đầu vào / kết quả | Quyền server |
 | --- | --- | --- |
 | `POST /api/client/orders` | CreateOrderRequest → 201 OrderDto | Customer; CustomerId từ `customer_id`; phiên Active thuộc khách |
 | `GET /api/client/orders` | `page=1&pageSize=20`, tối đa 100 → OrderPageDto | Customer; luôn lọc theo claim |
@@ -116,7 +120,7 @@ Danh sách Refund không lọc mất các dòng Failed hoặc chưa duyệt; s�
 Route Refund không tồn tại hoặc thuộc orderId khác trả 404, không ghi tác động. GET không thay đổi version,
 không tạo/duyệt/claim khoản hoàn và không trả secret, chữ ký, raw payload hoặc thông tin ví khách khác.
 
-## 4. DTO đề xuất
+## 4. DTO của hợp đồng
 
 DTO ở đây là đặc tả để tạo C# record/validator trong Application khi triển khai S2;
 entity EF không được dùng trực tiếp làm request/response.
@@ -263,14 +267,14 @@ theo policy thông thường; không tự suy từ hoàn tiền là hàng đã q
 
 ### 7.1. Ví và tiền mặt
 
-| Tình huống | Quy tắc đề xuất |
+| Tình huống | Quy tắc đã chốt |
 | --- | --- |
 | Wallet đặt đơn | Khóa khách và nguồn theo mục 8, xử lý phí phiên theo phương án mục 7.3 trước khi xét số dư đơn; tìm khóa `OrderPayment:{orderId}`, gọi WalletLedger.Record với `OrderPayment`, amount âm; phí phiên/đơn/tồn/usage/ledger/Payment cùng transaction |
 | Wallet hủy dòng | Khóa nguồn, hoàn netAmount snapshot bằng `OrderRefund`, khóa `OrderRefund:{orderId}:{orderDetailId}`; liên kết Refund với khoản thu gốc và ledger; khách Locked vẫn nhận được hoàn |
-| Cash tạo/chờ | PendingCollection; không debit/credit ví, không ghi khoản thu Succeeded |
+| Cash tạo/chờ | PendingCollection; không debit/credit ví, không ghi khoản thu Succeeded; không áp TTL của gateway, nhân viên xử lý hoặc người có order.cancel hủy theo trạng thái |
 | Cash thu | Chỉ khi tất cả dòng còn hiệu lực Confirmed, PayableAmount > 0; người có payment.create xác nhận thực nhận; server ghi đúng số còn phải thu, không lấy amount từ browser |
 | Cash hủy trước thu | Giảm PayableAmount; trả tồn theo dòng; không tạo Refund và không cộng ví |
-| Cash đã thu | Luồng thường không hủy dòng Confirmed. Nếu có xử lý ngoại lệ được duyệt ở S3, phải xác nhận thực hoàn theo payment.refund, truy khoản thu gốc; không tự hoàn vào ví |
+| Cash đã thu | Hủy dòng Confirmed luôn 409 trong checkout V1, kể cả Admin/Manager; không tạo Refund từ thao tác hủy không hợp lệ. Điều chỉnh sai khoản thu thuộc nghiệp vụ tiền có audit ở S3, cần payment.refund, bằng chứng thực hoàn và nguồn gốc; không tự hoàn ví |
 
 Khóa ledger và khóa HTTP là hai lớp khác nhau: ledger ngăn trừ/hoàn cùng nguồn hai lần;
 khóa HTTP ngăn tạo nhiều OrderId từ cùng ý định. Không ghép khóa client dài vào khóa ledger.
@@ -284,9 +288,12 @@ V1 thu cash từng đơn; thu cash gộp/hóa đơn gộp dùng contract chứng
 
 ### 7.2. ZaloPay sandbox
 
-**Đề xuất TTL giữ chỗ 15 phút**, cấu hình server `Checkout:ReservationMinutes`, giá trị phiên bản này là 15;
-Minh xác nhận khớp thời hạn yêu cầu thanh toán của adapter trước tích hợp. Lưu ReservedUntilUtc một lần
-từ thời điểm SQL chấp nhận đơn, trả qua expiresAtUtc; retry/restart không gia hạn.
+**Chốt TTL giữ chỗ nội bộ 15 phút**, cấu hình server `Checkout:ReservationMinutes=15`.
+Lưu ReservedUntilUtc một lần từ thời điểm SQL chấp nhận đơn, trả qua expiresAtUtc; retry/restart không gia hạn.
+Adapter yêu cầu hạn provider tương ứng nếu provider hỗ trợ; expiresAtUtc cho UI luôn là hạn nội bộ đã lưu.
+Nếu provider còn cho trả tiền sau hạn nội bộ, UI dừng hiển thị nút/link trả tiền khi hết hạn;
+callback/query thu sau đó vẫn theo chính sách thu muộn bên dưới, không kéo dài giữ tồn/lượt.
+Khả năng cấu hình hạn provider phải được Minh kiểm chứng trong task gateway, không mặc định đã được sandbox xác nhận.
 
 1. Transaction ngắn tạo Order AwaitingPayment, Sale/usage, Payment Pending, operationKey
    `OrderPayment:{orderId}` và mã merchant duy nhất gắn đúng order/customer/amount. Commit trước gọi provider.
@@ -315,11 +322,13 @@ từ thời điểm SQL chấp nhận đơn, trả qua expiresAtUtc; retry/resta
    nhận dưới khóa, đơn còn AwaitingPayment và `now < ReservedUntilUtc` → Payment Succeeded và đơn Pending,
    paymentStatus=Paid. Nhận tại/sau hạn hoặc đơn đã Cancelled/Expired → giải phóng và đánh dấu Expired nếu cần, ghi khoản thực thu,
    giữ nguyên đơn Expired/Cancelled, không phục hồi tồn/lượt. Ranh giới lấy thời điểm server xử lý dưới khóa,
-   kể cả provider thu trước hạn nhưng callback đến sau. Minh/Trường cần xác nhận lựa chọn này.
+   kể cả provider thu trước hạn nhưng callback đến sau. Đây là ranh giới đã chốt theo D05 mục 11.2.
 6. Worker Khang quét AwaitingPayment quá hạn kể cả sau restart, dùng cùng đường hủy/khóa nguồn;
    worker Minh đối soát khoản Pending/Expired/Failed chưa có kết luận chắc chắn và Refund Pending.
-   Callback và worker cạnh tranh chỉ một đường giải phóng. TTL hết không chứng minh chưa bị thu.
-7. Thu muộn tạo nghĩa vụ hoàn theo khoản thu gốc trong cùng transaction ghi nhận tiền. Đề xuất chuyển
+   Worker hết hạn quét mỗi 15 giây và quét ngay sau startup; callback cũng kiểm tra hạn dưới khóa,
+   không phụ thuộc worker đã chạy hay chưa. Callback và worker cạnh tranh chỉ một đường giải phóng.
+   TTL hết không chứng minh chưa bị thu; chu kỳ quét không gia hạn điều kiện chấp nhận thanh toán.
+7. Thu muộn tạo nghĩa vụ hoàn theo khoản thu gốc trong cùng transaction ghi nhận tiền. Chuyển
    Admin/Manager có payment.refund duyệt gửi hoàn; không tự gọi hoàn hoặc cộng ví từ callback.
    Lưu ApprovedByEmployeeId/ApprovedAtUtc trên Refund; callback tạo nghĩa vụ với hai trường null.
    Admin đọc GET danh sách Refund của đơn, lấy id/orderVersion của dòng Pending chưa duyệt,
@@ -381,7 +390,7 @@ nguồn hủy/khoản thu/yêu cầu mới, không đổi dòng Failed cũ thàn
 
 ### 7.3. Giao điểm phí phiên trước thanh toán ví
 
-**Phương án đề nghị nhóm review:** theo contract phiên Phúc, trước khi debit ví cho đơn có OriginalPayable > 0,
+**Quyết định D09:** áp dụng phí phiên tích lũy theo giây của contract phiên Phúc. Trước khi debit ví cho đơn có OriginalPayable > 0,
 caller khóa Customer → Computer → GamingSession/SessionCharge, gọi logic phiên để quyết toán tới cùng
 mốc now phía server; sau đó mới xét số dư còn lại cho đơn. Điểm gọi logic
 `SessionSettlement.BeforeWalletDebit(customerId, gamingSessionId?, nowUtc)` trả số dư sau quyết toán
@@ -397,11 +406,16 @@ Ví dụ minh họa thứ tự: ví 50000, phí phiên đến now còn phải th
 rollback request; không chấp nhận đơn dựa vào số dư 50000 rồi để phí phiên không còn tiền thu.
 Cash/ZaloPay và đơn gốc 0 đồng không gọi settlement vì checkout không debit ví; vòng đời phiên vẫn do module phiên xử lý.
 
-S1-M-1 hiện đề xuất GamingCharge thu trước đầu chu kỳ; contract phiên đề xuất thu phí tích lũy.
-Chỉ một policy được triển khai chung. Minh/Phúc/Trường cần thống nhất với Khang điểm gọi và phần phí
-đã thu để không thu cả chu kỳ trả trước lẫn phí tích lũy cho cùng thời gian. Nếu chọn policy trả trước,
-owner phiên cung cấp BeforeWalletDebit tương đương theo policy đó và cập nhật contract trước tích hợp;
-Khang không tự viết công thức phí trong checkout. Đây là quyết định còn mở, không phải lỗi đã sửa trong code phiên/ví.
+Chốt cách tính: P là giá VND/giờ snapshot khi mở phiên; s là số giây hoàn tất từ StartTime đến now;
+`C = ceil(P * s / 3600)`, `D = C - tổng SessionCharge đã commit`. Chỉ ghi GamingCharge=-D khi D>0,
+D=0 không thêm ledger; D<0 báo lệch sổ, không tự hoàn. Worker phí tính lại mỗi 60 giây từ StartTime, khi đóng phiên,
+trước chi ví khác và khi phục hồi; mỗi lần dùng tổng tích lũy để tránh cộng trùng sai số làm tròn.
+Giới hạn phí theo ngân sách đã thu + số dư có sẵn, kết thúc phiên khi hết khả năng tài trợ theo contract phiên.
+Ví dụ P=10000 VND/giờ: C tại 60/120/180 giây là 167/334/500; các khoản tăng là 167/167/166,
+không phải ba lần làm tròn độc lập thành 167. Giá sửa sau khi mở phiên không đổi P đã snapshot.
+Không triển khai thu trả trước đầu chu kỳ song song. Minh/Phúc cập nhật phần mô tả trả trước trong contract ví
+khi triển khai theo quyết định này; đây là công việc đồng bộ phụ thuộc, không phải lựa chọn chính sách còn mở.
+Khang gọi dịch vụ phiên, không sao chép công thức tính phí vào module đơn. Task tài liệu chưa sửa code phiên/ví.
 
 ### 7.4. Đọc, duyệt và thay thế khoản hoàn Failed
 
@@ -497,7 +511,7 @@ Không tự giải phóng khoản đang xử lý ở provider, che khoản thự
   Nếu scope chưa có thì áp toàn bộ kiểm tra Active/version/trạng thái. Request thất bại rollback không chiếm key.
 - Chỉ kiểm tra key trước insert là chưa đủ: khóa Customer của chủ đơn để serialize tạo đơn và tìm lại key
   trong transaction; unique scope là bảo vệ cuối. Wallet ledger còn tìm khóa riêng sau khóa khách trước Record.
-- Thứ tự khóa đề xuất đồng bộ S1-T-1: Customer → Computer → GamingSession → SessionCharge → Order
+- Thứ tự khóa chốt theo S1-T-1: Customer → Computer → GamingSession → SessionCharge → Order
   → Product → Promotion → Payment gốc → Refund → RefundAttempt → Invoice → InvoiceIssueRequest → audit.
   Chỉ lấy nhóm cần dùng; trong nhóm ID tăng dần. Mọi writer/callback/worker/phát hành dùng cùng thứ tự;
   không giữ Product rồi quay lại lấy Customer/Order. Đọc ID trước được, phải đọc lại sau khóa.
@@ -505,14 +519,14 @@ Không tự giải phóng khoản đang xử lý ở provider, che khoản thự
   không tự commit hoặc transaction lồng. Lưu snapshot/nguồn/ledger/thu-hủy/usage/key trong transaction;
   sau commit mới gửi event hoặc gọi gateway. Lỗi SaveChanges/deadlock rollback toàn thao tác, trả 409;
   client GET và retry cùng key, không tự retry với khóa mới.
-- OrderId/OrderDetailId hiện là SQL identity, trong khi khóa tiền/tồn cần ID nguồn. Đề xuất caller flush
+- OrderId/OrderDetailId hiện là SQL identity, trong khi khóa tiền/tồn cần ID nguồn. Chốt caller flush
   Order/Details bằng SaveChanges trong transaction đang giữ khóa để lấy ID, rồi ghi ledger/tồn/usage/Payment/key
   và SaveChanges trước một lần commit cuối. Lỗi bất kỳ bước nào rollback cả lần flush đầu, không lộ đơn dở dang.
   Không gọi gateway/phát event giữa hai lần lưu. Đối chiếu code S1-M-1 cho thấy SaveChangesAsync không commit;
   ExecuteInTransactionAsync chỉ commit sau khi callback hoàn tất, nên cấu trúc code cho phép cách lưu này
   nếu các module dùng cùng DbContext. Hướng dẫn “một SaveChanges” của S1-M-1 cần được Minh đồng bộ
-  thành “một transaction, một commit cuối; có thể flush identity trước khi lưu phần còn lại”. Đây là đề xuất
-  tương thích về cấu trúc code, chưa có test rollback tích hợp đơn/ví và chưa phải Minh đã chấp thuận sửa contract.
+  thành “một transaction, một commit cuối; có thể flush identity trước khi lưu phần còn lại” theo D08.
+  Code nguồn hỗ trợ cấu trúc này; chưa có test rollback tích hợp đơn/ví hoặc phản hồi chấp thuận riêng của Minh.
   Không giả định có OrderId thật trước khi EF nhận identity hoặc commit đơn riêng để lấy ID.
 - Order có rowversion. VersionRequest kiểm tra expectedVersion dưới khóa; bất kỳ thay đổi dòng,
   yêu cầu hủy, thu/hoàn hay trạng thái gateway đều tăng version của aggregate. Version cũ trả 409
@@ -524,7 +538,7 @@ Giữ dạng ProblemDetails có title/status/detail/instance/traceId như ApiExc
 Đề xuất bổ sung `code` cho module đơn; code này chưa được handler nền xuất ra. 401/403 từ middleware
 có thể chưa có ProblemDetails; client phải xử lý được bằng HTTP status.
 
-| HTTP / code đề xuất | Điều kiện |
+| HTTP / code | Điều kiện |
 | --- | --- |
 | 400 ValidationError | DTO/header sai, unknown field, enum sai, số lượng/tiền vượt giới hạn, thiếu reason/version |
 | 401 | Chưa đăng nhập/token sai hoặc hết hạn |
@@ -543,7 +557,7 @@ có thể chưa có ProblemDetails; client phải xử lý được bằng HTTP 
 
 ## 9. Giao điểm module, chứng từ và event
 
-| Owner | Điểm tích hợp đề xuất | Bất biến cần giữ |
+| Owner | Điểm tích hợp của hợp đồng | Bất biến cần giữ |
 | --- | --- | --- |
 | Khang | Order application service/DTO, snapshot, version, yêu cầu/duyệt hủy, TTL worker | Orchestrate cùng transaction; không tự ghi ví hoặc tạo bộ kho/voucher khác |
 | Minh | WalletLedger.Record; FindTrackedForWalletUpdateAsync; FindWalletTransactionByKeyAsync | OrderPayment âm / OrderRefund dương; SaveChanges/commit do caller; khóa ledger <=100 ký tự |
@@ -576,7 +590,7 @@ Nhóm staff yêu cầu order.view; không broadcast dữ liệu đơn cho khách
 Đây là danh sách giao việc trong các task triển khai hiện hữu, không áp migration trong S1-K-2.
 Nền 35 bảng là điểm xuất phát; bảng/cột bổ sung phải được Trường điều phối và Trưởng nhóm xem xét.
 
-| Nguồn hiện tại | Bổ sung/điều chỉnh đề xuất | Owner |
+| Nguồn hiện tại | Bổ sung/điều chỉnh cần triển khai | Owner |
 | --- | --- | --- |
 | Orders | Giữ OrderId/CustomerId/GamingSessionId/OrderTime; TotalAmount map OriginalPayable; thêm Subtotal, DiscountAmount, snapshot voucher, PaymentMethod, ReservedUntilUtc, rowversion; Status theo mục 5 | Khang |
 | Orders.EmployeeId NOT NULL | Nullable cho khách/hệ thống; actor type + liên kết khách qua CustomerId, staff qua EmployeeId; không đặt ID 0 hoặc CustomerId vào FK nhân viên | Khang + Đại đối chiếu actor |
@@ -587,8 +601,8 @@ Nền 35 bảng là điểm xuất phát; bảng/cột bổ sung phải được
 | Products/InventoryTransactions | Stock là khả dụng; Sale/Return theo OrderDetailId, unique nguồn/type; Stock>=0, Before/After; EmployeeId nullable cho khách/hệ thống theo S1-T-1 | Khang Product; Trường lịch sử tồn |
 | Promotions và lượt dùng | Snapshot/validation/rule + PromotionUsages unique OrderId; ReleasedAt và hạn giữ chỗ truy từ Orders, giữ chỗ chiếm hạn mức | Trường; Khang cung cấp trạng thái/hạn |
 | Payments.InvoiceId NOT NULL, chưa có nguồn/khóa hoàn | Theo S1-T-1: nullable InvoiceId, OrderId/SessionChargeId XOR, Type, RefundOfPaymentId, OrderDetailId cho hoàn dòng, OperationKey unique, trạng thái/mốc thời gian/mã gateway; RefundAttempts thuộc adapter | Minh + Trường |
-| Refund chưa có nguồn duyệt trên base | Đề xuất thêm ApprovedByEmployeeId/ApprovedAtUtc cho khoản hoàn gateway; null khi hệ thống tạo nghĩa vụ thu muộn; worker không gửi trước duyệt, không giả actor nhân viên. Nghĩa vụ chưa hoàn suy từ snapshot hủy + khoản thu/hoàn, không xóa dòng Failed | Minh; Trường đối chiếu với S1-T-1 |
-| Refund chưa có quan hệ thay thế trên base | Đề xuất Payments.ReplacementOfRefundId int? tự FK Payments.PaymentId, NoAction; chỉ Type=Refund, khác PaymentId; unique filtered khi khác null để mỗi tiền nhiệm có tối đa một con trực tiếp. Service kiểm tra tiền nhiệm Failed cùng nguồn/amount/method và mọi attempt đã chốt; replacedByRefundId trong DTO suy ngược từ FK | Minh; Khang gọi nghiệp vụ, Trường đối chiếu |
+| Refund chưa có nguồn duyệt trên base | Thêm ApprovedByEmployeeId/ApprovedAtUtc cho khoản hoàn gateway; null khi hệ thống tạo nghĩa vụ thu muộn; worker không gửi trước duyệt, không giả actor nhân viên. Nghĩa vụ chưa hoàn suy từ snapshot hủy + khoản thu/hoàn, không xóa dòng Failed | Minh; Trường đối chiếu với S1-T-1 |
+| Refund chưa có quan hệ thay thế trên base | Payments.ReplacementOfRefundId int? tự FK Payments.PaymentId, NoAction; chỉ Type=Refund, khác PaymentId; unique filtered khi khác null để mỗi tiền nhiệm có tối đa một con trực tiếp. Service kiểm tra tiền nhiệm Failed cùng nguồn/amount/method và mọi attempt đã chốt; replacedByRefundId trong DTO suy ngược từ FK | Minh; Khang gọi nghiệp vụ, Trường đối chiếu |
 | WalletTransactions chưa có IdempotencyKey trên base | Nhận migration/code S1-M-1 từ commit được nhóm tích hợp, không viết lại migration của Minh | Minh |
 | InvoiceOrders/InvoiceDetails | Unique nguồn, snapshot và cập nhật tài chính theo contract Trường; không tạo Invoice.OrderId thay quan hệ gộp | Trường |
 
@@ -596,14 +610,16 @@ DB constraint bảo vệ giá trị nội dòng/FK/unique. Đúng chủ ví, dò
 usage cuối và sự khớp provider là kiểm tra nghiệp vụ dưới khóa, không tuyên bố FK/unique tự chứng minh đủ.
 Không sửa migration đã áp. Không nhập migration MySQL/schema 19 bảng hoặc chuyển/xóa dữ liệu cũ.
 
-## 11. Các điểm cần xác nhận để chốt S1-K-2
+## 11. Quyết định thiết kế và bàn giao S1-K-2
 
-### 11.1. Kết quả đối chiếu kỹ thuật của bản 0.3
+### 11.1. Kết quả đối chiếu kỹ thuật và review
 
 Nguồn ghim tại mục 1; kết quả dưới đây là đối chiếu tài liệu/code, không phải phản hồi chấp thuận của owner
-hoặc bằng chứng đã chạy tích hợp. Các finding đã được sửa ngay trong hợp đồng để Trưởng nhóm review.
+hoặc bằng chứng đã chạy tích hợp. Review do người dùng cung cấp ngày 08/11/2026 cho commit 66f1a29
+xác nhận hai finding P1/P2 đã được xử lý ở mức thiết kế, chưa phát hiện lỗi mới trong diff so với 06ba492.
+Bản 0.4 tiếp tục chốt chính sách theo ủy quyền mới, vẫn cần Trưởng nhóm review thay đổi này.
 
-| Giao điểm | Nguồn đối chiếu | Kết quả trong bản 0.3 |
+| Giao điểm | Nguồn đối chiếu | Kết quả bàn giao |
 | --- | --- | --- |
 | Loại/dấu ví, số tiền 0 và khách Locked | S1-M-1 tại 8b2e6a2, WalletLedger.Record và mục 1/2/4 hợp đồng ví | Khớp: OrderPayment âm, OrderRefund dương; không ghi giao dịch 0; hoàn được cho khách Locked; tìm khóa trước ghi |
 | Snapshot, voucher và tồn | S1-T-1 mục 3.1/3.2/4 | Khớp quy tắc sau giảm/phân bổ/hoàn lượt; giữ UnitPrice sẵn có, Sale/Return theo dòng, không giảm/trả hai lần |
@@ -612,32 +628,47 @@ hoặc bằng chứng đã chạy tích hợp. Các finding đã được sửa 
 | Thu muộn của Payment Failed | S1-T-1 bản 1.6/1.7, bảng trạng thái và quy tắc audit mục 6.2.2 | Đã bổ sung query độc lập, đối chiếu giao dịch, audit cùng transaction, callback chỉ ack sau commit và worker query khi rollback |
 | P1: admin không lấy được refundId để duyệt | Review SCRUM-11 tại 06ba492 | Đã bổ sung GET danh sách/chi tiết, RefundDto có nguồn/amount/trạng thái/actor duyệt/version và ví dụ; approve trả đúng RefundDto; case thu muộn → đọc → duyệt → worker → replay ở mục 7.4/12 |
 | P2: thiếu đường tiếp tục sau Refund Failed | Review SCRUM-11 tại 06ba492; S1-T-1 mục 6.4 | Đã có POST replacements, lineage unique, cùng nguồn/amount/method, kiểm tra attempt/hạn mức và duyệt khoản mới; ví dụ 40000 thất bại rồi thành công, giữ dòng Failed và tổng thực hoàn 40000 |
-| Flush identity và commit | CustomerRepository.ExecuteInTransactionAsync/SaveChangesAsync tại 8b2e6a2 | Code cho phép nhiều lần lưu trong một transaction; tài liệu ví còn ghi một lần lưu. Bản này nêu phương án và nội dung cần đồng bộ, chưa khẳng định test rollback đã pass |
-| Phí phiên trước OrderPayment | Contract phiên tại 761333c mục 3–5 và ví tại 8b2e6a2 mục 5 | Đã bổ sung điểm gọi/phạm vi rollback và ví dụ ở mục 7.3; khác biệt thu phí tích lũy/trả trước vẫn cần nhóm chọn chung |
+| Flush identity và commit | CustomerRepository.ExecuteInTransactionAsync/SaveChangesAsync tại 8b2e6a2 | Code hỗ trợ nhiều lần lưu trong một transaction; D08 chọn cách này, tài liệu ví cần được owner đồng bộ; chưa khẳng định test rollback đã pass |
+| Phí phiên trước OrderPayment | Contract phiên tại 761333c mục 3–5 và ví tại 8b2e6a2 mục 5 | D09 chọn phí tích lũy theo giây và quyết toán trước debit món; phần mô tả trả trước trong ảnh chụp ví cần được owner đồng bộ khi triển khai |
 | Schema đích so với base e14a362 | Order/OrderDetail/Payment và EF configuration | Đã phân biệt phần có sẵn/phần cần migration ở mục 10; chưa có API checkout, không coi đề xuất schema là đã triển khai |
 
-### 11.2. Quyết định nghiệp vụ và phản hồi liên module còn chờ
+### 11.2. Quyết định thiết kế đã chốt
 
-Các dòng dưới **chờ nhóm xác nhận**, tách khỏi phần đối chiếu kỹ thuật đã thực hiện. Khi chốt ghi
-người/ngày/commit hoặc phản hồi thực tế vào đây, rồi cập nhật mục 11 kế hoạch bàn giao nếu quyết định chung thay đổi.
+**Ngày chốt: 08/11/2026. Căn cứ:** người dùng trực tiếp yêu cầu trong cuộc trò chuyện:
+“bạn tự chốt theo cách hợp lý nhất”. AI lựa chọn các phương án dưới đây trong phạm vi SCRUM-11.
+Đây là quyết định thiết kế theo ủy quyền của người dùng, không phải biên bản Minh/Trường/Phúc đã đồng ý.
+Các owner là người nhận đầu vào và phối hợp triển khai; việc hoàn thành Task vẫn cần Trưởng nhóm duyệt cuối.
+Nếu thay đổi lựa chọn dưới đây, ghi quyết định mới cùng lý do và cập nhật các hợp đồng bị ảnh hưởng.
 
-| Quyết định đề xuất | Người đối chiếu | Kết quả cần xác nhận |
+| Mã | Quyết định đã chốt | Lý do | Owner phối hợp triển khai |
+| --- | --- | --- | --- |
+| D01 | Ví trừ ngay khi server chấp nhận tạo đơn và commit thành công, trước confirm từng món; OrderPayment âm, OrderRefund dương; gốc 0 đồng không có ledger/Payment | Khách biết số tiền đã trả khi đặt; đơn và tiền cùng rollback; phù hợp WalletLedger và demo hiện có | Khang + Minh |
+| D02 | Chỉ hủy cả dòng Pending; hủy toàn đơn có dòng Confirmed bị từ chối. Cash thu sau khi mọi dòng còn hiệu lực Confirmed, thu từng đơn, không áp TTL gateway. Quyền theo mục 3, không mở quyền hủy/hoàn cho Cashier/Waiter | Không hoàn hàng đã chuẩn bị/phục vụ bằng luồng hủy thông thường; cash chưa thu không tạo tiền hoàn giả | Khang + Minh + Trường |
+| D03 | Products.Stock là tồn khả dụng; tạo đơn ghi Sale âm/dòng, hủy/expired ghi Return dương một lần. Callback/confirm không trừ thêm; không phục hồi tồn khi thu muộn | Một cách ghi tồn cho ba phương thức, ngăn bán vượt và trả tồn lặp | Khang + Trường |
+| D04 | Một voucher/đơn, chỉ tiền món; %/fixed, ngưỡng trước giảm, hiệu lực theo now server; làm tròn AwayFromZero, phân bổ đồng dư theo mục 6. Usage chiếm lượt khi tạo; partial không nhả, full cancel/expired nhả một lần | Khớp contract Trường, giữ lịch sử và số hoàn theo snapshot, không tính lại voucher sau hủy | Trường + Khang; Đại nhận rule dùng chung |
+| D05 | Giữ chỗ nội bộ ZaloPay 15 phút từ lúc nhận đơn, không gia hạn. Xác nhận lần đầu dưới khóa tại/sau hạn hoặc sau hủy là thu muộn; ghi thực thu, giữ đơn đã hủy/expired, không cấp lại món. Worker hết hạn mỗi 15 giây và lúc startup | Ranh giới xử lý tái hiện được, không chiếm tồn vô hạn; cùng luật cho callback và worker | Khang + Minh + Trường |
+| D06 | Hoàn về đúng phương thức đã trả. Thu muộn tạo Refund Pending chưa duyệt; Admin/Manager có payment.refund duyệt rồi worker mới gửi. Timeout giữ Pending; thất bại chắc chắn Failed nhưng còn nghĩa vụ xử lý; partial theo mục 7.2 | Truy được khoản thu gốc, không tự biến tiền gateway thành số dư ví hoặc báo hoàn khi tiền chưa về khách | Minh + Khang + Trường |
+| D07 | Dùng GET danh sách/chi tiết Refund và POST approve/replacements ở mục 3/7.4. Thay thế chỉ ZaloPay Failed đủ điều kiện, giữ nguồn/amount/method, một con trực tiếp, khoản mới phải duyệt; không hủy lại món | Khép hai finding review, admin có đường thao tác và không tạo nhánh hoàn trùng | Khang + Minh; Trường nhận nguồn đối soát |
+| D08 | Một DbContext/SQL transaction, một commit cuối; được flush identity trước khi lưu các phần còn lại. Khóa theo mục 8; actor khách/hệ thống để FK nhân viên nullable, staff lấy JWT; không giả nhân viên | Tạo được khóa theo OrderId thật mà vẫn rollback toàn bộ ví/đơn/tồn/lượt; tránh deadlock và nguồn actor sai | Khang + Minh + Trường; Đại nhận mapping actor |
+| D09 | Phí phiên tích lũy theo giây: ceil(P*s/3600), trừ phần SessionCharge đã thu; worker 60 giây, khi đóng/phục hồi và trước OrderPayment. Quyết toán phí trước khi xét số dư món, thiếu tiền rollback request; không thu trả trước chu kỳ song song | Không để món tiêu phần tiền giờ đã phát sinh; tính lại tổng tránh trùng phí và sai số làm tròn | Phúc + Minh + Trường + Khang |
+| D10 | Giữ DTO/route/error/version/idempotency của bản này; event thông báo sau commit, client GET lại. SQL tiền đích decimal(18,0), tỷ lệ DiscountValue decimal(18,2); giới hạn API vẫn 999_999_999 VND | Dùng chung một hợp đồng; giữ tỷ lệ lẻ, số nguyên JSON an toàn và chặn việc tự nâng giới hạn tiền khi đổi schema | Khang + Minh + Trường; Phúc nối event |
+| D11 | Chọn thiết kế chứng từ 1.7 tại 761333c, Git path docs/contracts/inventory-invoice-voucher.md: Payments neo nguồn trước hóa đơn, InvoiceIssueRequests, ConfirmedAt/ProviderOccurredAt/PaymentTimeBasis. Giữ lineage/approval bổ sung ở bản này; schema base vẫn e14a362, nền code SCRUM-11 là 66f1a29 | Có khóa phát hành bền vững và mốc báo cáo rõ khi provider thiếu giờ thực hoàn; không thu lại khi nối hóa đơn | Trường + Minh + Khang; Phúc cung cấp nguồn phí |
+
+### 11.3. Phụ thuộc triển khai và duyệt cuối
+
+Không còn lựa chọn thiết kế nào ở mục 11.2 phải chờ owner tự chọn lại. Những việc sau vẫn phải có
+bằng chứng trước khi tuyên bố hoàn tất tích hợp; quyền chốt thiết kế không thay cho việc đã chạy hệ thống:
+
+| Việc cần hoàn thành | Người/module phụ trách | Bằng chứng cần có |
 | --- | --- | --- |
-| Ví trừ khi server chấp nhận tạo đơn, trước confirm từng món; 0 đồng không ghi ledger | Khang + Minh | Thống nhất nghĩa “xác nhận đơn” của S1-M-1 và khóa debit/refund theo dòng |
-| Hủy cả dòng Pending; hủy toàn đơn có Confirmed bị từ chối; cash thu sau confirm | Khang + Minh + Trường | Quyền hủy/hoàn và xử lý ngoại lệ cash đã thu; không tự tăng quyền Cashier/Waiter |
-| Giữ tồn bằng Sale khi đặt, Return khi hủy/expired; usage chiếm lượt ngay, chỉ hoàn khi hủy toàn bộ | Khang + Trường | Không trừ/trả hai lần; tương thích InventoryTransaction/PromotionUsage và phân bổ giảm |
-| TTL ZaloPay 15 phút, không gia hạn; callback xử lý tại/sau hạn là thu muộn | Khang + Minh + Trường | Khớp hạn provider, chủ worker, không khôi phục đơn; trách nhiệm xử lý tiền đã thu |
-| Hoàn gateway theo nguồn gốc; thu muộn cần Admin/Manager duyệt; partial theo quy tắc đã đối chiếu mục 7.2 | Minh + Khang + Trường | Interface adapter/approval, điều kiện kênh/chương trình và đường xử lý nghĩa vụ còn lại khi Refund Failed; không tự hoàn ví |
-| API quản trị Refund và yêu cầu thay thế cùng nguồn theo mục 7.4 | Minh + Khang + Trường | Xác nhận RefundDto, snapshot nguồn, ReplacementOfRefundId/index/operationKey và điểm gọi chung của Minh; đây là phần bổ sung sau review, chưa phải schema/endpoint đã có |
-| Payments neo nguồn trước hóa đơn, thứ tự khóa và flush identity mục 8; actor khách/hệ thống nullable | Minh + Trường + Khang; Đại đối chiếu actor | Migration/DI cùng DbContext, nhiều SaveChanges trong một transaction nếu cần ID; ledger và Payment không đếm tiền hai lần, không giả nhân viên |
-| Phí phiên được xử lý trước OrderPayment qua điểm gọi chung mục 7.3 | Phúc + Minh + Trường + Khang | Chọn policy phí tích lũy hay trả trước; xác nhận phần phí đã thu, thứ tự gọi/khóa và rollback; không thu hai policy cho cùng thời gian |
-| DTO/route/version/idempotency/error/event và precision tiền | Khang + Minh + Trường; Phúc đối chiếu event | Các caller dùng cùng cấu trúc; phần bổ sung schema được điều phối, chưa coi có sẵn |
-| Base tích hợp của contract chứng từ 1.6/1.7 | Trường + Minh + Khang; Trưởng nhóm quyết định base | Chỉ định commit chung và quyết định dùng InvoiceIssueRequests/các mốc thời gian của 1.7 trước khi triển khai schema tương ứng |
-| Duyệt cuối hợp đồng chung | Trưởng nhóm | Chỉ ghi đã duyệt/Done khi có quyết định thực tế |
+| Duyệt cuối SCRUM-11 bản 0.4 | Trưởng nhóm | Quyết định review thực tế; checklist Task vẫn chưa tick trong phiên này |
+| Đồng bộ các giao điểm đã chọn | Minh/Trường/Phúc phối hợp Khang; Đại nhận mapping actor | Contract/interface của provider khớp D01–D11; phần khác ảnh chụp nguồn được cập nhật bằng commit/PR khi triển khai, không chỉ sửa mô tả checkout |
+| Tích hợp code/migration đúng backend chung | Owner bảng, Trường điều phối | Chuỗi migration mới, source/DTO/DI dùng chung DbContext, không sửa migration đã áp hoặc giả dữ liệu actor |
+| Cấu hình và kiểm chứng gateway | Minh | Sandbox/HTTPS/adapter thực tế, hạn provider, khả năng partial và kết quả query/hoàn; không coi lựa chọn TTL nội bộ là test sandbox |
+| Chứng minh nhất quán và giao diện | Các task S2/S3 của owner | Các ca mục 12: rollback/retry/cạnh tranh, không thu/hoàn trùng, nguồn chứng từ và UI/API/SQL/realtime khớp |
 
-S1-K-2 phụ thuộc contract của S1-M-1/S1-T-1; S1-M-2 nhận giao diện Order từ đây để chốt gateway.
-Credentials, callback HTTPS và kiểm chứng provider thuộc các task Minh, không chặn soạn bản thiết kế này;
-thiếu interface/xác nhận/migration phải nêu khi nghiệm thu tích hợp S2, không ghi sandbox đã chạy.
+S1-K-2 vẫn sử dụng đầu vào S1-M-1/S1-T-1; S1-M-2 nhận giao diện Order đã chọn ở đây.
+Các phụ thuộc triển khai trên không trở lại thành yêu cầu chờ chốt chính sách của bản thiết kế này.
 
 ## 12. Tiêu chí kiểm chứng khi triển khai
 
@@ -646,7 +677,7 @@ Các ca dưới là yêu cầu bàn giao cho S2/S3, **chưa được chạy tron
 | Ca | Kết quả cần kiểm tra ở API/SQL |
 | --- | --- |
 | Wallet hợp lệ / thiếu tiền / lỗi SaveChanges | Thành công có một đơn/debit/Sale/usage/Payment đúng nguồn; lỗi rollback toàn bộ, ví không âm |
-| Ví đủ giá món nhưng thiếu sau phí phiên; retry cùng key; lỗi sau flush identity | Theo phương án 7.3: đơn bị từ chối và toàn request rollback, không tạo nguồn dở dang hoặc thu thêm phí từ replay; worker phiên quyết toán độc lập |
+| Ví đủ giá món nhưng thiếu sau phí phiên; retry cùng key; lỗi sau flush identity | Theo quyết định D09/mục 7.3: đơn bị từ chối và toàn request rollback, không tạo nguồn dở dang hoặc thu thêm phí từ replay; worker phiên quyết toán độc lập |
 | Gửi cùng key tuần tự/đồng thời; mất response/restart | Cùng resource ID, không trừ ví/tồn/dùng lượt lần hai; payload khác 409; key khác vẫn không thu/hoàn trùng nguồn |
 | Hai khách tranh tồn/lượt cuối | Chỉ một bên thành công; bên thua 409, không có ledger hoặc nguồn dở dang |
 | Giá/tên/voucher sửa sau đặt; giả giá/tổng/status trong body | Snapshot và hoàn theo giá cũ; body ngoài DTO bị từ chối; không dùng giá browser |
@@ -668,5 +699,5 @@ Các ca dưới là yêu cầu bàn giao cho S2/S3, **chưa được chạy tron
 | Event và reconnect | Phát sau commit đúng người nhận; GET thấy trạng thái đã lưu, không fallback localStorage |
 
 Tự kiểm tra thiết kế dùng [REVIEW_GUIDE](../../codex/REVIEW_GUIDE.md). Khi bàn giao S1-K-2 cần
-diff/tài liệu, kiểm tra link/JSON/nhất quán và phản hồi mục 11; không yêu cầu test SQL thay cho xác nhận thiết kế,
+diff/tài liệu, kiểm tra link/JSON/nhất quán và căn cứ chốt tại mục 11.2 cùng quyết định duyệt cuối; không yêu cầu test SQL thay cho quyết định thiết kế,
 cũng không dùng kiểm tra tài liệu để tuyên bố các ca API/SQL/gateway trên đã pass.

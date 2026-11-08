@@ -253,21 +253,22 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 #### S1-K-2 — Define-Order-Checkout-Contracts
 
 **Tài liệu bàn giao:** [Hợp đồng đơn món và checkout](../Backend/docs/004-order-checkout-contract.md),
-phiên bản 0.3 ngày 07/11/2026; bổ sung API/DTO đọc khoản hoàn và tạo yêu cầu thay thế Refund Failed
-sau review SCRUM-11 tại 06ba492, đề nghị Trưởng nhóm re-review thiết kế.
-Kết quả đối chiếu ở mục 11.1; quyết định còn chờ Minh/Trường/Phúc và Trưởng nhóm ở mục 11.2;
-ca kiểm chứng triển khai ở mục 12. Chưa đánh dấu Done.
+phiên bản 0.4 ngày 08/11/2026; sau review 66f1a29, người dùng ủy quyền AI chốt các lựa chọn còn mở.
+Mục 11.2 ghi D01–D11 cùng căn cứ/lý do; việc chốt thiết kế không còn chờ phản hồi riêng của owner.
+Mục 11.3 tách phụ thuộc code/migration/kiểm chứng và duyệt cuối; chưa ghi các owner đã đồng ý,
+chưa đánh dấu Done. Trưởng nhóm review bản 0.4 trước khi duyệt cuối.
 
 **Description:**
 
 - Chốt DTO đặt/xử lý/hủy đơn, trạng thái, snapshot giá/giảm và cách tính tiền tại server.
-- Thống nhất ví/tiền mặt/ZaloPay, giữ tồn/lượt voucher, hết hạn và hoàn tiền với Minh/Trường trước khi tích hợp checkout.
+- Chốt ví/tiền mặt/ZaloPay, giữ tồn/lượt voucher, hết hạn và hoàn tiền theo quyết định 08/11/2026;
+  bàn giao hợp đồng cho Minh/Trường và Phúc ở giao điểm phí phiên để tích hợp cùng một phương án.
 
 **Dependencies:** `S1-M-1`, `S1-T-1`
 
 **Done khi:**
 
-- [ ] **Chốt vòng đời đơn và phương thức thu.** Có DTO đặt/xử lý/hủy, snapshot giá/giảm giá, ví/tiền mặt/gateway, giữ tồn/hết hạn và policy hoàn; Minh/Trường cùng đối chiếu hợp đồng.
+- [ ] **Chốt vòng đời đơn và phương thức thu.** Có DTO đặt/xử lý/hủy, snapshot giá/giảm giá, ví/tiền mặt/gateway, giữ tồn/hết hạn và policy hoàn; ghi căn cứ chốt theo ủy quyền 08/11/2026, đầu vào bàn giao liên module và được Trưởng nhóm duyệt theo điều kiện Done chung.
 
 **Gom từ mã cũ:** `S1-K-02`. Đây là mã tra cứu, không tạo lại các thẻ cũ.
 
