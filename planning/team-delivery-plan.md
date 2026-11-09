@@ -384,6 +384,11 @@ hoặc Trưởng nhóm đã duyệt; việc tích hợp code/migration/kiểm ch
 
 Credentials ZaloPay và callback HTTPS là **task phụ thuộc S1-M**, không phải lựa chọn cần người dùng xác nhận lại. Kết quả kickoff phải được ghi vào hợp đồng/schema trước khi các module triển khai khác nhau.
 
+Gói SCRUM-6 / S1-M-2 ghép lên base `d2141da`, giữ realtime và các module tích hợp; bằng chứng lịch sử ở `4816802`; xem
+[contract ZaloPay](../Backend/docs/005-zalopay-sandbox-contract.md). Cấu hình, HMAC/fixture và probe HTTPS
+thuộc S1; adapter ghi tiền/migration gateway thuộc S2. Kết quả kiểm tra provider thực tế được ghi riêng,
+không suy từ probe hoặc cấu hình hợp lệ thành thanh toán thành công.
+
 Ngày 03/11/2026, người dùng cho phép soạn contract bước 1 của SCRUM-7 (`S1-P-1`). [Contract máy/phiên](../Backend/docs/002-computer-session-contract.md) ghi phương án trạng thái, tiền giờ tính theo giây/làm tròn tổng lên một đồng, thu chênh lệch mỗi 60 giây/khi đóng/trước debit khác, giới hạn hết tiền và phục hồi SQL sau restart; đồng thời mô tả API đọc máy/loại/phòng và sửa trạng thái theo permission. Snapshot giá, liên kết khoản thu–ledger, khóa chống lặp và các ràng buộc phiên/hóa đơn cần migration riêng ở S2; SCRUM-7 không triển khai thu tiền hoặc đổi schema. Login `S1-D-2` đã được tích hợp vào nhánh SCRUM-7 tại `903e055`.
 
 Ngày 05/11/2026, Trưởng nhóm yêu cầu giữ merge SCRUM-12 (`229d7af`, PR #8) và bổ sung phần thiếu để
