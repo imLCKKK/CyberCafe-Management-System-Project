@@ -372,7 +372,7 @@ hoặc Trưởng nhóm đã duyệt; việc tích hợp code/migration/kiểm ch
 | --- | --- |
 | Mapping tài khoản khách/nhân viên và quyền từng endpoint; quy tắc khóa tài khoản | Đại + Minh |
 | Phiên/giao điểm chi ví: D09 chọn phí tích lũy theo giây, ceil tổng tiền, worker 60 giây và quyết toán trước debit món; không thu trả trước chu kỳ song song. Điều kiện mở/đóng, hết tiền/restart và công thức theo [contract SCRUM-7](../Backend/docs/002-computer-session-contract.md) | Trưởng nhóm điều phối/duyệt cuối; Phúc + Minh + Trường phối hợp; Khang gọi điểm tích hợp |
-| Nạp tại quầy: thời điểm thu/cộng ví; xử lý trạng thái demo `CreditedUnpaid` khi chuyển dữ liệu | Minh + Trường |
+| Nạp tại quầy: người dùng chốt 08/11 thu tiền xong mới cộng ví/ledger cùng transaction, không nạp nợ; không nhập `CreditedUnpaid` như nạp thành công. Contract và điểm gọi credit/debit/refund ở [SCRUM-5](../Backend/docs/003-customer-wallet-contract.md); writer/migration ở S2 | Minh + Trường |
 | Đơn: D01–D03/D05–D08 chốt trừ ví khi tạo, cash thu sau confirm, chỉ hủy dòng Pending, tồn khả dụng Sale/Return một lần; ZaloPay giữ 15 phút, thu muộn không hồi sinh đơn, hoàn về nguồn gốc sau duyệt; Refund Failed có đường thay thế | Khang + Minh + Trường |
 | Voucher trong checkout: D04 chốt một mã, ngưỡng trước giảm, hiệu lực server, AwayFromZero/phân bổ snapshot; usage chiếm lượt khi tạo, partial không nhả, full cancel/expired nhả một lần; không giảm vượt tiền món | Trường + Khang + Đại |
 | Giải đấu: UI đang miễn phí nhưng DBML có phí; chọn policy nhất quán, thời hạn đăng ký/hủy và điều kiện đủ đội | Đại + Minh + Phúc |

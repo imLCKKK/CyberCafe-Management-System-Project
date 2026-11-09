@@ -35,6 +35,9 @@ hoàn thiện cạnh tranh/hủy/hoàn thuộc S3-K-1. Không tick Done chỉ v�
 - Đầu vào ví đã đọc: commit `8b2e6a21bb3d3d1f081bd4b1497b39154af971b5`,
   Git path `backend/docs/002-wallet-ledger.md` và code `WalletLedger`/`ICustomerRepository` tương ứng.
   Dùng `OrderPayment` âm, `OrderRefund` dương; Record không tự lưu/commit.
+- Bổ sung SCRUM-5 ngày 08/11/2026: [contract ví trên CyberManagement int](003-customer-wallet-contract.md)
+  thay cho đường code CyberCafe cũ khi tích hợp S2. Giữ OrderPayment/OrderRefund, D09 và D11;
+  hiện mới triển khai query/tạo hồ sơ, chưa có writer Record hoặc settlement đang chạy.
 - Đầu vào kho/chứng từ/voucher đã đọc: commit `761333c4bc32fe3ae5f6bc524b6a2ba8526db864`,
   Git path `docs/contracts/inventory-invoice-voucher.md`, phiên bản 1.7 chờ duyệt.
   Giữ thiết kế một voucher/đơn, phân bổ giảm theo dòng, Payments neo nguồn trước hóa đơn,

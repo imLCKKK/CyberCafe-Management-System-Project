@@ -145,6 +145,11 @@ Assignee: **Minh**. Reviewer: **Trưởng nhóm**. Phối hợp: Đại; Trườ
 
 #### S1-M-1 — Implement-Customer-Wallet-Queries
 
+Jira: **SCRUM-5**. Contract/API hiện tại: [hồ sơ và ví](../Backend/docs/003-customer-wallet-contract.md).
+Ngày 08/11/2026 người dùng chọn nạp quầy thu tiền xong mới cộng ví, không nạp nợ.
+Tạo/đọc khách và query ví thuộc task này; writer credit/debit/refund và realtime thuộc S2-M-1.
+Giữ checklist chưa tick cho đến khi có bằng chứng tích hợp và Trưởng nhóm duyệt.
+
 **Description:**
 
 - Chốt contract credit/debit/refund, ledger, chống xử lý lặp và thời điểm thu tiền với Phúc/Khang/Trường.
@@ -233,10 +238,6 @@ Assignee: **Phúc**. Reviewer: **Trưởng nhóm**. Phối hợp: Đại; Minh �
 Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Minh đối chiếu phương thức thanh toán.
 
 #### S1-K-1 — Implement-Catalog-API-Menu
-
-**Tài liệu triển khai:** [API danh mục/menu và cách kiểm tra](../Backend/README.md#s1-k-1--scrum-10-danh-mục-sản-phẩm-và-menu).
-Code trên nhánh SCRUM-10 dùng chung Products/Categories; giỏ chọn món từ API,
-gửi đơn/thanh toán chờ task checkout. Checklist giữ chưa tick cho đến khi Trưởng nhóm duyệt.
 
 **Description:**
 

@@ -13,6 +13,10 @@ Quyết định của Trưởng nhóm ngày 02/11/2026: dùng **database SQL Ser
 
 Owner triển khai module xuyên các tầng và UI. Application/Domain không dùng DbContext/HttpContext; interface được implementation ở tầng ngoài. [Hợp đồng identity](docs/001-monorepo.md) quy định EmployeeId/CustomerId kiểu int, năm role nhân viên và customer principal. Frontend còn demo; nối login và nghiệp vụ khác theo [55 task](../codex/SPRINT_TASKS.md).
 
+SCRUM-5 đã nối tạo/đọc khách và đọc hồ sơ/ví chính chủ qua API/SQL; xem
+[contract hồ sơ và ví](docs/003-customer-wallet-contract.md). Task này không thêm hoặc sửa schema/migration đã có trong base.
+Credit/debit/refund, nạp tại quầy và realtime writer thuộc S2; contract ghi rõ điểm gọi transaction chung.
+
 
 
 ## Build từ repository root
@@ -151,3 +155,16 @@ Remove-Item Env:AUTH_CHECKS_SQL_CONNECTION
 `--catalog-only` chạy auth/seed + catalog, tách các ca máy tính ngoài phạm vi task. Không có flag này,
 API.Checks vẫn chạy cả máy tính. Browser SQL suite cần Chrome/Edge, có thể cấu hình `CHROME_PATH`;
 CRUD/auth/menu dùng host SQL thật, riêng loading/empty/error được tiêm response để kiểm tra giao diện.
+
+## SCRUM-5: kiểm tra khách hàng và ví
+
+Chạy riêng auth/seed và hồ sơ/ví khách trên cùng cơ chế DB thử:
+
+```powershell
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --customer-only
+```
+
+`--customer-only` tách các ca khách hàng khỏi máy tính/realtime/catalog; `--catalog-only` giữ phạm vi auth/seed
+và catalog như trước. Không truyền flag thì chạy máy tính, realtime, catalog và khách hàng; lỗi của suite đầy đủ
+vẫn được trả về, không được coi kết quả focused là toàn bộ suite pass. Dùng `AUTH_CHECKS_SQL_CONNECTION`
+như hướng dẫn trên để chạy lại cùng các ca khách hàng với SQL Server thử riêng.

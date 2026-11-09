@@ -1021,6 +1021,12 @@ Các quyết định thiết kế được dùng làm cơ sở bàn giao; phản
 Chưa có bằng chứng xác nhận trực tiếp của cả bốn owner hoặc quyết định duyệt cuối.
 Việc rà code không thay cho xác nhận giao điểm cần bàn giao.
 
+Bổ sung SCRUM-5 ngày 08/11/2026: [contract hồ sơ/ví CyberManagement int](../../Backend/docs/003-customer-wallet-contract.md)
+ghi credit/debit/refund, dấu/type và khóa nguồn, transaction chung, liên kết Payment dịch vụ và nạp quầy.
+Người dùng chọn thu tiền trước khi cộng ví, không nạp nợ; nạp ví không phải doanh thu.
+Query/tạo hồ sơ đã có code; writer/nguồn nạp/OperationKey và migration vẫn thuộc S2.
+Ghi chú này bổ sung đầu vào cho Minh/Trường/Khang/Phúc, không thay lịch sử rà soát hoặc giả phản hồi đồng thuận.
+
 ### 9.3. Phụ thuộc cần giải quyết trước khi tích hợp
 
 | Đầu vào                                                                                                     | Người cung cấp                             | Phạm vi ảnh hưởng                                                   |

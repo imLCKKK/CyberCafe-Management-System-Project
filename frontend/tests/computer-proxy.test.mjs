@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer, preview } from 'vite';
 
 for (const mode of ['legacy-dev', 'auth-dev', 'preview']) {
-test(`Vite ${mode} forwards auth/admin/menu and realtime WebSockets while keeping OP.GG middleware local`, async () => {
+test(`Vite ${mode} forwards auth/admin/menu/customers and realtime WebSockets while keeping OP.GG middleware local`, async () => {
   const backendRequests = [];
   const upgrades = [];
   const upgradedSockets = new Set();
@@ -42,16 +42,27 @@ test(`Vite ${mode} forwards auth/admin/menu and realtime WebSockets while keepin
     vite = mode === 'preview' ? await preview(config) : await createServer(config);
     if (mode !== 'preview') await vite.listen();
     const origin = vite.resolvedUrls.local[0].replace(/\/$/, '');
-    for (const [path, method] of [['/api/auth/me', 'GET'], ['/api/admin/computers', 'GET'], ['/api/admin/computers/101/status', 'PATCH'], ['/api/menu', 'GET']]) {
+    const routes = [
+      ['/api/auth/me', 'GET'],
+      ['/api/admin/computers', 'GET'],
+      ['/api/admin/computers/101/status', 'PATCH'],
+      ['/api/admin/products', 'GET'],
+      ['/api/admin/inventory', 'GET'],
+      ['/api/menu', 'GET'],
+      ['/api/customers/me', 'GET'],
+      ['/api/customers/me/wallet', 'GET'],
+    ];
+    for (const [path, method] of routes) {
       const response = await fetch(`${origin}${path}`, { method, headers: { Authorization: 'Bearer proxy-test-token' } });
       assert.equal(response.status, 200);
+      assert.match(response.headers.get('Content-Type') || '', /application\/json/);
       assert.deepEqual(await response.json(), { proxied: true });
       assert.deepEqual(backendRequests.at(-1), { path, method, authorization: 'Bearer proxy-test-token' });
     }
     const opgg = await fetch(`${origin}/api/valorant/opgg/stats`, { method: 'POST' });
     assert.equal(opgg.status, 405);
     assert.equal(opgg.headers.get('Allow'), 'GET');
-    assert.equal(backendRequests.length, 4, 'OP.GG must not be forwarded to .NET');
+    assert.equal(backendRequests.length, routes.length, 'OP.GG must not be forwarded to .NET');
     const negotiate = await fetch(`${origin}/hubs/realtime/negotiate?negotiateVersion=1`, { method: 'POST' });
     assert.equal(negotiate.status, 200);
     assert.equal(backendRequests.at(-1).path, '/hubs/realtime/negotiate?negotiateVersion=1');
