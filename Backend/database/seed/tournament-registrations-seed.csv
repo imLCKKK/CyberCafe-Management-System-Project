@@ -1,0 +1,12 @@
+registrationId,tournamentId,customerId,customerName,riotId,rankId,rankName,rankOrder,preferredRole,winRate,hoursPlayed,skillScore,status,registeredAtUtc
+101,1,11,Nguyen Van An,NguyenVanAn#VNM01,4,Gold,4,Duelist,51.5,820,45.87,Registered,2026-11-01T09:15:00Z
+102,1,12,Tran Minh Khoa,TranMinhKhoa#VNM02,5,Platinum,5,Controller,54.2,1450,58.54,Registered,2026-11-01T10:15:00Z
+103,1,13,Le Thi Hoa,LeThiHoa#VNM03,3,Silver,3,Sentinel,49.0,430,35.67,Registered,2026-11-01T11:15:00Z
+104,1,14,Pham Quoc Bao,PhamQuocBao#VNM04,6,Diamond,6,Initiator,56.8,2300,70.37,Registered,2026-11-01T12:15:00Z
+105,1,15,Vo Thanh Dat,VoThanhDat#VNM05,4,Gold,4,Flex,50.3,960,46.91,Registered,2026-11-02T09:15:00Z
+106,1,16,Do Gia Huy,DoGiaHuy#VNM06,7,Ascendant,7,Duelist,58.1,3100,76.32,Registered,2026-11-02T10:15:00Z
+107,1,17,Bui Thu Trang,BuiThuTrang#VNM07,2,Bronze,2,Sentinel,47.5,210,27.46,Registered,2026-11-02T11:15:00Z
+108,1,18,Hoang Duc Long,HoangDucLong#VNM08,5,Platinum,5,Initiator,53.0,1200,55.68,Registered,2026-11-02T12:15:00Z
+109,1,19,Dang Ngoc Mai,DangNgocMai#VNM09,3,Silver,3,Controller,48.6,520,36.45,Registered,2026-11-03T09:15:00Z
+110,1,20,Ngo Tuan Kiet,NgoTuanKiet#VNM10,8,Immortal,8,Flex,60.4,4200,82.56,Registered,2026-11-03T10:15:00Z
+111,1,21,Ly Hai Yen,LyHaiYen#VNM11,4,Gold,4,Controller,50.0,700,44.22,Cancelled,2026-11-03T11:15:00Z
