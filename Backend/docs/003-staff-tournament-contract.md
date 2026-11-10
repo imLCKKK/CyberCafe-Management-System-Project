@@ -29,7 +29,7 @@
 ## 2. Quy ước và bất biến
 
 - JSON camelCase; enum là chuỗi phân biệt hoa/thường; ID là int dương; thời gian ISO 8601 UTC (`Z`), UI hiển thị +07:00; một mốc `now` server mỗi transaction.
-- Tiền là số nguyên VND, tối đa `999_999_999`; phần lẻ bị từ chối (cùng 004). Cột SQL hiện `decimal(12,2)`, hướng đích `decimal(18,0)` theo 004/D10.
+- Tiền là số nguyên VND, tối đa `999_999_999`; phần lẻ bị từ chối (cùng 004). Ví (`WalletTransactions.Amount/BalanceAfter`) đã là `decimal(18,0)`; `Tournaments.EntryFee` hiện còn `decimal(12,2)`, hướng đích `decimal(18,0)` theo 004/D10.
 - `CustomerId`, `EmployeeId` là hai miền int khác nhau; principal lấy từ JWT, không nhận từ body.
 - Trường ngoài DTO, hoặc client gửi điểm kỹ năng/phí/trạng thái/người xử lý → 400.
 - Mọi POST/PUT/PATCH/DELETE ghi dữ liệu bắt buộc `Idempotency-Key` (8..100 ký tự `[A-Za-z0-9._:-]`), quy tắc replay/fingerprint như 004 mục 8.1.
@@ -217,7 +217,7 @@ Chi tiết ở Phụ lục B (cột hiện có và cột đề xuất được t
 | Giải / phí / chính sách | `Tournaments(TournamentId, GameId, CreatedBy, TournamentName, RegistrationStart, RegistrationEnd, StartTime, EntryFee decimal(12,2), Status)` | Thêm `MaxParticipants: int? NULL`, `FullRefundBeforeUtc: datetime2 NOT NULL` (backfill từ `RegistrationEnd`), `RefundPercentAfter: int NOT NULL` (mặc định 0, range 0..100), `rowversion`; đổi `EntryFee` thành `decimal(18,0)` sau khi xử lý dữ liệu lẻ. Không có default SQL hiện tại cho các cột hiện hữu |
 | Đăng ký | `TournamentRegistrations(RegistrationId, TournamentId, CustomerId, RankId, PreferredRole, WinRate decimal(5,2) NOT NULL, HoursPlayed int NOT NULL, SkillScore decimal(6,2) NULL, Status, RegisteredAt)`, unique `(TournamentId, CustomerId)` | Thêm `RiotId nvarchar(128) NOT NULL` (backfill trước khi áp NOT NULL nếu có dữ liệu); `FeeCharged decimal(18,0) NULL`, `FeeRefunded decimal(18,0) NULL`, `ChargeTransactionId nvarchar(128) NULL`, `RefundTransactionId nvarchar(128) NULL`, `CancelledAtUtc datetime2 NULL`, `CancelReason nvarchar(250) NULL`, `rowversion`. Request cho phép thiếu WinRate/HoursPlayed; normalize null thành 0 theo mục 6.4 để giữ schema/entity NOT NULL, chỉ migrate nullable nếu cần lưu sự khác biệt giữa thiếu và 0 |
 | Đội & chia đội | `Teams(TeamId, TournamentId, TeamName, AvgSkillScore decimal(6,2) NULL)`, `TeamMembers(TeamId, RegistrationId, AssignedRole)` với unique index `RegistrationId` | Thêm `ModelSource nvarchar(50)`, `ModelVersion nvarchar(100) NULL`, `PlanToken nvarchar(36) NULL`, `PlanSnapshot nvarchar(max) NULL`, `rowversion` trên Teams; thêm unique `(TournamentId, TeamName)` nếu cần bảo đảm chống trùng ở DB. Không có `TeamId` trên `TournamentRegistrations`; lấy quan hệ qua `TeamMembers` |
-| Ví | `WalletTransactions(TransactionId, CustomerId, Amount decimal(12,2), BalanceAfter decimal(12,2), Type, Description, CreatedAt)` | Thêm giá trị nghiệp vụ `TournamentFee`, `TournamentRefund` cho `Type` (không cần đổi schema nvarchar); thêm `IdempotencyKey nvarchar(128) NULL` + unique filtered index cho giá trị khác null; nếu theo policy VND nguyên thì đổi `Amount`/`BalanceAfter` sang `decimal(18,0)` sau khi xử lý dữ liệu lẻ |
+| Ví | `WalletTransactions(TransactionId, CustomerId, Amount decimal(18,0), BalanceAfter decimal(18,0), Type, Description, CreatedAt)` | Thêm giá trị nghiệp vụ `TournamentFee`, `TournamentRefund` cho `Type` (không cần đổi schema nvarchar); thêm `IdempotencyKey nvarchar(128) NULL` + unique filtered index cho giá trị khác null. Không đổi precision `Amount`/`BalanceAfter` (đã `decimal(18,0)`) |
 | Idempotency API | Quy ước chung ở 004 | Dùng kho idempotency API dùng chung theo 004; ledger vẫn có unique `IdempotencyKey` riêng làm bảo vệ cuối cho thu/hoàn |
 
 `Teams` không có `CaptainCustomerId` và `TeamMembers` nối qua `RegistrationId` (không qua `CustomerId`): thiết kế này khớp mô hình đội do hệ thống chia. DB constraint chỉ bảo vệ unique/FK; số người đủ `teamSize`, cùng giải, hạn mức hoàn là kiểm tra nghiệp vụ dưới khóa. Không sửa migration đã áp.
@@ -311,7 +311,7 @@ Trạng thái: phương án thiết kế được chọn trong contract v0.4 đ�
 
 ## Phụ lục B. Mapping cột SQL Server
 
-Đối chiếu theo schema/migration hiện tại trong `backend/database/CyberManagement.sql` (InitialCreate) và cấu hình EF. Cột để `—` là chưa tồn tại, không phải cột hiện có; mọi thay đổi schema phải dùng migration mới, không sửa migration đã áp dụng.
+Đối chiếu theo schema/migration hiện tại trên toàn bộ chuỗi migration (`InitialCreate` và các migration sau, gồm `IntegrateInventoryInvoiceVoucherContracts`), `ApplicationDbContextModelSnapshot` và cấu hình EF; `CyberManagement.sql` chỉ là script InitialCreate nên không đủ làm căn cứ. Cột để `—` là chưa tồn tại, không phải cột hiện có; mọi thay đổi schema phải dùng migration mới, không sửa migration đã áp dụng.
 
 ### Bảng Tournaments
 
@@ -377,8 +377,8 @@ Trạng thái: phương án thiết kế được chọn trong contract v0.4 đ�
 | DTO/FieldName | SQL Column | Kiểu | Mặc định | Migration |
 | --- | --- | --- | --- | --- |
 | `type` | `Type` | nvarchar(50) NOT NULL | — | Thêm giá trị ứng dụng `TournamentFee`, `TournamentRefund`; không cần đổi kiểu cột |
-| `amount` | `Amount` | decimal(12,2) NOT NULL | — | Hiện có; đổi thành decimal(18,0) nếu áp dụng policy VND nguyên, xử lý dữ liệu lẻ trước |
-| `balanceAfter` | `BalanceAfter` | decimal(12,2) NOT NULL | — | Hiện có; đổi thành decimal(18,0) đồng bộ nếu policy yêu cầu |
+| `amount` | `Amount` | decimal(18,0) NOT NULL | — | Hiện có; không cần migration precision |
+| `balanceAfter` | `BalanceAfter` | decimal(18,0) NOT NULL | — | Hiện có; không cần migration precision |
 | `description` | `Description` | nvarchar(255) NULL | NULL | Hiện có |
 | (N/A) | `IdempotencyKey` | — | — | Cần thêm nvarchar(128) NULL + unique filtered index WHERE `IdempotencyKey IS NOT NULL` |
 
@@ -390,4 +390,4 @@ Trạng thái: phương án thiết kế được chọn trong contract v0.4 đ�
 | `teamId` | `TeamId` | int FK | | Hiện có |
 | `assignedRole` | `AssignedRole` | nvarchar(50)? | NULL | Hiện có |
 
-**Ghi chú:** Schema hiện tại map `name` → `TournamentName`, `registrationStartUtc` → `RegistrationStart`, `registrationEndUtc` → `RegistrationEnd`, `startTimeUtc` → `StartTime`, `createdByEmployeeId` → `CreatedBy`, và `registeredAtUtc` → `RegisteredAt`. `WinRate`/`HoursPlayed` NOT NULL; API optional phải normalize null thành 0 theo mục 6.4 (chỉ đổi nullable nếu cần lưu phân biệt giá trị thiếu). `SkillScore` và `AvgSkillScore` đều nullable `decimal(6,2)`. `TournamentRegistrations` không có `TeamId`: join `TournamentRegistrations.RegistrationId` → `TeamMembers.RegistrationId` → `Teams.TeamId`; `TeamMembers` có PK `(TeamId, RegistrationId)`, FK `TeamId` cascade-delete tới Teams và unique index trên `RegistrationId`. Trước migration precision tiền, kiểm tra/xử lý dữ liệu lẻ; các cột mới cần backfill/default phù hợp trước khi đặt NOT NULL.
+**Ghi chú:** Schema hiện tại map `name` → `TournamentName`, `registrationStartUtc` → `RegistrationStart`, `registrationEndUtc` → `RegistrationEnd`, `startTimeUtc` → `StartTime`, `createdByEmployeeId` → `CreatedBy`, và `registeredAtUtc` → `RegisteredAt`. `WinRate`/`HoursPlayed` NOT NULL; API optional phải normalize null thành 0 theo mục 6.4 (chỉ đổi nullable nếu cần lưu phân biệt giá trị thiếu). `SkillScore` và `AvgSkillScore` đều nullable `decimal(6,2)`. `TournamentRegistrations` không có `TeamId`: join `TournamentRegistrations.RegistrationId` → `TeamMembers.RegistrationId` → `Teams.TeamId`; `TeamMembers` có PK `(TeamId, RegistrationId)`, FK `TeamId` cascade-delete tới Teams và unique index trên `RegistrationId`. Trước migration precision `EntryFee`, kiểm tra/xử lý dữ liệu lẻ; các cột mới cần backfill/default phù hợp trước khi đặt NOT NULL.
