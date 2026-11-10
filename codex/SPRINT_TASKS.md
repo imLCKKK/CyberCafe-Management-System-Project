@@ -137,7 +137,7 @@ Assignee: **Đại**. Reviewer: **Trưởng nhóm**. Phối hợp: Minh; Phúc �
 
 - [ ] **Chốt API nhân viên, đổi mật khẩu và giải đấu.** Có endpoint/DTO/lỗi/trạng thái cho nhân viên, giải, đăng ký và đội; chốt phí giải UI/DBML với nhóm, cung cấp danh sách đăng ký cho Phúc.
 
-**Bổ sung sau merge ngày 10/11/2026:** SCRUM-4 đã Done và PR #18 đã merge vào `dev`. Theo quyết định Trưởng nhóm, contract v0.6 đồng bộ fallback sang `rank-snake-v1` của SCRUM-9 (rank tier OP.GG giảm dần, hòa theo RegistrationId tăng dần, phân snake); giữ SkillScore tổng hợp làm dữ liệu tham khảo, giữ yêu cầu ML. Bàn giao bằng PR bổ sung cùng tham chiếu SCRUM-4; Trưởng nhóm duyệt cuối.
+**Bổ sung sau merge ngày 10/11/2026:** SCRUM-4 đã Done và PR #18 đã merge vào `dev`. Theo quyết định Trưởng nhóm, contract v0.7 đồng bộ fallback sang `rank-snake-v1` của SCRUM-9 (rank tier OP.GG giảm dần, hòa theo RegistrationId tăng dần, phân snake); giữ SkillScore tổng hợp làm dữ liệu tham khảo, giữ yêu cầu ML. Confirm chỉ đổi tên đội và phải khớp phân đội/vai trò server; swap sau xác nhận được ghi nguồn Manual cùng snapshot/lịch sử riêng. Bàn giao bằng PR bổ sung cùng tham chiếu SCRUM-4; Trưởng nhóm duyệt cuối.
 
 **Gom từ mã cũ:** `S1-D-04`. Đây là mã tra cứu, không tạo lại các thẻ cũ.
 
