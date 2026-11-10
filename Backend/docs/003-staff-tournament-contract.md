@@ -5,7 +5,7 @@
 | Task | Đặc tả endpoint, DTO, trạng thái, lỗi cho nhân viên, đổi mật khẩu, giải đấu, đăng ký, đội; chốt phí giải, mapping UI/DBML, dữ liệu đăng ký cho Phúc |
 | Owner | Đại; Minh đối chiếu ví/ledger, Phúc nhận dữ liệu đăng ký và thuật toán chia đội |
 | Reviewer cuối | Trưởng nhóm |
-| Phiên bản | 0.4, ngày 09/11/2026; cập nhật theo review Trưởng nhóm; đã đối chiếu `gaming_cafe_schema.sql` và 001-monorepo |
+| Phiên bản | 0.5, ngày 10/11/2026; cập nhật mapping theo migration SQL hiện tại và review Trưởng nhóm |
 | Backend đích | CyberManagement .NET 10 / SQL Server, nền 35 bảng |
 | Phụ thuộc | `S1-D-1` (nội dung chưa được đối chiếu), 001 (identity, đã đối chiếu), 002 (phiên/phí giờ), 004 (idempotency, khóa, lỗi) |
 | File đi kèm | `tournament-registrations-seed.csv` (dữ liệu mẫu cho Phúc); quyết định và mapping UI/DBML tại Phụ lục A, B |
@@ -85,8 +85,8 @@ Theo 001, `employee.manage` chỉ Admin có; Manager chỉ xem nhân viên. Đ�
 
 | Method / route | Đầu vào → kết quả | Quyền server |
 | --- | --- | --- |
-| `POST /api/admin/tournaments/{id}/teams/preview` | TeamPreviewRequest → 200 TeamPlanDto, **không ghi dữ liệu** | `team.assign` |
-| `POST /api/admin/tournaments/{id}/teams` | ConfirmTeamsRequest → 201 TeamPageDto | `team.assign` |
+| `POST /api/admin/tournaments/{id}/teams/preview` | TeamPreviewRequest → 200 TeamPlanDto, **không ghi dữ liệu**; nếu đã có đội thì trả snapshot đã chốt, không tạo plan/token mới | `team.assign` |
+| `POST /api/admin/tournaments/{id}/teams` | ConfirmTeamsRequest → 201 TeamPageDto; replay cùng key trả kết quả cũ, key mới khi đội vẫn tồn tại trả 409 `TeamsAlreadyFormed` | `team.assign` |
 | `GET /api/admin/tournaments/{id}/teams` | page → TeamPageDto | `tournament.view` |
 | `PUT /api/admin/teams/{teamId}` | UpdateTeamRequest (đổi tên) → 200 | `team.assign`; chỉ trước `InProgress` |
 | `POST /api/admin/tournaments/{id}/teams/swap` | SwapRequest → 200 TeamPageDto | `team.assign` |
@@ -113,7 +113,7 @@ Khách khác/đăng ký không thuộc mình → 404.
 | GameDto / RankDto | `gameId`, `gameName`, `teamSize`, `isActive` / `rankId`, `rankName`, `rankOrder` |
 | TournamentDto | `id`, `gameId`, `gameName`, `teamSize`, `name` 1..150, `registrationStartUtc`, `registrationEndUtc`, `startTimeUtc`, `entryFee` (≥0, **mỗi đăng ký**), `maxParticipants: int?`, `registeredCount`, `fullRefundBeforeUtc`, `refundPercentAfter` 0..100, `status`, `createdByEmployeeId`, `version` |
 | CreateTournamentRequest | `gameId`, `name`, `registrationStartUtc`, `registrationEndUtc`, `startTimeUtc`, `entryFee`, `maxParticipants?` (bội số `teamSize`), `fullRefundBeforeUtc?` (mặc định = `registrationEndUtc`), `refundPercentAfter` (mặc định 0) |
-| UpdateTournamentRequest | `fullName`, `phone?`, `roleId`, `gameId`, `name`, `registrationStartUtc`, `registrationEndUtc`, `startTimeUtc`, `entryFee`, `maxParticipants?`, `fullRefundBeforeUtc?`, `refundPercentAfter` + `expectedVersion`. Sau đăng ký đầu tiên không đổi `gameId/entryFee/fullRefundBeforeUtc/refundPercentAfter` (409 `TournamentLocked`) |
+| UpdateTournamentRequest | Đúng các trường của `CreateTournamentRequest` (`gameId`, `name`, `registrationStartUtc`, `registrationEndUtc`, `startTimeUtc`, `entryFee`, `maxParticipants?`, `fullRefundBeforeUtc?`, `refundPercentAfter`) + `expectedVersion`; không có `fullName`, `phone`, `roleId`. Sau đăng ký đầu tiên không đổi `gameId/entryFee/fullRefundBeforeUtc/refundPercentAfter` (409 `TournamentLocked`) |
 | TransitionRequest | `toStatus`, `expectedVersion`, `reason?` (bắt buộc khi Cancelled) |
 | RegisterRequest | `riotId` dạng `Tên#TAG` (trim từng phần, đúng một `#`, tên 1..100 ký tự, tag 1..20 ký tự, không ký tự điều khiển, tag không có khoảng trắng; chuẩn hóa thành `Tên#TAG`); `rankId` (thuộc game của giải), `preferredRole: string?` ≤50, `winRate: decimal?` 0..100 (2 chữ số lẻ), `hoursPlayed: int?` 0..100000. **Không nhận `skillScore`, phí, trạng thái** |
 | StaffRegisterRequest | `customerId` + các trường của RegisterRequest; khách phải `Active`; phí trừ ví của khách (mục 3.4) |
@@ -121,7 +121,7 @@ Khách khác/đăng ký không thuộc mình → 404.
 | UpdateRegistrationRequest | `rankId?`, `preferredRole?`, `winRate?`, `hoursPlayed?`, `reason` 1..250, `expectedVersion`; server tính lại `skillScore`, ghi audit |
 | CancelRegistrationRequest | `expectedVersion`, `reason` 1..250 |
 | TeamPreviewRequest | `strategy: Balanced` (V1 chỉ một giá trị), `expectedVersion` của giải |
-| TeamPlanDto | `teams: { teamName, avgSkillScore, members: { registrationId, customerName, skillScore, rankName, assignedRole? }[] }[]`, `unassigned: int[]`, `scoreSpread` (max − min điểm TB giữa các đội), `planToken` (UUID), `modelSource: Balanced|ML` (fallback/ML), `modelVersion: string?` (version ML nếu dùng ML) |
+| TeamPlanDto | `teams: { teamName, avgSkillScore, members: { registrationId, customerName, skillScore, rankName, assignedRole? }[] }[]`, `unassigned: int[]`, `scoreSpread` (max − min điểm TB giữa các đội), `planToken: UUID?` (có ở đề xuất mới; snapshot đã chốt không cấp token mới), `modelSource: Balanced|ML` (fallback/ML), `modelVersion: string?` (version ML nếu dùng ML) |
 | ConfirmTeamsRequest | `planToken` (nối liên kết với preview), `expectedVersion`, `teams: { teamName 1..100 duy nhất trong giải, members: { registrationId, assignedRole? }[] }[]`. Server kiểm tra lại và tính `AvgSkillScore`, **không tin điểm client**, lưu `modelSource`, `modelVersion`, `planSnapshot` vào DB |
 | SwapRequest | `registrationIdA`, `registrationIdB` (khác đội), `expectedVersion` |
 | UpdateTeamRequest | `name` trim 1..100 ký tự + `expectedVersion`; chỉ đổi tên khi giải ở `RegistrationClosed` hoặc `TeamsAssigned`, trước `InProgress`; tên không trùng (sau trim, không phân biệt hoa/thường) trong cùng giải |
@@ -141,7 +141,7 @@ Khách khác/đăng ký không thuộc mình → 404.
 | `RegistrationClosed` → `TeamsAssigned` | Đã chia đội; mọi đội đủ `teamSize`; confirm lưu metadata (modelSource, modelVersion, planToken từ preview) |
 | `TeamsAssigned` → `InProgress` | `now >= startTimeUtc` hoặc staff bắt đầu |
 | `InProgress` → `Completed` | Nhân viên xác nhận kết thúc |
-| `TeamsAssigned` → `RegistrationClosed` | Xóa tất cả teams; mọi registration vẫn `Registered`, chưa hoàn phí |
+| `TeamsAssigned` → `RegistrationClosed` | **Chia lại:** DELETE tất cả teams (sau này có thể Confirm lại với dữ liệu/key khác); mọi registration vẫn `Registered`, chưa hoàn phí |
 | `Draft/RegistrationOpen/RegistrationClosed/TeamsAssigned` → `Cancelled` | Có `reason`; hoàn 100% mọi đăng ký `Registered` (mục 7) |
 | Các tổ hợp khác | 409 `InvalidTournamentTransition` |
 
@@ -161,8 +161,8 @@ Ràng buộc: `registrationStartUtc < registrationEndUtc <= startTimeUtc`; `star
 2. Đăng ký khi giải `RegistrationOpen`, `now` trong `[registrationStartUtc, registrationEndUtc)`, còn chỗ (`maxParticipants` nếu có), khách `Active`.
 3. Hết chỗ cạnh tranh: kiểm tra dưới khóa Tournament; bên thua 409 `TournamentFull`, không ledger.
 4. **SkillScore** do server tính; công thức hợp đồng mặc định: `round(100 × (0.5 × rankOrder/maxRankOrder + 0.3 × winRate/100 + 0.2 × min(hoursPlayed,2000)/2000), 2)`; thiếu `winRate`/`hoursPlayed` coi là 0 và đánh dấu dữ liệu tự khai chưa xác minh. Điểm tính lại khi staff sửa đầu vào, không tính lại sau khi chia đội. Phúc xác nhận phù hợp dữ liệu/model trước khi triển khai.
-5. **Chia đội** do nhân viên có `team.assign` chạy (001 ghi "chạy ML chia đội"). Preview trả `planToken` (UUID) và metadata cần lưu lại (`modelSource: Balanced|ML`, `modelVersion: string?`); Confirm nhận `planToken` để server liên kết với preview tương ứng, lưu `modelSource`, `modelVersion`, `planSnapshot` vào bảng `Teams`. Luồng: (1) client gọi Preview, nhận planToken và teams đề xuất; (2) nhân viên xem xét, chỉnh sửa nếu cần; (3) gọi Confirm với cùng `planToken`, server kiểm tra token còn hiệu lực, registration không đổi, tính lại `AvgSkillScore` và lưu snapshot. Giao diện preview/confirm nhận cùng contract dù backend dùng model ML của Phúc hay quy tắc dự phòng deterministic: sắp `skillScore` giảm dần, hòa theo `registrationId` tăng dần, `k = n / teamSize` đội, chia kiểu rắn (snake draft), ưu tiên phụ là không trùng `preferredRole`. Dù dùng cách nào: `n` không chia hết `teamSize` → 409 `TeamSizeMismatch` kèm số dư; Preview không ghi; Confirm kiểm tra lại toàn bộ dưới khóa và server tự tính `AvgSkillScore`, không tin điểm từ client. Phúc xác nhận model/version/seed và fallback trước khi triển khai.
-6. Chỉ chia đội khi giải `RegistrationClosed`. Chia lại = `DELETE teams` rồi Confirm mới (một transaction mỗi bước).
+5. **Chia đội** do nhân viên có `team.assign` chạy (001 ghi "chạy ML chia đội"). Preview trả `planToken` (UUID) và metadata cần lưu lại (`modelSource: Balanced|ML`, `modelVersion: string?`); Confirm nhận `planToken` để server liên kết với preview tương ứng, lưu `modelSource`, `modelVersion`, `planSnapshot` vào bảng `Teams`. Luồng: (1) client gọi Preview, nhận planToken và teams đề xuất; (2) nhân viên xem xét, chỉnh sửa nếu cần; (3) gọi Confirm với cùng `planToken`, server kiểm tra token còn hiệu lực, registration không đổi, tính lại `AvgSkillScore` và lưu snapshot. Nếu đội đã được chốt, Preview/truy vấn lại trả snapshot hiện có, không ghi đè hay tạo plan mới. Giao diện preview/confirm nhận cùng contract dù backend dùng model ML của Phúc hay quy tắc dự phòng deterministic: sắp `skillScore` giảm dần, hòa theo `registrationId` tăng dần, `k = n / teamSize` đội, chia kiểu rắn (snake draft), ưu tiên phụ là không trùng `preferredRole`. Dù dùng cách nào: `n` không chia hết `teamSize` → 409 `TeamSizeMismatch` kèm số dư; Preview không ghi; Confirm kiểm tra lại toàn bộ dưới khóa và server tự tính `AvgSkillScore`, không tin điểm từ client. Phúc xác nhận model/version/seed và fallback trước khi triển khai.
+6. Chỉ chia đội khi giải `RegistrationClosed`. Confirm cùng Idempotency-Key và payload replay kết quả cũ. Confirm bằng key mới khi vẫn còn đội đã chốt trả 409 `TeamsAlreadyFormed`, không cập nhật snapshot. Muốn chia lại phải DELETE thành công các đội hiện tại trước (TeamMembers được cascade-delete), sau đó Preview/Confirm mới; chỉ lần Confirm mới sau DELETE hợp lệ mới được ghi snapshot mới (mỗi bước trong transaction riêng).
 7. Khách `Locked` không đăng ký mới nhưng vẫn nhận hoàn phí.
 
 ## 7. Phí giải và ví
@@ -214,10 +214,10 @@ Chi tiết ở Phụ lục B (cột hiện có và cột đề xuất được t
 | --- | --- | --- |
 | Nhân viên | `Employees(RoleId, FullName, Phone, IsActive, CreatedAt)` + `Username`, `PasswordHash` (đã có theo 001), `Roles` | Rowversion; `MustChangePassword` (cho reset) |
 | Đổi mật khẩu | `AuditLogs` (`Action` ≤255 ký tự) | Không cần cột mới: dùng `Employees.PasswordHash`, `Customers.PasswordHash` đã có |
-| Giải / phí / chính sách | `TournamentDto.entryFee` ↔ `Tournaments.EntryFee`; `TournamentDto.maxParticipants` ↔ `Tournaments.MaxParticipants`; `TournamentDto.fullRefundBeforeUtc` ↔ `Tournaments.FullRefundBeforeUtc`; `TournamentDto.refundPercentAfter` ↔ `Tournaments.RefundPercentAfter` | `MaxParticipants: int? NULL`, `FullRefundBeforeUtc: datetime2 NOT NULL` (mặc định = `RegistrationEndUtc`), `RefundPercentAfter: int NOT NULL` (mặc định 0, range 0..100), `rowversion`; migration phải set giá trị mặc định cho bảng hiện tại. Tất cả VND nguyên, precision `decimal(18,0)` theo 004 |
-| Đăng ký | `TournamentRegistrations(RankId, PreferredRole, WinRate, HoursPlayed, SkillScore, Status, RegisteredAt)`, unique `(TournamentId, CustomerId)` | `RiotId nvarchar(128) NOT NULL` (migration phải backfill trước khi áp NOT NULL nếu có dữ liệu); `FeeCharged decimal(18,0) NULL`, `FeeRefunded decimal(18,0) NULL`, `ChargeTransactionId nvarchar(128) NULL`, `RefundTransactionId nvarchar(128) NULL`, `CancelledAtUtc datetime2 NULL`, `CancelReason nvarchar(250) NULL`, `rowversion` |
-| Đội & chia đội | `Teams(TournamentId, TeamName, AvgSkillScore)`, `TeamMembers(TeamId, RegistrationId, AssignedRole)` unique `RegistrationId` | `ModelSource nvarchar(50)` (Balanced/ML), `ModelVersion nvarchar(100) NULL`, `PlanToken nvarchar(36) NULL` (lưu UUID từ preview để xác minh confirm), `PlanSnapshot nvarchar(max) NULL` (JSON snapshot teams từ confirm), `rowversion` trên Teams; unique `(TournamentId, TeamName)` theo tên đã trim/không phân biệt hoa thường (trong DB dùng collation `SQL_Latin1_General_CP1_CI_AS`); rowversion |
-| Ví | `WalletTransactions(Amount, BalanceAfter, Type, Description)` | Thêm giá trị Type `TournamentFee`, `TournamentRefund`; thêm `IdempotencyKey nvarchar(128) NULL` + unique filtered index cho giá trị khác null; giá trị theo mẫu ở mục 7; Amount là `decimal(18,0)` |
+| Giải / phí / chính sách | `Tournaments(TournamentId, GameId, CreatedBy, TournamentName, RegistrationStart, RegistrationEnd, StartTime, EntryFee decimal(12,2), Status)` | Thêm `MaxParticipants: int? NULL`, `FullRefundBeforeUtc: datetime2 NOT NULL` (backfill từ `RegistrationEnd`), `RefundPercentAfter: int NOT NULL` (mặc định 0, range 0..100), `rowversion`; đổi `EntryFee` thành `decimal(18,0)` sau khi xử lý dữ liệu lẻ. Không có default SQL hiện tại cho các cột hiện hữu |
+| Đăng ký | `TournamentRegistrations(RegistrationId, TournamentId, CustomerId, RankId, PreferredRole, WinRate decimal(5,2) NOT NULL, HoursPlayed int NOT NULL, SkillScore decimal(6,2) NULL, Status, RegisteredAt)`, unique `(TournamentId, CustomerId)` | Thêm `RiotId nvarchar(128) NOT NULL` (backfill trước khi áp NOT NULL nếu có dữ liệu); `FeeCharged decimal(18,0) NULL`, `FeeRefunded decimal(18,0) NULL`, `ChargeTransactionId nvarchar(128) NULL`, `RefundTransactionId nvarchar(128) NULL`, `CancelledAtUtc datetime2 NULL`, `CancelReason nvarchar(250) NULL`, `rowversion`. Request cho phép thiếu WinRate/HoursPlayed; normalize null thành 0 theo mục 6.4 để giữ schema/entity NOT NULL, chỉ migrate nullable nếu cần lưu sự khác biệt giữa thiếu và 0 |
+| Đội & chia đội | `Teams(TeamId, TournamentId, TeamName, AvgSkillScore decimal(6,2) NULL)`, `TeamMembers(TeamId, RegistrationId, AssignedRole)` với unique index `RegistrationId` | Thêm `ModelSource nvarchar(50)`, `ModelVersion nvarchar(100) NULL`, `PlanToken nvarchar(36) NULL`, `PlanSnapshot nvarchar(max) NULL`, `rowversion` trên Teams; thêm unique `(TournamentId, TeamName)` nếu cần bảo đảm chống trùng ở DB. Không có `TeamId` trên `TournamentRegistrations`; lấy quan hệ qua `TeamMembers` |
+| Ví | `WalletTransactions(TransactionId, CustomerId, Amount decimal(12,2), BalanceAfter decimal(12,2), Type, Description, CreatedAt)` | Thêm giá trị nghiệp vụ `TournamentFee`, `TournamentRefund` cho `Type` (không cần đổi schema nvarchar); thêm `IdempotencyKey nvarchar(128) NULL` + unique filtered index cho giá trị khác null; nếu theo policy VND nguyên thì đổi `Amount`/`BalanceAfter` sang `decimal(18,0)` sau khi xử lý dữ liệu lẻ |
 | Idempotency API | Quy ước chung ở 004 | Dùng kho idempotency API dùng chung theo 004; ledger vẫn có unique `IdempotencyKey` riêng làm bảo vệ cuối cho thu/hoàn |
 
 `Teams` không có `CaptainCustomerId` và `TeamMembers` nối qua `RegistrationId` (không qua `CustomerId`): thiết kế này khớp mô hình đội do hệ thống chia. DB constraint chỉ bảo vệ unique/FK; số người đủ `teamSize`, cùng giải, hạn mức hoàn là kiểm tra nghiệp vụ dưới khóa. Không sửa migration đã áp.
@@ -254,7 +254,7 @@ Các ca dưới là yêu cầu cho S2/S3, **chưa được chạy**.
 | Client gửi `skillScore`, `feeCharged` | 400, server tính điểm |
 | Preview rồi Confirm; plan có đăng ký trùng; số người không chia hết | Preview không ghi, trả `planToken` + `modelSource`/`modelVersion`; Confirm kiểm tra `planToken` hợp lệ, registration không đổi, tính lại `AvgSkillScore`, lưu `modelSource`/`modelVersion`/`planSnapshot`, `TeamSizeMismatch` có số dư |
 | Confirm mà `planToken` sai/hết hạn | 409 `InvalidPlanToken`; phải Preview lại |
-| Cùng dữ liệu chia đội hai lần | Preview lần sau trả `planToken` mới; Confirm lần sau cập nhật snapshot; nếu dùng ML phải cố định phiên bản/seed (Phúc xác nhận trước triển khai) |
+| Confirm/Preview/retry sau khi đã chốt đội | Cùng key + payload trả kết quả cũ; key mới khi vẫn còn đội trả 409 `TeamsAlreadyFormed`; Preview/retry giữ snapshot đã chốt, không cấp token mới hay ghi đè; chỉ Confirm mới sau DELETE thành công mới ghi snapshot mới |
 | Huỷ trước/sau mốc hoàn; huỷ lặp; huỷ khi đã chia đội | Hoàn đúng % một lần; khách bị chặn sau khi chia đội; nhân viên huỷ xoá `TeamMembers`, giải chuyển `RegistrationClosed`, phải chia lại |
 | Huỷ giải nhiều đăng ký; restart giữa chừng | Mỗi đăng ký hoàn đúng một lần, tổng hoàn = tổng phí |
 | Khách Locked đăng ký / nhận hoàn | Đăng ký 409; hoàn vẫn thực hiện |
@@ -311,22 +311,24 @@ Trạng thái: phương án thiết kế được chọn trong contract v0.4 đ�
 
 ## Phụ lục B. Mapping cột SQL Server
 
+Đối chiếu theo schema/migration hiện tại trong `backend/database/CyberManagement.sql` (InitialCreate) và cấu hình EF. Cột để `—` là chưa tồn tại, không phải cột hiện có; mọi thay đổi schema phải dùng migration mới, không sửa migration đã áp dụng.
+
 ### Bảng Tournaments
 
 | DTO/FieldName | SQL Column | Kiểu | Mặc định | Migration |
 | --- | --- | --- | --- | --- |
 | `id` | `TournamentId` | int PK | Auto | Hiện có |
 | `gameId` | `GameId` | int FK | | Hiện có |
-| `name` | `Name` | nvarchar(150) | | Hiện có |
-| `registrationStartUtc` | `RegistrationStartUtc` | datetime2 | | Hiện có |
-| `registrationEndUtc` | `RegistrationEndUtc` | datetime2 | | Hiện có |
-| `startTimeUtc` | `StartTimeUtc` | datetime2 | | Hiện có |
-| `entryFee` | `EntryFee` | decimal(18,0) | 0 | Đổi precision từ (12,2) |
-| `maxParticipants` | `MaxParticipants` | int? | NULL | Cần thêm |
-| `fullRefundBeforeUtc` | `FullRefundBeforeUtc` | datetime2 | = `RegistrationEndUtc` | Cần thêm |
-| `refundPercentAfter` | `RefundPercentAfter` | int | 0 | Cần thêm, range 0..100 |
-| `status` | `Status` | nvarchar(50) | 'Draft' | Hiện có |
-| `createdByEmployeeId` | `CreatedByEmployeeId` | int FK | | Hiện có |
+| `name` | `TournamentName` | nvarchar(150) | | Hiện có |
+| `registrationStartUtc` | `RegistrationStart` | datetime2 | | Hiện có |
+| `registrationEndUtc` | `RegistrationEnd` | datetime2 | | Hiện có |
+| `startTimeUtc` | `StartTime` | datetime2 | | Hiện có |
+| `entryFee` | `EntryFee` | decimal(12,2) NOT NULL | Không có SQL default | Hiện có; migrate → `decimal(18,0)` theo policy VND nguyên, kiểm tra/xử lý dữ liệu lẻ trước |
+| `maxParticipants` | — | — | — | Cần thêm int NULL |
+| `fullRefundBeforeUtc` | — | — | — | Cần thêm datetime2 NOT NULL; backfill từ `RegistrationEnd`, đặt default cho hàng mới |
+| `refundPercentAfter` | — | — | — | Cần thêm int NOT NULL; backfill/default 0, range 0..100 |
+| `status` | `Status` | nvarchar(50) NOT NULL | Không có SQL default | Hiện có |
+| `createdByEmployeeId` | `CreatedBy` | int FK | | Hiện có |
 | `registeredCount` | (tính từ `COUNT(*) TournamentRegistrations WHERE Status='Registered'`) | readonly | | Logic ứng dụng |
 | `version` | `rowversion` | rowversion | | Cần thêm |
 
@@ -340,18 +342,18 @@ Trạng thái: phương án thiết kế được chọn trong contract v0.4 đ�
 | `riotId` | `RiotId` | nvarchar(128) NOT NULL | | Cần thêm (backfill trước) |
 | `rankId` | `RankId` | int FK | | Hiện có |
 | `preferredRole` | `PreferredRole` | nvarchar(50)? | NULL | Hiện có |
-| `winRate` | `WinRate` | decimal(5,2)? | NULL | Hiện có |
-| `hoursPlayed` | `HoursPlayed` | int? | NULL | Hiện có |
-| `skillScore` | `SkillScore` | decimal(10,2) | | Hiện có |
-| `status` | `Status` | nvarchar(50) | 'Registered' | Hiện có |
+| `winRate` | `WinRate` | decimal(5,2) | 0 | Hiện có (NOT NULL, không nullable; null = 0 server-side) |
+| `hoursPlayed` | `HoursPlayed` | int | 0 | Hiện có (NOT NULL, không nullable; null = 0 server-side) |
+| `skillScore` | `SkillScore` | decimal(6,2) NULL | NULL | Hiện có |
+| `status` | `Status` | nvarchar(50) NOT NULL | Không có SQL default | Hiện có |
 | `feeCharged` | `FeeCharged` | decimal(18,0)? | NULL | Cần thêm |
 | `feeRefunded` | `FeeRefunded` | decimal(18,0)? | NULL | Cần thêm |
 | `chargeTransactionId` | `ChargeTransactionId` | nvarchar(128)? | NULL | Cần thêm (IdempotencyKey từ ledger) |
 | `refundTransactionId` | `RefundTransactionId` | nvarchar(128)? | NULL | Cần thêm (IdempotencyKey từ ledger) |
-| `registeredAtUtc` | `RegisteredAtUtc` | datetime2 | GETUTCDATE() | Hiện có |
+| `registeredAtUtc` | `RegisteredAt` | datetime2 NOT NULL | Giá trị khởi tạo UTC ở entity; không có SQL default | Hiện có |
 | `cancelledAtUtc` | `CancelledAtUtc` | datetime2? | NULL | Cần thêm |
 | `cancelReason` | `CancelReason` | nvarchar(250)? | NULL | Cần thêm |
-| `teamId` | `TeamId` | int? FK | NULL | Hiện có |
+| `teamId` | — | Không có cột trực tiếp | — | Không thêm; lấy qua `TeamMembers.RegistrationId` |
 | `version` | `rowversion` | rowversion | | Cần thêm |
 | `Unique(TournamentId, CustomerId)` | | Constraint | | Hiện có |
 
@@ -362,8 +364,8 @@ Trạng thái: phương án thiết kế được chọn trong contract v0.4 đ�
 | `id` | `TeamId` | int PK | Auto | Hiện có |
 | `tournamentId` | `TournamentId` | int FK | | Hiện có |
 | `name` | `TeamName` | nvarchar(100) | | Hiện có |
-| `avgSkillScore` | `AvgSkillScore` | decimal(10,2) | | Hiện có |
-| `modelSource` | `ModelSource` | nvarchar(50) | 'Balanced' | Cần thêm (Balanced/ML) |
+| `avgSkillScore` | `AvgSkillScore` | decimal(6,2)? | NULL | Hiện có (type thực tế `(6,2)` không `(10,2)`) |
+| `modelSource` | `ModelSource` | nvarchar(50) | — | Cần thêm; backfill/default `Balanced` nếu dùng NOT NULL |
 | `modelVersion` | `ModelVersion` | nvarchar(100)? | NULL | Cần thêm (version từ ML nếu dùng ML) |
 | `planToken` | `PlanToken` | nvarchar(36)? | NULL | Cần thêm (UUID từ preview, xóa sau confirm) |
 | `planSnapshot` | `PlanSnapshot` | nvarchar(max)? | NULL | Cần thêm (JSON snapshot teams) |
@@ -374,8 +376,11 @@ Trạng thái: phương án thiết kế được chọn trong contract v0.4 đ�
 
 | DTO/FieldName | SQL Column | Kiểu | Mặc định | Migration |
 | --- | --- | --- | --- | --- |
-| `type` | `Type` | nvarchar(50) | | Thêm giá trị `TournamentFee`, `TournamentRefund` |
-| (N/A) | `IdempotencyKey` | nvarchar(128)? | NULL | Cần thêm + unique filtered index trên `IdempotencyKey IS NOT NULL` |
+| `type` | `Type` | nvarchar(50) NOT NULL | — | Thêm giá trị ứng dụng `TournamentFee`, `TournamentRefund`; không cần đổi kiểu cột |
+| `amount` | `Amount` | decimal(12,2) NOT NULL | — | Hiện có; đổi thành decimal(18,0) nếu áp dụng policy VND nguyên, xử lý dữ liệu lẻ trước |
+| `balanceAfter` | `BalanceAfter` | decimal(12,2) NOT NULL | — | Hiện có; đổi thành decimal(18,0) đồng bộ nếu policy yêu cầu |
+| `description` | `Description` | nvarchar(255) NULL | NULL | Hiện có |
+| (N/A) | `IdempotencyKey` | — | — | Cần thêm nvarchar(128) NULL + unique filtered index WHERE `IdempotencyKey IS NOT NULL` |
 
 ### Bảng TeamMembers (không đổi, reference qua RegistrationId)
 
@@ -385,6 +390,4 @@ Trạng thái: phương án thiết kế được chọn trong contract v0.4 đ�
 | `teamId` | `TeamId` | int FK | | Hiện có |
 | `assignedRole` | `AssignedRole` | nvarchar(50)? | NULL | Hiện có |
 
-**Ghi chú:** Khi migration bảng Tournaments, phải backfill `FullRefundBeforeUtc` bằng `RegistrationEndUtc` cho hàng cũ. Khi migration TournamentRegistrations, phải backfill `RiotId` nếu có dữ liệu hiện tại trước khi áp NOT NULL. `ModelSource`, `ModelVersion`, `PlanSnapshot` sẽ được đặt khi Confirm teams; cho đến lúc đó chúng NULL.
-| D-T12 | Cashier đăng ký thay khách và trừ ví khách | Cho phép nếu có `tournament.register`; khách Active; audit EmployeeId | Dùng permission hiện hữu, không tạo permission mới | Trưởng nhóm + Minh | Theo contract v0.3/001; Minh cần xác nhận luồng ledger |
-| D-T13 | Độ dài mật khẩu tối thiểu | 12 ký tự; ít nhất một chữ và một số | Nhất quán chính sách seed/contract auth | Owner login | Giữ quy ước contract hiện tại; không thuộc điểm review này |
+**Ghi chú:** Schema hiện tại map `name` → `TournamentName`, `registrationStartUtc` → `RegistrationStart`, `registrationEndUtc` → `RegistrationEnd`, `startTimeUtc` → `StartTime`, `createdByEmployeeId` → `CreatedBy`, và `registeredAtUtc` → `RegisteredAt`. `WinRate`/`HoursPlayed` NOT NULL; API optional phải normalize null thành 0 theo mục 6.4 (chỉ đổi nullable nếu cần lưu phân biệt giá trị thiếu). `SkillScore` và `AvgSkillScore` đều nullable `decimal(6,2)`. `TournamentRegistrations` không có `TeamId`: join `TournamentRegistrations.RegistrationId` → `TeamMembers.RegistrationId` → `Teams.TeamId`; `TeamMembers` có PK `(TeamId, RegistrationId)`, FK `TeamId` cascade-delete tới Teams và unique index trên `RegistrationId`. Trước migration precision tiền, kiểm tra/xử lý dữ liệu lẻ; các cột mới cần backfill/default phù hợp trước khi đặt NOT NULL.
