@@ -5,12 +5,14 @@
 | Task | Đặc tả endpoint, DTO, trạng thái, lỗi cho nhân viên, đổi mật khẩu, giải đấu, đăng ký, đội; chốt phí giải, mapping UI/DBML, dữ liệu đăng ký cho Phúc |
 | Owner | Đại; Minh đối chiếu ví/ledger, Phúc nhận dữ liệu đăng ký và thuật toán chia đội |
 | Reviewer cuối | Trưởng nhóm |
-| Phiên bản | 0.5, ngày 10/11/2026; cập nhật mapping theo migration SQL hiện tại và review Trưởng nhóm |
+| Phiên bản | 0.6, ngày 10/11/2026; bổ sung sau PR #18: thống nhất fallback `rank-snake-v1` theo rank OP.GG của SCRUM-9 |
 | Backend đích | CyberManagement .NET 10 / SQL Server, nền 35 bảng |
 | Phụ thuộc | `S1-D-1` (nội dung chưa được đối chiếu), 001 (identity, đã đối chiếu), 002 (phiên/phí giờ), 004 (idempotency, khóa, lỗi) |
 | File đi kèm | `tournament-registrations-seed.csv` (dữ liệu mẫu cho Phúc); quyết định và mapping UI/DBML tại Phụ lục A, B |
 
 **Trạng thái:** bản hợp đồng cập nhật theo review Trưởng nhóm, chưa phải API đang chạy. Các phương án ở Phụ lục A là lựa chọn thiết kế để triển khai; xác nhận liên module của Minh/Phúc và duyệt cuối của Trưởng nhóm được ghi riêng, không suy diễn từ việc cập nhật tài liệu.
+
+**Quyết định bổ sung ngày 10/11/2026:** Trưởng nhóm chọn baseline/fallback `rank-snake-v1` theo [SCRUM-9, mục 5](https://github.com/imLCKKK/CyberCafe-Management-System-Project/blob/1b2ceb9b34cf91b81c61d5dc5c30b5918487527b/docs/contracts/ml-team-balancing-pipeline.md#L146-L153), thay cách xếp theo SkillScore tổng hợp trong v0.5 đã merge ở PR #18. Giữ yêu cầu ML; không chờ xác nhận riêng của Minh/Phúc để chốt phương án này. Bản bổ sung vẫn do Trưởng nhóm duyệt cuối.
 
 **Thay đổi v0.3 (sau khi đọc 001):** dùng đúng tên permission của ma trận quyền (không tạo permission mới); `Username`/`PasswordHash` đã có nên không còn là cột đề xuất; JWT không bị thu hồi phía server nên bỏ giả định "thu hồi token" và bỏ giới hạn thử sai mật khẩu; đổi route đổi mật khẩu về `/api/auth/...`; staff đăng ký thay khách được hỗ trợ (`tournament.register`); chia đội do `team.assign` chạy ML.
 
@@ -120,12 +122,12 @@ Khách khác/đăng ký không thuộc mình → 404.
 | RegistrationDto | `id`, `tournamentId`, `customerId`, `customerName`, `riotId`, `rankId`, `rankName`, `preferredRole`, `winRate`, `hoursPlayed`, `skillScore`, `status`, `feeCharged`, `feeRefunded`, `registeredAtUtc`, `cancelledAtUtc?`, `cancelReason?`, `teamId: int?`, `version`. Danh sách client chỉ trả của chính khách |
 | UpdateRegistrationRequest | `rankId?`, `preferredRole?`, `winRate?`, `hoursPlayed?`, `reason` 1..250, `expectedVersion`; server tính lại `skillScore`, ghi audit |
 | CancelRegistrationRequest | `expectedVersion`, `reason` 1..250 |
-| TeamPreviewRequest | `strategy: Balanced` (V1 chỉ một giá trị), `expectedVersion` của giải |
-| TeamPlanDto | `teams: { teamName, avgSkillScore, members: { registrationId, customerName, skillScore, rankName, assignedRole? }[] }[]`, `unassigned: int[]`, `scoreSpread` (max − min điểm TB giữa các đội), `planToken: UUID?` (có ở đề xuất mới; snapshot đã chốt không cấp token mới), `modelSource: Balanced|ML` (fallback/ML), `modelVersion: string?` (version ML nếu dùng ML) |
+| TeamPreviewRequest | `strategy: Balanced` (giá trị của contract này, ánh xạ baseline `rank-snake-v1` ở SCRUM-9), `expectedVersion` của giải |
+| TeamPlanDto | `teams: { teamName, avgSkillScore, members: { registrationId, customerName, skillScore, rankName, assignedRole? }[] }[]`, `unassigned: int[]`, `scoreSpread` (max − min điểm TB giữa các đội), `planToken: UUID?` (có ở đề xuất mới; snapshot đã chốt không cấp token mới), `modelSource: Balanced\|ML` (fallback/ML), `modelVersion: string?` (version ML nếu dùng ML), `baselineVersion: string?` (`rank-snake-v1` khi `modelSource=Balanced`, null khi ML) |
 | ConfirmTeamsRequest | `planToken` (nối liên kết với preview), `expectedVersion`, `teams: { teamName 1..100 duy nhất trong giải, members: { registrationId, assignedRole? }[] }[]`. Server kiểm tra lại và tính `AvgSkillScore`, **không tin điểm client**, lưu `modelSource`, `modelVersion`, `planSnapshot` vào DB |
 | SwapRequest | `registrationIdA`, `registrationIdB` (khác đội), `expectedVersion` |
 | UpdateTeamRequest | `name` trim 1..100 ký tự + `expectedVersion`; chỉ đổi tên khi giải ở `RegistrationClosed` hoặc `TeamsAssigned`, trước `InProgress`; tên không trùng (sau trim, không phân biệt hoa/thường) trong cùng giải |
-| TeamDto | `id`, `tournamentId`, `name`, `avgSkillScore`, `members: TeamMemberDto[]`, `modelSource: Balanced|ML?`, `modelVersion: string?`, `version` |
+| TeamDto | `id`, `tournamentId`, `name`, `avgSkillScore`, `members: TeamMemberDto[]`, `modelSource: Balanced\|ML?`, `modelVersion: string?`, `baselineVersion: string?` (đọc từ `planSnapshot`), `version` |
 | TeamMemberDto | `registrationId`, `customerId`, `displayName`, `skillScore`, `assignedRole?` |
 | Page / VersionRequest | `items,page,pageSize,totalCount` sắp `createdAt` giảm dần rồi id giảm dần / `expectedVersion` |
 
@@ -160,10 +162,18 @@ Ràng buộc: `registrationStartUtc < registrationEndUtc <= startTimeUtc`; `star
 1. Mỗi khách một đăng ký trong một giải (`UNIQUE (TournamentId, CustomerId)`). Nếu registration đã `Cancelled`, mọi lần đăng ký tiếp theo trả 409 `AlreadyRegistered`; không khôi phục dòng cũ, không tạo registration mới. Quy tắc này giữ nguyên ID bất biến suốt vòng đời và ngăn tái sử dụng khóa thu/hoàn.
 2. Đăng ký khi giải `RegistrationOpen`, `now` trong `[registrationStartUtc, registrationEndUtc)`, còn chỗ (`maxParticipants` nếu có), khách `Active`.
 3. Hết chỗ cạnh tranh: kiểm tra dưới khóa Tournament; bên thua 409 `TournamentFull`, không ledger.
-4. **SkillScore** do server tính; công thức hợp đồng mặc định: `round(100 × (0.5 × rankOrder/maxRankOrder + 0.3 × winRate/100 + 0.2 × min(hoursPlayed,2000)/2000), 2)`; thiếu `winRate`/`hoursPlayed` coi là 0 và đánh dấu dữ liệu tự khai chưa xác minh. Điểm tính lại khi staff sửa đầu vào, không tính lại sau khi chia đội. Phúc xác nhận phù hợp dữ liệu/model trước khi triển khai.
-5. **Chia đội** do nhân viên có `team.assign` chạy (001 ghi "chạy ML chia đội"). Preview trả `planToken` (UUID) và metadata cần lưu lại (`modelSource: Balanced|ML`, `modelVersion: string?`); Confirm nhận `planToken` để server liên kết với preview tương ứng, lưu `modelSource`, `modelVersion`, `planSnapshot` vào bảng `Teams`. Luồng: (1) client gọi Preview, nhận planToken và teams đề xuất; (2) nhân viên xem xét, chỉnh sửa nếu cần; (3) gọi Confirm với cùng `planToken`, server kiểm tra token còn hiệu lực, registration không đổi, tính lại `AvgSkillScore` và lưu snapshot. Nếu đội đã được chốt, Preview/truy vấn lại trả snapshot hiện có, không ghi đè hay tạo plan mới. Giao diện preview/confirm nhận cùng contract dù backend dùng model ML của Phúc hay quy tắc dự phòng deterministic: sắp `skillScore` giảm dần, hòa theo `registrationId` tăng dần, `k = n / teamSize` đội, chia kiểu rắn (snake draft), ưu tiên phụ là không trùng `preferredRole`. Dù dùng cách nào: `n` không chia hết `teamSize` → 409 `TeamSizeMismatch` kèm số dư; Preview không ghi; Confirm kiểm tra lại toàn bộ dưới khóa và server tự tính `AvgSkillScore`, không tin điểm từ client. Phúc xác nhận model/version/seed và fallback trước khi triển khai.
+4. **SkillScore tổng hợp của đăng ký** là dữ liệu tham khảo do server tính, không dùng để sắp người hoặc đánh giá baseline/fallback `rank-snake-v1`; công thức được giữ cho dữ liệu này: `round(100 × (0.5 × rankOrder/maxRankOrder + 0.3 × winRate/100 + 0.2 × min(hoursPlayed,2000)/2000), 2)`; thiếu `winRate`/`hoursPlayed` coi là 0 và đánh dấu dữ liệu tự khai chưa xác minh. Điểm tính lại khi staff sửa đầu vào, không tính lại sau khi chia đội. Dữ liệu tự khai này không thay snapshot rank OP.GG và không tự trở thành feature/label ML.
+5. **Chia đội** do nhân viên có `team.assign` chạy (001 ghi "chạy ML chia đội"). Preview trả `planToken` (UUID) và metadata cần lưu lại (`modelSource: Balanced|ML`, `modelVersion: string?`); Confirm nhận `planToken` để server liên kết với preview tương ứng, lưu `modelSource`, `modelVersion`, `planSnapshot` vào bảng `Teams`. Luồng: (1) client gọi Preview, nhận planToken và teams đề xuất; (2) nhân viên xem xét, chỉnh sửa nếu cần; (3) gọi Confirm với cùng `planToken`, server kiểm tra token còn hiệu lực, registration không đổi, tính lại `AvgSkillScore` và lưu snapshot. Nếu đội đã được chốt, Preview/truy vấn lại trả snapshot hiện có, không ghi đè hay tạo plan mới. Giao diện preview/confirm nhận cùng contract dù backend dùng model ML của Phúc hay quy tắc dự phòng deterministic: baseline `rank-snake-v1` theo rank OP.GG ở mục 6.1, không dùng SkillScore tổng hợp hoặc tự đổi thứ tự snake để ưu tiên vai trò. Dù dùng cách nào: `n` không chia hết `teamSize` → 409 `TeamSizeMismatch` kèm số dư; Preview không ghi; Confirm kiểm tra lại toàn bộ dưới khóa và server tự tính `AvgSkillScore`, không tin điểm từ client. Phúc cung cấp model/version/seed khi triển khai ML; baseline/fallback đã được Trưởng nhóm chọn ngày 10/11/2026.
 6. Chỉ chia đội khi giải `RegistrationClosed`. Confirm cùng Idempotency-Key và payload replay kết quả cũ. Confirm bằng key mới khi vẫn còn đội đã chốt trả 409 `TeamsAlreadyFormed`, không cập nhật snapshot. Muốn chia lại phải DELETE thành công các đội hiện tại trước (TeamMembers được cascade-delete), sau đó Preview/Confirm mới; chỉ lần Confirm mới sau DELETE hợp lệ mới được ghi snapshot mới (mỗi bước trong transaction riêng).
 7. Khách `Locked` không đăng ký mới nhưng vẫn nhận hoàn phí.
+
+### 6.1. Baseline/fallback `rank-snake-v1`
+
+- Nguồn xếp người là `OpggSnapshot.rank.tier` từ snapshot do module OP.GG phía server đọc và xác minh cho đúng Riot ID/game/queue; `rank.tier` là số nguyên 1..27 trong phạm vi VALORANT v1 của SCRUM-9. Không dùng `GameRanks.RankId`, `RankOrder`, `Registration.SkillScore`, winRate/hoursPlayed tự khai hoặc fixture để thay rank provider. Thiếu/sai nguồn/rank hợp lệ trả 422 `STATS_UNAVAILABLE`, không tự gán rank 0 và không ghi đội.
+- Sắp toàn bộ đăng ký hợp lệ theo `rank.tier` giảm dần; hòa tier thì `RegistrationId` tăng dần. Với `n` người, `teamSize` hợp lệ, yêu cầu ít nhất hai đội và `n % teamSize == 0`; sai trả 409 `TeamSizeMismatch`. Đặt `k = n / teamSize`; người tại chỉ số `i` (từ 0) vào đội `i % k` khi `floor(i/k)` chẵn, vào đội `k - 1 - (i % k)` khi lẻ. Đây là cùng thứ tự/tie-break của `generateTeams`, không gọi model demo từ production backend.
+- Baseline không tự hoán đổi người để tối ưu `preferredRole`. Sau khi chia, validator kiểm tra roster/vai trò theo policy của luồng tích hợp; vi phạm vai trò trả 422 `ROLE_CONSTRAINT_UNSATISFIABLE`, không đổi thuật toán rồi vẫn gắn nhãn `rank-snake-v1`. Phạm vi ML v1 và các gate dữ liệu của SCRUM-9 giữ nguyên.
+- Khi `modelSource=Balanced`, `skillScore` của thành viên trong `TeamPlanDto`/`TeamMemberDto` là tier OP.GG đã chụp; `avgSkillScore`/`Teams.AvgSkillScore` là trung bình tier mỗi đội, `scoreSpread` là chênh lệch trung bình tier lớn nhất và nhỏ nhất. Chúng có thang điểm rank, không phải SkillScore tổng hợp của `RegistrationDto` và không phải xác suất thắng. `modelVersion=null`, `baselineVersion=rank-snake-v1`; UI ghi rõ phương pháp. Không trả kết quả dự phòng dưới nhãn ML.
+- Confirm lưu trong `PlanSnapshot` phương pháp/baselineVersion, roster có thứ tự chuẩn, tier và ID/hash snapshot nguồn của từng người, cùng phân đội cuối. Snapshot giúp server tái hiện và trả các điểm theo đúng phương pháp, thay vì đọc lại SkillScore tổng hợp. `baselineVersion` nằm trong JSON này, không cần cột SQL mới riêng. Roster/snapshot đổi trước Confirm phải bị từ chối theo version/plan token; Preview/retry giữ nguyên đội đã chốt theo quy tắc 6 của mục 6.
 
 ## 7. Phí giải và ví
 
@@ -204,6 +214,7 @@ ProblemDetails như `ApiExceptionHandler`, thêm `code` (đề xuất).
 | 409 `CustomerLocked / InsufficientWalletBalance` | Khách khoá; ví không đủ sau quyết toán phí phiên |
 | 409 `RefundNotAllowed` | Đăng ký đã Cancelled hoặc đã hoàn đủ |
 | 409 `VersionConflict / IdempotencyConflict / ConcurrencyConflict` | Version cũ; key khác payload; unique/deadlock SQL (rollback toàn bộ) |
+| 422 `STATS_UNAVAILABLE / ROLE_CONSTRAINT_UNSATISFIABLE` | Baseline thiếu/sai snapshot rank OP.GG hợp lệ; phân đội không thỏa validator vai trò, không ghi đội hoặc thay âm thầm thuật toán |
 | 500 | Lỗi nội bộ, không lộ SQL/secret |
 
 ## 10. Mapping UI ↔ DBML
@@ -230,6 +241,7 @@ Cột (cùng thứ tự CSV, UTF-8 không BOM): `registrationId, tournamentId, c
 
 - Export thật qua `GET .../registrations/export?format=csv|json&status=Registered`; mặc định chỉ `Registered`, gồm `riotId`, không gồm thông tin liên hệ/tài chính khách hàng.
 - Chuỗi bắt đầu bằng `=`,`+`,`-`,`@` được thêm tiền tố `'` (chống CSV injection); không xuất số điện thoại, email, số dư ví.
+- CSV seed giữ SkillScore tổng hợp để tham khảo, không có snapshot rank tier/provenance OP.GG nên chưa đủ chạy baseline `rank-snake-v1`; S2-P-2 cung cấp snapshot server đã xác minh trước bước đề xuất đội.
 - CSV và JSON là hai định dạng bàn giao; CSV seed chỉ là fixture, chưa có dữ liệu đăng ký thật. Phúc xác nhận trường đầu vào cần thêm cho model và cách dùng OP.GG; không gửi dữ liệu khách thật qua seed.
 
 ## 12. Tiêu chí kiểm chứng khi triển khai
@@ -253,6 +265,11 @@ Các ca dưới là yêu cầu cho S2/S3, **chưa được chạy**.
 | Đăng ký đang tồn tại / cùng key khác payload | 409 `AlreadyRegistered` / `IdempotencyConflict` |
 | Client gửi `skillScore`, `feeCharged` | 400, server tính điểm |
 | Preview rồi Confirm; plan có đăng ký trùng; số người không chia hết | Preview không ghi, trả `planToken` + `modelSource`/`modelVersion`; Confirm kiểm tra `planToken` hợp lệ, registration không đổi, tính lại `AvgSkillScore`, lưu `modelSource`/`modelVersion`/`planSnapshot`, `TeamSizeMismatch` có số dư |
+| Rank tier và SkillScore tổng hợp cho thứ tự ngược nhau | `Balanced` chia đúng theo tier OP.GG; thay SkillScore/winRate/hoursPlayed tự khai không đổi phân đội nếu snapshot rank giữ nguyên |
+| Hòa rank, hoán vị thứ tự input | Sắp theo RegistrationId tăng dần khi hòa; cùng roster/snapshot cho cùng phân đội snake và `baselineVersion=rank-snake-v1` |
+| Thiếu/sai nguồn snapshot rank OP.GG | 422 `STATS_UNAVAILABLE`; không lấy RankId/RankOrder/SkillScore làm giá trị thay thế, không ghi Teams/TeamMembers |
+| Baseline vi phạm validator vai trò | 422 `ROLE_CONSTRAINT_UNSATISFIABLE`; không tự hoán đổi người rồi trả nhãn `rank-snake-v1` |
+| Điểm và snapshot của baseline | Điểm thành viên = tier, AvgSkillScore = trung bình tier, scoreSpread cùng thang rank; modelVersion null, PlanSnapshot giữ baselineVersion và snapshot nguồn |
 | Confirm mà `planToken` sai/hết hạn | 409 `InvalidPlanToken`; phải Preview lại |
 | Confirm/Preview/retry sau khi đã chốt đội | Cùng key + payload trả kết quả cũ; key mới khi vẫn còn đội trả 409 `TeamsAlreadyFormed`; Preview/retry giữ snapshot đã chốt, không cấp token mới hay ghi đè; chỉ Confirm mới sau DELETE thành công mới ghi snapshot mới |
 | Huỷ trước/sau mốc hoàn; huỷ lặp; huỷ khi đã chia đội | Hoàn đúng % một lần; khách bị chặn sau khi chia đội; nhân viên huỷ xoá `TeamMembers`, giải chuyển `RegistrationClosed`, phải chia lại |
@@ -284,7 +301,7 @@ Application chỉ tham chiếu Domain; EF/SQL và migration ở Infrastructure; 
 | Việc | Người |
 | --- | --- |
 | Xác nhận D-T02..D-T04, `IdempotencyKey`/ledger uniqueness, thứ tự quyết toán phí phiên và snapshot/modelSource lưu trữ | Minh (chưa có xác nhận trong bằng chứng hiện tại) |
-| Xác nhận D-T08..D-T10, model/version/seed, fallback chia đội, planToken/modelSource/modelVersion/planSnapshot lưu trữ, export format với `riotId` | Phúc (chưa có xác nhận trong bằng chứng hiện tại) |
+| Phối hợp dữ liệu OP.GG/model/version/seed, baselineVersion/snapshot và export `riotId`; baseline/fallback đã chốt `rank-snake-v1` theo quyết định 10/11/2026 | Phúc phối hợp triển khai; không chờ xác nhận riêng để chốt fallback |
 | Đối chiếu nội dung `S1-D-1`, mockup UI, `RolePermissionCatalog` và `UpdateTournamentRequest` DTO |  Đại |
 | Xác nhận các lựa chọn D-T01, D-T05..D-T07 và duyệt cuối contract | Trưởng nhóm |
 
@@ -301,13 +318,13 @@ Trạng thái: phương án thiết kế được chọn trong contract v0.4 đ�
 | D-T05 | Chính sách hoàn | Trước `FullRefundBeforeUtc`: 100%; sau đó `RefundPercentAfter` (mặc định 0%); nhân viên huỷ/huỷ giải: 100%; làm tròn xuống đồng | Tính trên `feeCharged` snapshot, không theo phí hiện tại | Trưởng nhóm | Được ghi nhận theo đề xuất hiện tại; chờ duyệt cuối |
 | D-T06 | Khóa sửa phí | Sau registration đầu tiên không đổi EntryFee/chính sách hoàn | Tránh thay đổi số tiền đã cam kết | Đại | Đã chọn trong contract v0.4; owner triển khai áp dụng |
 | D-T07 | Khách huỷ rồi đăng ký lại | Cấm; cancelled row giữ nguyên | Giữ unique `(TournamentId, CustomerId)` và không tái sử dụng ledger key | Đại | Đã chọn trong contract v0.4; không có xác nhận độc lập khác |
-| D-T08 | Công thức `SkillScore` | `round(100×(0.5×rankOrder/maxRankOrder + 0.3×winRate/100 + 0.2×min(hours,2000)/2000),2)` | Đầu vào bounded, thiếu self-report là 0 và đánh dấu chưa xác minh | Phúc | Chờ Phúc xác nhận |
-| D-T09 | Thuật toán chia đội | ML do Phúc; deterministic snake-draft là fallback nếu ML chưa sẵn sàng | Phù hợp permission `team.assign`; preview/confirm dùng cùng DTO | Phúc | Chờ Phúc chốt model/version/seed/fallback |
+| D-T08 | Công thức `SkillScore` tổng hợp | Giữ công thức ở mục 6.4 cho dữ liệu tham khảo của đăng ký; không dùng cho `rank-snake-v1` | Rank OP.GG là đầu vào baseline ở mục 6.1; dữ liệu tự khai không thay provider | Đại + Phúc | Được tách rõ theo quyết định Trưởng nhóm 10/11/2026 |
+| D-T09 | Thuật toán chia đội | ML do Phúc; baseline/fallback `rank-snake-v1`: tier OP.GG giảm dần, hòa theo RegistrationId tăng dần rồi snake; validator vai trò không tự sửa thứ tự baseline | SCRUM-9 mục 5 và quyết định Trưởng nhóm 10/11/2026 sau PR #18 | Đại + Phúc triển khai | Phương án đã được Trưởng nhóm chọn; PR bổ sung chờ duyệt cuối |
 | D-T10 | Định dạng dữ liệu đăng ký | CSV + JSON; có `riotId`; không xuất PII/tài chính; sample không phải dữ liệu thật | Phù hợp handoff và OP.GG lookup | Phúc | Chọn trong contract v0.4; chờ Phúc xác nhận trường/model input |
 | D-T11 | Thu hồi token sau đổi/reset mật khẩu | Không thu hồi tức thời; token tự hết hạn theo TTL cấu hình (mặc định 20 phút, cấu hình 1..30 phút) | 001 mục 5, không có server-side revocation | Owner login | Giữ quyết định đã mô tả ở 001; không thuộc điểm review này |
 | D-T12 | Cashier đăng ký thay khách và trừ ví khách | Cho phép nếu có `tournament.register`; khách Active; audit EmployeeId | Dùng permission hiện hữu, không tạo permission mới | Trưởng nhóm + Minh | Theo contract v0.3/001; Minh cần xác nhận luồng ledger |
 | D-T13 | Độ dài mật khẩu tối thiểu | 12 ký tự; ít nhất một chữ và một số | Nhất quán chính sách seed/contract auth | Owner login | Giữ quy ước contract hiện tại; không thuộc điểm review này |
-| D-T14 | Lưu trữ `planToken`, `modelSource`, `modelVersion`, `planSnapshot` | `planToken` là UUID; `modelSource` là `Balanced|ML` (để biết kết quả từ ML hay fallback); `modelVersion` là string version model (để tái hiện); `planSnapshot` là JSON snapshot teams từ confirm (để audit) | Đại (triển khai Confirm lưu) + Phúc (xác nhận version/snapshot format) | Ghi trong contract v0.4; chờ xác nhận triển khai |
+| D-T14 | Lưu trữ metadata đề xuất | `planToken` là UUID; `modelSource=Balanced` ánh xạ `rank-snake-v1`, modelVersion null; PlanSnapshot lưu baselineVersion, roster/tier/snapshot nguồn và teams cuối; ML giữ modelVersion riêng | Truy vết nguồn và tái hiện đúng phương pháp theo mục 6.1 | Đại + Phúc | Đặc tả bổ sung v0.6; chưa phải code/migration đã triển khai |
 
 ## Phụ lục B. Mapping cột SQL Server
 
@@ -368,7 +385,7 @@ Trạng thái: phương án thiết kế được chọn trong contract v0.4 đ�
 | `modelSource` | `ModelSource` | nvarchar(50) | — | Cần thêm; backfill/default `Balanced` nếu dùng NOT NULL |
 | `modelVersion` | `ModelVersion` | nvarchar(100)? | NULL | Cần thêm (version từ ML nếu dùng ML) |
 | `planToken` | `PlanToken` | nvarchar(36)? | NULL | Cần thêm (UUID từ preview, xóa sau confirm) |
-| `planSnapshot` | `PlanSnapshot` | nvarchar(max)? | NULL | Cần thêm (JSON snapshot teams) |
+| `planSnapshot` | `PlanSnapshot` | nvarchar(max)? | NULL | Cần thêm (JSON: phương pháp/baselineVersion, roster/tier/snapshot nguồn và teams đã chốt theo mục 6.1) |
 | `version` | `rowversion` | rowversion | | Cần thêm |
 | `Unique(TournamentId, TeamName)` | | Constraint | Collation `SQL_Latin1_General_CP1_CI_AS` | Cần thêm |
 

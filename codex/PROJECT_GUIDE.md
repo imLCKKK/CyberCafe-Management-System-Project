@@ -107,6 +107,7 @@ Người dùng thao tác React
 - ZaloPay: server tạo giao dịch TopUp/Order; callback xác minh chữ ký/giao dịch/số tiền hoặc truy vấn provider mới ghi nhận. Redirect của browser không chứng minh thanh toán; callback/query lặp không ghi tiền hai lần. Không giữ SQL transaction trong thời gian chờ provider.
 - Đơn chờ ZaloPay cần policy giữ tồn/lượt voucher, hết hạn, callback muộn và hoàn tiền. Quy tắc cụ thể chốt ở S1, không tự đổi phương thức hoàn tiền.
 - ML: đăng ký hợp lệ → Phúc cung cấp dữ liệu/model/suy luận và đề xuất đội → Đại tích hợp UI/xác nhận → API lưu đội cùng version/snapshot → SignalR. Có dữ liệu đánh giá và baseline; phân biệt mô hình học từ dữ liệu với thuật toán ghép đội viết tay.
+- Quyết định ngày 10/11/2026: baseline/fallback SCRUM-4 và SCRUM-9 dùng chung `rank-snake-v1`: sắp `OpggSnapshot.rank.tier` giảm dần, hòa theo `RegistrationId` tăng dần rồi phân snake; không xếp theo SkillScore tổng hợp. Thiếu rank OP.GG hợp lệ báo lỗi; dự phòng có nhãn/phương pháp riêng. Yêu cầu ML và đánh giá so baseline giữ nguyên.
 - OP.GG lỗi/không có dữ liệu phải hiện đúng; fixture chỉ dùng kiểm thử, không ghi thành dữ liệu provider thật.
 
 ## 5. Người sở hữu từng phần
