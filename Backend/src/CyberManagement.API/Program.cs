@@ -5,6 +5,7 @@ using CyberManagement.Application.DTOs.Identity;
 using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Security;
 using CyberManagement.API.Realtime;
+using CyberManagement.Infrastructure.Payments;
 using Microsoft.EntityFrameworkCore;
 
 namespace CyberManagement.API
@@ -18,6 +19,7 @@ namespace CyberManagement.API
             builder.Services.AddApplicationServices();
             builder.Services.AddApiServices(builder.Configuration);
             builder.Services.AddInfrastructureServices(builder.Configuration);
+            builder.Services.AddZaloPaySandboxConfiguration(builder.Configuration, builder.Environment.EnvironmentName);
 
             // Add services to the container.
 

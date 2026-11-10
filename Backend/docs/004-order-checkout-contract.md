@@ -302,7 +302,8 @@ Khả năng cấu hình hạn provider phải được Minh kiểm chứng trong
    `OrderPayment:{orderId}` và mã merchant duy nhất gắn đúng order/customer/amount. Commit trước gọi provider.
 2. Adapter nhận `{ orderId, customerId, paymentId, amountVnd, expiresAtUtc, operationKey }` từ server.
    Trả `{ paymentId, status: Pending/Failed, paymentUrl?, expiresAtUtc }`; timeout không được suy thành Failed.
-   Đây là giao diện logic bàn giao S1-M-2, chưa xác nhận chữ ký C# hoặc route callback của Minh.
+   [Contract S1-M-2](005-zalopay-sandbox-contract.md) chốt cấu hình, chữ ký và route callback logic;
+   adapter gọi provider/settlement thuộc S2. Listener probe S1 chỉ kiểm tra HTTPS/chữ ký, không ghi tiền.
 3. API vẫn trả 201 OrderDto khi ý định đã lưu nhưng URL chưa có: paymentUrl=null, paymentStatus=Pending,
    requiresReconciliation=true. Client đọc lại GET, không tạo đơn/mã merchant mới. Nếu chưa lưu được, trả lỗi.
 4. Callback/query của Minh cung cấp kết quả đã kiểm chứng app/merchant, paymentId, mã giao dịch,
@@ -606,7 +607,7 @@ Nền 35 bảng là điểm xuất phát; bảng/cột bổ sung phải được
 | Payments.InvoiceId NOT NULL, chưa có nguồn/khóa hoàn | Theo S1-T-1: nullable InvoiceId, OrderId/SessionChargeId XOR, Type, RefundOfPaymentId, OrderDetailId cho hoàn dòng, OperationKey unique, trạng thái/mốc thời gian/mã gateway; RefundAttempts thuộc adapter | Minh + Trường |
 | Refund chưa có nguồn duyệt trên base | Thêm ApprovedByEmployeeId/ApprovedAtUtc cho khoản hoàn gateway; null khi hệ thống tạo nghĩa vụ thu muộn; worker không gửi trước duyệt, không giả actor nhân viên. Nghĩa vụ chưa hoàn suy từ snapshot hủy + khoản thu/hoàn, không xóa dòng Failed | Minh; Trường đối chiếu với S1-T-1 |
 | Refund chưa có quan hệ thay thế trên base | Payments.ReplacementOfRefundId int? tự FK Payments.PaymentId, NoAction; chỉ Type=Refund, khác PaymentId; unique filtered khi khác null để mỗi tiền nhiệm có tối đa một con trực tiếp. Service kiểm tra tiền nhiệm Failed cùng nguồn/amount/method và mọi attempt đã chốt; replacedByRefundId trong DTO suy ngược từ FK | Minh; Khang gọi nghiệp vụ, Trường đối chiếu |
-| WalletTransactions chưa có IdempotencyKey trên base | Nhận migration/code S1-M-1 từ commit được nhóm tích hợp, không viết lại migration của Minh | Minh |
+| WalletTransactions chưa có IdempotencyKey trên base | S1-M-1 cung cấp query/contract theo 003; writer và migration ví thuộc S2-M-1. Nhận migration của Minh khi nhóm tích hợp, không viết lại lịch sử | Minh |
 | InvoiceOrders/InvoiceDetails | Unique nguồn, snapshot và cập nhật tài chính theo contract Trường; không tạo Invoice.OrderId thay quan hệ gộp | Trường |
 
 DB constraint bảo vệ giá trị nội dòng/FK/unique. Đúng chủ ví, dòng thuộc đơn, tổng giảm, hạn mức hoàn,

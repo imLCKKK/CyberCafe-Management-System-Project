@@ -1,5 +1,7 @@
 # CyberCafe Management System
 
+Gói bàn giao **SCRUM-6**: xem [README-SCRUM-6.md](README-SCRUM-6.md) để biết phạm vi, kiểm tra và cách commit/push.
+
 Đồ án .NET quản lý phòng máy: máy/phiên, khách hàng, nhân viên, ví, món/đơn, kho, hóa đơn/báo cáo, giải đấu và khuyến mãi. Nhận diện NEXORA CYBER; React/Vite + ASP.NET Core .NET 10 + EF Core + SQL Server.
 
 ## Nền được chọn

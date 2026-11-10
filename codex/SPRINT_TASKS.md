@@ -167,6 +167,12 @@ Giữ checklist chưa tick cho đến khi có bằng chứng tích hợp và Tr�
 
 #### S1-M-2 — Configure-ZaloPay-Sandbox-Contracts
 
+Tài liệu bàn giao: [cấu hình và contract ZaloPay sandbox](../Backend/docs/005-zalopay-sandbox-contract.md).
+Gói SCRUM-6 ghép lên `d2141da`, giữ realtime/catalog/kho/khách; bằng chứng S1 ban đầu ở `4816802` ghi riêng.
+Áp dụng hướng dẫn Zalosandbox.pdf, cấu hình server qua User Secrets, fixture chữ ký và probe HTTPS riêng.
+Kết quả provider thật và các giới hạn được ghi tại mục 8 của contract; không xem fixture là thanh toán thật.
+Giữ checklist chờ đủ bằng chứng và Trưởng nhóm duyệt.
+
 **Description:**
 
 - Chuẩn bị biến môi trường/secret server và callback HTTPS cho ZaloPay sandbox chính thức.

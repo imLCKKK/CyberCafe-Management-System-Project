@@ -168,3 +168,39 @@ Chạy riêng auth/seed và hồ sơ/ví khách trên cùng cơ chế DB thử:
 và catalog như trước. Không truyền flag thì chạy máy tính, realtime, catalog và khách hàng; lỗi của suite đầy đủ
 vẫn được trả về, không được coi kết quả focused là toàn bộ suite pass. Dùng `AUTH_CHECKS_SQL_CONNECTION`
 như hướng dẫn trên để chạy lại cùng các ca khách hàng với SQL Server thử riêng.
+
+## S1-M-2: ZaloPay sandbox
+
+S1-M-2 có [contract ZaloPay sandbox](docs/005-zalopay-sandbox-contract.md), validation cấu hình server và
+HMAC create/query/callback. Khóa dùng User Secrets/environment; tham khảo tên biến tại
+[zalopay-sandbox.env.example](zalopay-sandbox.env.example), file này không tự được .NET nạp.
+
+Để chạy riêng 77 kiểm tra fixture, từ repository root:
+
+```powershell
+.\scripts\dotnet-local.cmd build Backend\tests\CyberManagement.API.Checks --artifacts-path .tools\scrum6\artifacts
+.\scripts\dotnet-local.cmd .tools\scrum6\artifacts\bin\CyberManagement.API.Checks\debug\CyberManagement.API.Checks.dll --zalopay-checks
+```
+
+Probe HTTPS S1 cần `cloudflared` từ [nguồn chính thức](https://developers.cloudflare.com/tunnel/downloads/),
+trên PATH hoặc ở `.tools/scrum6/cloudflared.exe`. Sau đó:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-zalopay-demo.ps1 -UseOfficialDemo
+# Dừng đúng listener/tunnel S1 đã ghi nhận:
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-zalopay-demo.ps1
+```
+
+Khi chạy lại, dừng probe/tunnel cũ trước rồi mới start. Quick tunnel có thể hết hiệu lực;
+start script sẽ cấp URL HTTPS mới, cập nhật User Secrets và kiểm tra lại Query/4 fixture HTTPS.
+
+Script đọc merchant dùng thử đang được ZaloPay công bố, không hard-code keys; lưu vào User Secrets
+API và ghi bằng chứng không chứa khóa tại `.tools/scrum6/`. Chạy bằng bộ merchant riêng thì cấu hình
+các trường trong contract bằng User Secrets, bật `Enabled=true`, rồi chạy start script không có
+`-UseOfficialDemo`. Script chỉ cập nhật CallbackUrl theo tunnel vừa được cấp, giữ nguyên keys của bạn;
+nếu cấu hình chưa bật hoặc không hợp lệ thì dừng và không báo HTTPS đã được xác minh.
+Probe chỉ kiểm tra HTTPS/chữ ký, không có SQL/ghi tiền hoặc acknowledgment thanh toán thành công.
+`Enabled=true` chỉ là cờ cấu hình, không xác nhận provider đã chấp nhận khóa.
+Ngày 09/11/2026 Query sandbox bằng AppId 554/Key1 dùng thử đã đạt controls chữ ký đúng/sai
+(`2/-101` và `2/-402`), gỡ blocker kết nối trước đó. Xem phạm vi và bằng chứng trong contract;
+Create, callback từ khoản thanh toán thật và ghi tiền vẫn thuộc luồng tích hợp S2.

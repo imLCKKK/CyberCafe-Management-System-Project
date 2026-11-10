@@ -21,6 +21,18 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
+if (args.Contains("--zalopay-checks"))
+{
+    Console.WriteLine($"{ZaloPayContractChecks.Run()} ZaloPay configuration and signature fixture checks passed (no provider call).");
+    return;
+}
+
+if (args.Contains("--zalopay-probe-host"))
+{
+    await ZaloPayCallbackProbeHost.RunAsync();
+    return;
+}
+
 if (args.Contains("--realtime-host", StringComparer.Ordinal))
 {
     await RealtimeIntegrationHost.RunAsync();
@@ -89,7 +101,7 @@ builder.Services
 
 await using var app = builder.Build();
 HttpClient client = null!;
-var checks = 0;
+var checks = ZaloPayContractChecks.Run();
 var started = false;
 try
 {
@@ -259,7 +271,7 @@ try
     await CheckStatus("Disabled employee cannot log in", HttpStatusCode.Forbidden,
         await SendLogin("tech01", "Technician-check-password-2026!"));
 
-    Console.WriteLine($"{checks} HTTP and persistence checks passed ({databaseFixture.Provider}).");
+    Console.WriteLine($"{checks} HTTP, persistence and contract checks passed ({databaseFixture.Provider}).");
 }
 finally
 {
