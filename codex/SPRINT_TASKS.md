@@ -215,7 +215,7 @@ Assignee: **Phúc**. Reviewer: **Trưởng nhóm**. Phối hợp: Đại; Minh �
 #### S1-P-3 — Define-ML-Team-Balancing-Pipeline
 
 **Jira / đặc tả:** SCRUM-9 — [Pipeline ML chia đội v1](../docs/contracts/ml-team-balancing-pipeline.md).
-Đã kiểm kê adapter/baseline và định nghĩa contract, dữ liệu, đánh giá, runtime; model/dataset có nhãn và giao điểm S1-D-3 còn blocker. Checklist giữ nguyên, chưa có bằng chứng Đại đối chiếu hoặc Trưởng nhóm nghiệm thu.
+Đã kiểm kê adapter/baseline và định nghĩa contract, dữ liệu, đánh giá, runtime. Cập nhật 11/11/2026: đã đọc S1-D-3 / SCRUM-4 v0.7 (`aad623a`), bổ sung mapping `/teams/preview` → `/teams` cho ML/Balanced, binding token/proposal/roster/model và hai JSON mẫu; B1 không còn là thiếu contract. Model/dataset có nhãn và lưu snapshot SQL còn blocker. Giữ bằng chứng 28/28 lần trước do source không đổi; chưa chạy thêm ML/API/SQL. Checklist giữ nguyên, chưa có xác nhận owner về mapping mới hoặc Trưởng nhóm duyệt cuối.
 
 **Description:**
 

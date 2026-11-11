@@ -3,7 +3,7 @@
 | Thông tin | Giá trị |
 | --- | --- |
 | Task | SCRUM-9 / S1-P-3 — Define-ML-Team-Balancing-Pipeline |
-| Phiên bản / ngày | Thiết kế v1.0 / 08/11/2026 |
+| Phiên bản / ngày | Thiết kế v1.1 / 11/11/2026; bổ sung mapping preview → confirm |
 | Base kiểm kê | `dev` tại `93cf457`; nhánh `SCRUM-9-define-ml-team-balancing-pipeline` |
 | Owner / phối hợp | Phúc / Đại; Trưởng nhóm là reviewer cuối theo backlog |
 | Phụ thuộc | S1-D-3 — Define-Staff-Tournament-Contracts |
@@ -21,7 +21,8 @@ SCRUM-9 kiểm kê và định nghĩa pipeline, không triển khai model, endpo
 | Nhánh Phúc lịch sử | Ref local `origin/Phuc` tại `52db755` (22/10/2026); remote hiện không còn nhánh `Phuc` | `server/opgg.js` và model giải frontend chỉ khác import so với đường dẫn mới; `tournamentAdminModel.js` giống nguyên nội dung. Không khôi phục cấu trúc cũ |
 | [Entity đăng ký](../../Backend/src/CyberManagement.Domain/Entities/TournamentRegistration.cs), [đội](../../Backend/src/CyberManagement.Domain/Entities/Team.cs), [thành viên](../../Backend/src/CyberManagement.Domain/Entities/TeamMember.cs) | RegistrationId/TournamentId/CustomerId/RankId là int; PreferredRole nullable; WinRate, HoursPlayed, SkillScore; unique TournamentId + CustomerId và unique RegistrationId trong TeamMembers | Chưa có RiotId, OpggSnapshot, nguồn/thời điểm thống kê, modelVersion hoặc snapshot đề xuất trong entity hiện tại |
 | Model/dataset ML | Không tìm thấy training code, dependency ML, artifact `.zip` ML được định danh, `.onnx/.pkl/.joblib/.pt/.h5`, notebook hoặc tập `.csv/.parquet/.jsonl` huấn luyện trong file versioned của base và cây lịch sử Phúc đã kiểm kê | Chưa có model, nhãn kết quả trận, manifest train/evaluation hay báo cáo đánh giá để tái sử dụng. Không kết luận về file cá nhân chưa được cung cấp |
-| Nguồn ngoài repo được người dùng cung cấp | [OP.GG](https://op.gg/) | Đây là trang provider; chưa cung cấp file model/dataset có nhãn hoặc contract S1-D-3. Phạm vi adapter hiện hữu là VALORANT, không lấy dữ liệu LoL trang chủ để thay vào |
+| Contract S1-D-3 / SCRUM-4 | [Contract v0.7 tại `aad623a`](https://github.com/imLCKKK/CyberCafe-Management-System-Project/blob/aad623ac7b7bf120f8d08e88276ae317909dc789/Backend/docs/003-staff-tournament-contract.md), mục 3–6, 10–12 và phụ lục A–B; đã đọc từ ref `origin/fix/SCRUM-4-rank-snake-fallback` ngày 11/11/2026 | Đã có route/DTO/status/phí/Riot ID/PlanSnapshot; baseline đã thống nhất `rank-snake-v1`. V0.7 chỉ nhận `strategy: Balanced`; mapping bổ sung ML và gắn token với proposal tại mục 4 dưới đây, không coi là API đã triển khai |
+| Nguồn ngoài repo được người dùng cung cấp | [OP.GG](https://op.gg/) | Đây là trang provider; chưa cung cấp file model/dataset có nhãn. Phạm vi adapter hiện hữu là VALORANT, không lấy dữ liệu LoL trang chủ để thay vào |
 | Test và dữ liệu demo | [Adapter tests](../../Backend/integrations/opgg/opgg.test.js), [tournament tests](../../frontend/src/client/tournaments/tournamentModel.test.js), [baseline test](../../frontend/src/admin/shared/adminModel.test.js), mock Home và browser fixtures | Dùng kiểm tra kỹ thuật; loại khỏi dataset huấn luyện/đánh giá. Fixture cũng mang `source: "opgg"`, nên riêng trường này không chứng minh nguồn thật |
 
 Phạm vi rà soát không bao gồm DB cá nhân, ổ đĩa ngoài repo hoặc file chưa được gửi. `GameRanks.RankId` là khóa SQL, **không phải** `rank.tier` của OP.GG; `WinRate/HoursPlayed/SkillScore` cũ chưa có provenance nên chưa đủ làm feature/label.
@@ -55,93 +56,194 @@ Phạm vi v1: **VALORANT PC Competitive, đúng 10 người, hai đội 5 ngư�
 
 Các điều kiện bắt buộc:
 
-1. API lấy giải và toàn bộ đăng ký đủ điều kiện từ SQL sau khi xác thực. Giải đã đóng đăng ký, chưa có đội xác nhận; danh sách caller chọn phải khớp toàn bộ roster đủ điều kiện. S1-D-3 phải chốt trạng thái chính thức và policy phí; không tự coi demo `Registered/Closed` là API đã có.
+1. API lấy giải và toàn bộ đăng ký đủ điều kiện từ SQL sau khi xác thực: giải `RegistrationClosed`, chưa có đội xác nhận; đăng ký `Registered`, khách `Active`, phí đã xử lý theo S1-D-3 (miễn phí hoặc Wallet thu cùng transaction đăng ký). Không nhận danh sách con do browser chọn. Confirm chuyển giải sang `TeamsAssigned`, đăng ký vẫn `Registered`; không dùng trạng thái demo `Closed/Assigned` cho API. Các lựa chọn phí/ledger trong S1-D-3 không đồng nghĩa đã được owner ví xác nhận hoặc đã có code.
 2. Có đúng 10 RegistrationId, 10 CustomerId và 10 Riot ID chuẩn hóa không trùng; dùng `parseRiotId` hiện có và khóa so sánh không phân biệt hoa/thường (`toLocaleLowerCase('en')`) như adapter. Mỗi đăng ký thuộc đúng giải, khách còn đủ điều kiện. Mỗi người xuất hiện đúng một lần trong output, mỗi đội đúng 5 người. Không tự loại người thiếu dữ liệu.
-3. Vai trò chỉ thuộc `Duelist/Initiator/Controller/Sentinel/Flex`. Mỗi đội phải phủ bốn vai trò đầu; người thứ năm có thể trùng vai trò hoặc Flex. Người chọn vai trò cụ thể giữ nguyên vai trò; chỉ người chọn Flex được gán sang vai trò thiếu. Nếu không có cách phủ đủ, trả `ROLE_CONSTRAINT_UNSATISFIABLE`. Đây là policy đề xuất của sản phẩm, không phải khẳng định luật game bắt buộc đội hình này; Đại cần đối chiếu ở S1-D-3.
+3. Vai trò chỉ thuộc `Duelist/Initiator/Controller/Sentinel/Flex`. Mỗi đội phải phủ bốn vai trò đầu; người thứ năm có thể trùng vai trò hoặc Flex. Người chọn vai trò cụ thể giữ nguyên vai trò; chỉ người chọn Flex được gán sang vai trò thiếu. Nếu không có cách phủ đủ, trả `ROLE_CONSTRAINT_UNSATISFIABLE`. Đây là policy sản phẩm v1 cho giao điểm này, không phải luật game. DTO S1-D-3 cho phép preferredRole null/chuỗi khác; các giá trị đó chưa đủ chạy v1, trả lỗi roster thay vì tự gán Flex.
 4. Snapshot phải đúng Riot ID, game/queue và cùng scope hỗ trợ; có provenance từ lần đọc provider thật. V1 yêu cầu rank tier 1..27 và ít nhất 10 trận. Các chỉ số nullable được xử lý theo mục 6, không dùng mặc định rank 0 hoặc số liệu khách khai báo.
 5. Khi suy luận: fetchedAt không ở tương lai và không quá 24 giờ. Nếu sourceUpdatedAt có giá trị thì không ở tương lai/không quá 7 ngày; nếu null, cảnh báo `SOURCE_FRESHNESS_UNKNOWN`, không tự nhận số liệu provider là mới. Ngưỡng này là policy chất lượng v1, tách biệt cache 10 phút của adapter.
 6. Input bất biến + model/version + policy như nhau phải cho cùng đề xuất. Không nhận khóa nhóm, điểm cân bằng, quyền hoặc đường dẫn model do browser quyết định.
 
 ## 4. Input/output và giao điểm với Đại
 
-### 4.1. HTTP đề xuất cho S1-D-3, chưa triển khai
+### 4.1. Route/DTO chung và mapping SCRUM-4 → SCRUM-9
 
-`POST /api/admin/tournaments/{tournamentId}/team-proposals`, permission **team.assign** hiện có (Admin/Manager). Request:
+Dùng route của **S1-D-3 / SCRUM-4 v0.7**; `/team-proposals` trong bản SCRUM-9 v1.0 được thay bằng mapping này, không triển khai thêm route công khai đó. Phần mở rộng dưới đây là contract thiết kế dùng cho S2-D-4/S2-P-3, chưa phải thay đổi source/API hoặc xác nhận owner đã tích hợp.
 
-```json
-{
-  "contractVersion": "team-balance.v1",
-  "rosterVersion": "sha256:roster-returned-by-server",
-  "registrationIds": [101, 102, 103, 104, 105, 106, 107, 108, 109, 110],
-  "strategy": "ml"
-}
-```
+| Giao điểm | Contract dùng khi triển khai |
+| --- | --- |
+| Preview | `POST /api/admin/tournaments/{id}/teams/preview`, permission **team.assign** (Admin/Manager); `TeamPreviewRequest = {strategy: ML\|Balanced, expectedVersion: string}`. Hai trường bắt buộc, enum phân biệt hoa/thường, không mặc định phương pháp. `ML` là giá trị bổ sung cho DTO v0.7 |
+| Chọn phương pháp | `strategy: ML` → input nội bộ `strategy: ml` → output `method: ml`, DTO `modelSource: ML`, `modelVersion` từ artifact, `baselineVersion: null`. `strategy: Balanced` → `rank-snake-v1` → `method: rank-snake-v1`, DTO `modelSource: Balanced`, `modelVersion: null`, `baselineVersion: rank-snake-v1`. `Manual` chỉ xuất hiện sau swap, không phải strategy preview |
+| Version giải | `expectedVersion` là `TournamentDto.version` rowversion base64 do server cấp. Preview mới trả lại cùng giá trị ở `TeamPlanDto.version`; Confirm dùng chính giá trị đó. Mọi thay đổi đăng ký/cấu hình giải ảnh hưởng plan phải tăng version aggregate giải trong cùng transaction. Không chuyển rowversion thành hash roster hoặc ngược lại |
+| Roster | Không gửi `registrationIds` hoặc `rosterVersion` trong request công khai. API đọc toàn bộ roster đủ điều kiện, snapshot/provenance tin cậy và tính `rosterVersion` nội bộ theo mục 4.2; trả hash để truy vết. Confirm tính lại hash ngay cả khi rowversion giải chưa đổi |
+| Kết quả preview mới | Giữ các trường `TeamPlanDto` của SCRUM-4; bổ sung `version`, `rosterVersion`, `proposalId`, `expiresAtUtc`, `quality`, `warnings`. `planToken` là UUID do server sinh, khác `proposalId` hash nội dung. Server giữ toàn bộ output mục 4.3 trong binding token; browser không tự cấp model/version/điểm |
+| Confirm | `POST /api/admin/tournaments/{id}/teams`, cùng quyền, header `Idempotency-Key` theo SCRUM-4; `ConfirmTeamsRequest = {planToken, expectedVersion, teams: [{teamName, members: [{registrationId, assignedRole?}]}]}`. Không nhận proposalId/rosterVersion/model metadata do client khai thay binding server. Thành công `201 TeamPageDto`; replay cùng key/payload trả kết quả cũ |
+| Đội đã xác nhận | Sau xác thực/quyền và validation DTO, Preview ưu tiên trả snapshot/version hiện tại, `planToken: null`, không tạo plan hoặc so expectedVersion để tạo plan mới; giữ nguồn `ML/Balanced/Manual` thực tế. Muốn chia lại theo SCRUM-4 phải DELETE hợp lệ rồi Preview/Confirm mới; không dùng token cũ |
 
-`strategy` nhận `ml` hoặc `rank-snake-v1`; mặc định `ml`. Baseline chỉ chạy khi caller chọn rõ. Không tự fallback sang baseline khi model lỗi rồi trả `method: ml`. Đây là request minh họa tổng hợp, không phải đăng ký hoặc số đo thật.
-
-API xác minh rosterVersion, IDs và quyền rồi tự dựng input nội bộ; không tin stats/Riot ID do browser gửi. Không gọi OP.GG từ vòng tìm phương án. Lookup/refresh là bước riêng của S2-P-2 trước khi tạo snapshot.
+ML lỗi trả lỗi rõ; UI chỉ gọi lại với `Balanced` khi người có quyền chọn baseline. Mỗi lần preview phương pháp khác có token/binding riêng; không tái sử dụng token ML cho baseline. `Balanced` tổng quát vẫn giữ phạm vi số đội của SCRUM-4 mục 6.1; giao điểm/đánh giá ML v1 dưới đây dùng đúng roster 10 người. Không gọi OP.GG trong preview/tìm phương án hoặc transaction confirm; refresh và lưu snapshot là bước riêng S2-P-2 trước preview.
 
 ### 4.2. Input nội bộ Phúc nhận từ module giải
 
 | Trường | Kiểu / quy tắc |
 | --- | --- |
 | contractVersion, featureVersion | `team-balance.v1`, `opgg-competitive.v1` |
+| policyVersion | `valorant-5v5.v1`: ràng buộc vai trò và gate dữ liệu mục 3; đổi rule phải đổi version, không sửa nội dung dưới cùng version |
+| strategy | `ml` hoặc `rank-snake-v1`, do API ánh xạ từ ML/Balanced |
 | tournamentId, gameId | int dương; gameId lấy SQL, resolve thành `valorant`; không hard-code GameId = 1 |
 | teamSize, teamCount | 5 và 2 |
-| rosterVersion, generatedAtUtc | Hash roster có thứ tự chuẩn; thời điểm server UTC |
+| expectedVersion, rosterVersion, generatedAtUtc | Rowversion giải được kiểm tra ở API; hash roster riêng; thời điểm server UTC |
 | participants | Đúng 10 phần tử, sắp RegistrationId tăng dần |
 | participant.registrationId/customerId | int dương từ đăng ký SQL |
+| status, feePolicy; participant.customerStatus/registrationStatus/feeCharged/feeRefunded/feeEligible | Trạng thái và policy từ SQL; số tiền snapshot nullable giữ nguyên; feeEligible do server xác minh theo S1-D-3, không suy ra từ số dư ví hiện tại hoặc dữ liệu browser |
 | participant.riotId/preferredRole | Riot ID chuẩn hóa; vai trò enum ở mục 3 |
 | participant.stats | Toàn bộ object OP.GG ở mục 2, không đổi tên hoặc đơn vị |
 | participant.provenance | `{origin: provider, snapshotId, snapshotSha256, capturedAtUtc}` do collector/server tin cậy ghi; có bản lưu đối chiếu |
 
-`rosterVersion` hash canonical UTF-8 gồm tournamentId/gameId/status, eligibility và bộ `{registrationId, customerId, riotId, preferredRole, registrationStatus, snapshotSha256}` sắp theo RegistrationId. Hash snapshot lấy từ toàn bộ stats. Quy ước chung: canonical JSON theo [RFC 8785 JCS](https://www.rfc-editor.org/rfc/rfc8785), encode UTF-8, SHA-256, trả `sha256:` + 64 ký tự hex thường; không hash JSON có thứ tự key tùy ý. S1-D-3/S2-P-2 phải chốt mapping lưu trữ và có test vector JCS dùng chung Node/.NET trước khi triển khai; chưa có các cột này trong SQL.
+`rosterVersion` hash đúng object `{tournamentId, gameId, status, teamSize, feePolicy, participants}`. `feePolicy` gồm đúng `{entryFee, fullRefundBeforeUtc, refundPercentAfter}`; mỗi participant trong phép hash gồm đúng `{registrationId, customerId, customerStatus, riotId, preferredRole, registrationStatus, feeCharged, feeRefunded, feeEligible, snapshotSha256}`, sắp RegistrationId tăng dần. Giữ null của số tiền chưa có; `feeEligible` là boolean server xác minh việc miễn phí/thu phí hợp lệ, bắt buộc true trước khi tạo proposal. Không âm thầm bỏ đăng ký Registered có khách bị khóa/phí không hợp lệ để tạo roster nhỏ hơn: trả `409 TeamPlanInvalid` để xử lý đăng ký trước.
 
-### 4.3. Output thành công
+`snapshotSha256` hash đúng object `{stats, provenance: {origin, snapshotId, capturedAtUtc}}`, không chứa chính snapshotSha256; snapshotId là chuỗi định danh do collector cấp. Giữ nguyên toàn bộ stats và chuỗi thời gian do adapter trả, không đổi null thành 0. Trường thời gian do server tạo (`capturedAtUtc`, `fullRefundBeforeUtc`) chuẩn hóa UTC `YYYY-MM-DDTHH:mm:ss.SSSZ` trước hash. Đổi rank, scope, thời điểm hoặc nguồn cũng đổi hash. Không hash SkillScore tổng hợp như một feature sức mạnh. Quy ước chung: canonical JSON theo [RFC 8785 JCS](https://www.rfc-editor.org/rfc/rfc8785), encode UTF-8, SHA-256, trả `sha256:` + 64 ký tự hex thường; đủ các key đã liệt kê, không bỏ key null hoặc hash JSON có thứ tự key tùy ý. `expectedVersion` bắt cả thay đổi aggregate không làm đổi feature. S1-D-3 đã có thiết kế rowversion/PlanSnapshot; S2-D-4/S2-P-2 còn phải triển khai lưu trữ và test vector JCS chung Node/.NET, chưa có các cột này trong SQL của checkout này.
+
+Preview mới đọc version/roster/snapshot trong cùng một ảnh chụp dữ liệu nhất quán, suy luận ngoài transaction giữ khóa; trước khi cấp token kiểm tra lại version/hash với dữ liệu hiện tại. Nếu đã đổi, trả `409 VersionConflict` hoặc `409 TeamPlanInvalid` như confirm, không cấp token cho đầu vào trộn từ nhiều thời điểm.
+
+### 4.3. Output nội bộ và binding token
+
+Output Phúc trả gồm `contractVersion=team-balance.v1`, `tournamentId`, `rosterVersion`, `proposalId`, `method`, `modelVersion`, `modelSha256`, `featureVersion`, `policyVersion`, `datasetVersion`, `baselineVersion`, `teams: [{teamKey, members: [{registrationId, assignedRole}]}]`, `quality`, `warnings`, `persisted: false`. ML lấy model/dataset/hash từ artifact manifest và baselineVersion null; baseline có baselineVersion `rank-snake-v1`, modelVersion/modelSha256/datasetVersion null, xác suất/imbalance null.
+
+`proposalId` hash JCS/SHA-256 của đúng các trường `contractVersion, tournamentId, rosterVersion, method, modelVersion, modelSha256, featureVersion, policyVersion, datasetVersion, baselineVersion, teams`. Chuẩn hóa nhóm theo dãy RegistrationId tăng dần so sánh từ điển, gán teamKey A/B theo thứ tự nhóm, members sắp RegistrationId; giữ assignedRole. Không hash tên đội, proposalId, UUID token, thời điểm sinh hoặc cảnh báo. Hash nội dung không phải bằng chứng quyền/token. Model v1 chưa mô hình hóa map/agent/party synergy hoặc chứng minh hiệu lực trên giải custom.
+
+API kiểm tra output rồi tạo UUID ngẫu nhiên cho `planToken`, giữ binding bất biến phía server: **token → EmployeeId từ JWT + tournamentId + expectedVersion + rosterVersion + proposalId + toàn bộ input/output + version/hash artifact/policy + thời điểm cấp/hết hạn**. TTL 10 phút tính bằng giờ UTC server. Preview không ghi SQL, Teams/TeamMembers, audit nghiệp vụ hoặc đổi trạng thái/version; binding tạm nằm trong cache server, không ở browser. Cache mất/restart hoặc token hết hạn → `409 InvalidPlanToken`, phải preview lại. Nhiều instance phải dùng cùng cache binding hoặc định tuyến tới instance giữ token; không tin UUID do client tự dựng. Cách bố trí cache thuộc bước triển khai, không thêm dependency/schema trong SCRUM-9.
+
+Mapping đội sang `TeamPlanDto` giữ nguyên phân nhóm/vai trò. Trong giao điểm VALORANT v1 này, điểm thành viên/trung bình/chênh lệch hiển thị là **tier OP.GG** cho cả ML và Balanced; ghi `pointScale=OpggRankTier` trong snapshot. `quality` chứa xác suất ML riêng. `RegistrationDto.skillScore` tổng hợp vẫn chỉ tham khảo, không dùng sắp baseline, không ghi xác suất vào `TournamentRegistrations.SkillScore` hoặc `Teams.AvgSkillScore`.
+
+Các trường bổ sung của `TeamPlanDto`: `version: string`, `rosterVersion: string?`, `proposalId: string?`, `expiresAtUtc: string?`, `quality: object?`, `warnings: string[]`. Preview mới bắt buộc có hash, expiry và quality; quality gồm `predictedWinProbabilityA`, `predictedImbalance`, `rankMeanGap`, `roleCoverageValid` như hai mẫu dưới. Mảng teams của preview và đọc lại nguồn ML giữ thứ tự nhóm A rồi B theo sourceProposal, kể cả khi confirm gửi ngược thứ tự mảng; xác suất A không phụ thuộc tên đội người dùng sửa.
+
+| Kết quả đọc lại | Metadata trả về |
+| --- | --- |
+| Đã confirm, chưa swap | `version` hiện tại của giải; `planToken/ expiresAtUtc = null`; proposalId/rosterVersion/quality/warnings lấy từ snapshot đã chốt, không suy luận hoặc refresh lại. Xác suất là đánh giá lúc đề xuất; A là nhóm thành viên A trong sourceProposal, kể cả sau đổi tên hoặc đảo thứ tự mảng confirm |
+| Đã swap → Manual | `modelVersion/baselineVersion/proposalId/quality = null`, `planToken/expiresAtUtc = null`; tính điểm tier/scoreSpread theo đội hiện tại. rosterVersion vẫn là hash đầu vào gốc để truy vết; không gọi nó là version roster hiện tại. ProposalId, xác suất và cảnh báo cân bằng ML gốc chỉ giữ trong sourceProposal, không trình bày như đánh giá của đội đã chỉnh tay; warnings chỉ chứa cảnh báo áp dụng cho snapshot hiện tại |
+| Snapshot cũ thiếu metadata | Trường hash/quality không có bằng chứng trả null, warnings có `LEGACY_PLAN_METADATA_UNAVAILABLE`; không tạo hash/model/token giả. Không coi snapshot này là đầu vào confirm mới |
+
+### 4.4. Confirm và dữ liệu thay đổi trước confirm
+
+1. Xác thực/quyền/trạng thái staff ở server. Cùng Idempotency-Key và payload đã thành công replay kết quả cũ **trước** kiểm tra version/token đã hết hạn hoặc bị tiêu thụ; cùng key khác payload → `409 IdempotencyConflict`.
+2. Với confirm mới, dùng transaction/khóa theo S1-D-3 (Customer theo ID → Tournament → Registration → Team; bỏ qua nhóm không dùng). Đội đã tồn tại → `409 TeamsAlreadyFormed`. Token phải thuộc đúng staff/giải, chưa hết hạn; request.expectedVersion phải bằng binding.expectedVersion và version giải hiện tại, sai → `409 VersionConflict`. Giải phải còn `RegistrationClosed`.
+3. Đọc lại toàn bộ roster/eligibility/snapshot/provenance dưới khóa, tính lại hash và kiểm tra độ mới ở thời điểm confirm. Hash khác binding → `409 TeamPlanInvalid` dù version giải chưa đổi. Snapshot đã quá hạn → `422 STATS_STALE`. Kiểm tra proposalId từ input/output đã giữ, các version contract/feature/policy/baseline và model/dataset/hash trong manifest đang được cấu hình; khác binding → `409 TeamPlanInvalid`. Chỉ ML phụ thuộc model/dataset/hash artifact: thiếu/hỏng/không kiểm chứng được → `503 MODEL_UNAVAILABLE`; kích hoạt model ML khác không tự làm mất hiệu lực token Balanced. Ghim cấu hình artifact/policy trong khoảng kiểm tra đến commit, phối hợp cơ chế kích hoạt model để không đổi giữa chừng. Không chạy lại bằng model mới hoặc chuyển baseline khi confirm.
+4. Chuẩn hóa thứ tự nhóm/thành viên của payload; bỏ qua tên đội, assignedRole thiếu thì lấy từ chính registration trong đề xuất; gửi null/vai trò ngoài enum của v1 → `400 ValidationError`. So sánh với **proposal của binding**, khác nhóm/vai trò → `409 TeamPlanMismatch` dù vẫn đủ roster và role. Chỉ cho đổi tên đội (trim 1..100, duy nhất không phân biệt hoa/thường). Server luôn lấy phương pháp/version từ token đã gửi: hai proposal có thể cùng phân hoạch nhưng khác phương pháp, không được suy ra phương pháp từ danh sách đội. UI gửi đúng token của preview đang hiển thị.
+5. Chỉ sau mọi kiểm tra mới ghi Teams/TeamMembers, `TeamsAssigned`, snapshot và kết quả idempotency/audit cùng transaction. `PlanSnapshot.sourceProposal` giữ input/output bất biến, proposalId, rosterVersion, expectedVersion, model/baseline/feature/policy/dataset versions, modelSha256 và tier/provenance; snapshot hiện tại giữ tên đội cuối/pointScale. Sau commit mới tiêu thụ token và phát event. Lỗi/rollback **không ghi đội, snapshot, audit, idempotency hoặc đổi version/trạng thái**; hai confirm cạnh tranh không tạo hai bộ đội. Swap về sau theo SCRUM-4 mục 6.2 ghi nguồn Manual và giữ sourceProposal, không sửa nguồn gốc.
+
+Khóa ở bước 2–3 phải bảo vệ cả tập đăng ký (ngăn thêm/hủy chen ngang) và con trỏ snapshot hiện hành đến hết commit. Luồng sửa đăng ký, khóa khách và refresh OP.GG phải tham gia cùng cơ chế khóa/version; snapshot đã thu là bất biến, refresh tạo snapshot mới rồi đổi con trỏ dưới khóa. Chỉ đọc hash một lần mà cho writer đổi dữ liệu trước commit không đáp ứng contract. Model/policy cũng dùng một thế hệ cấu hình bất biến được ghim đến commit; version và hash không được tái sử dụng cho nội dung khác.
+
+### 4.5. Hai ví dụ preview → confirm
+
+Hai JSON dưới là **kịch bản contract minh họa**, không phải request đã chạy, model thật hay test vector hash. Hash/UUID/version và xác suất là giá trị mẫu; preview lúc `2026-11-11T03:00:00Z`. Server đã giữ snapshot hợp lệ có tier của RegistrationId 101..110 lần lượt 27..18; preferredRole đúng như vai trò các member bên dưới. Các member ở response lược bỏ customerName/rankName để dễ đọc; triển khai vẫn trả DTO đầy đủ. Hai luồng thành công chạy độc lập từ cùng trạng thái ban đầu; mỗi nhánh `rejectIfChanged` thay thế cho confirm thành công. Riêng ca trộn token giả định cả hai preview cùng còn hạn trong cache.
+
+**ML:** chọn `ML`; token chỉ trỏ output `method=ml`, artifact `valorant-win.v1.example` và manifest/hash được giữ phía server.
 
 ```json
 {
-  "contractVersion": "team-balance.v1",
-  "tournamentId": 7,
-  "rosterVersion": "sha256:roster-returned-by-server",
-  "proposalId": "sha256:canonical-proposal",
-  "method": "ml",
-  "modelVersion": "valorant-win.v1.example",
-  "featureVersion": "opgg-competitive.v1",
-  "policyVersion": "valorant-5v5.v1",
-  "datasetVersion": "example-only",
-  "teams": [
-    {"teamKey":"A","members":[{"registrationId":101,"assignedRole":"Duelist"},{"registrationId":104,"assignedRole":"Initiator"},{"registrationId":106,"assignedRole":"Controller"},{"registrationId":108,"assignedRole":"Sentinel"},{"registrationId":110,"assignedRole":"Flex"}]},
-    {"teamKey":"B","members":[{"registrationId":102,"assignedRole":"Duelist"},{"registrationId":103,"assignedRole":"Initiator"},{"registrationId":105,"assignedRole":"Controller"},{"registrationId":107,"assignedRole":"Sentinel"},{"registrationId":109,"assignedRole":"Flex"}]}
-  ],
-  "quality": {"predictedWinProbabilityA":0.52,"predictedImbalance":0.02,"rankMeanGap":0.4,"roleCoverageValid":true},
-  "warnings": [],
-  "persisted": false
+  "preview": {
+    "method": "POST",
+    "url": "/api/admin/tournaments/7/teams/preview",
+    "body": {"strategy": "ML", "expectedVersion": "AAAAAAAAAAc="},
+    "status": 200,
+    "response": {
+      "version": "AAAAAAAAAAc=",
+      "rosterVersion": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "proposalId": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "planToken": "5e8c9d10-1111-4222-8333-444455556666",
+      "expiresAtUtc": "2026-11-11T03:10:00Z",
+      "modelSource": "ML", "modelVersion": "valorant-win.v1.example", "baselineVersion": null,
+      "teams": [
+        {"teamName":"Doi A","avgSkillScore":22.2,"members":[{"registrationId":101,"skillScore":27,"assignedRole":"Duelist"},{"registrationId":104,"skillScore":24,"assignedRole":"Initiator"},{"registrationId":106,"skillScore":22,"assignedRole":"Controller"},{"registrationId":108,"skillScore":20,"assignedRole":"Sentinel"},{"registrationId":110,"skillScore":18,"assignedRole":"Flex"}]},
+        {"teamName":"Doi B","avgSkillScore":22.8,"members":[{"registrationId":102,"skillScore":26,"assignedRole":"Duelist"},{"registrationId":103,"skillScore":25,"assignedRole":"Initiator"},{"registrationId":105,"skillScore":23,"assignedRole":"Controller"},{"registrationId":107,"skillScore":21,"assignedRole":"Sentinel"},{"registrationId":109,"skillScore":19,"assignedRole":"Flex"}]}
+      ],
+      "unassigned": [], "scoreSpread": 0.6,
+      "quality": {"predictedWinProbabilityA":0.52,"predictedImbalance":0.02,"rankMeanGap":0.6,"roleCoverageValid":true},
+      "warnings": []
+    }
+  },
+  "confirm": {
+    "method": "POST", "url": "/api/admin/tournaments/7/teams",
+    "headers": {"Idempotency-Key":"example-ml-confirm-001"},
+    "body": {
+      "planToken":"5e8c9d10-1111-4222-8333-444455556666", "expectedVersion":"AAAAAAAAAAc=",
+      "teams":[
+        {"teamName":"Nexora A","members":[{"registrationId":101,"assignedRole":"Duelist"},{"registrationId":104,"assignedRole":"Initiator"},{"registrationId":106,"assignedRole":"Controller"},{"registrationId":108,"assignedRole":"Sentinel"},{"registrationId":110,"assignedRole":"Flex"}]},
+        {"teamName":"Nexora B","members":[{"registrationId":102,"assignedRole":"Duelist"},{"registrationId":103,"assignedRole":"Initiator"},{"registrationId":105,"assignedRole":"Controller"},{"registrationId":107,"assignedRole":"Sentinel"},{"registrationId":109,"assignedRole":"Flex"}]}
+      ]
+    },
+    "status":201, "resultDto":"TeamPageDto", "tournamentStatus":"TeamsAssigned", "createdTeams":2, "createdMembers":10
+  },
+  "rejectIfChanged":[
+    {"change":"registration cancelled; tournament version changed","status":409,"code":"VersionConflict","createdTeams":0,"createdMembers":0},
+    {"change":"active model version or artifact hash changed","status":409,"code":"TeamPlanInvalid","createdTeams":0,"createdMembers":0},
+    {"change":"confirm swaps registrations 101 and 102 but keeps their roles","status":409,"code":"TeamPlanMismatch","createdTeams":0,"createdMembers":0}
+  ]
 }
 ```
 
-**Toàn bộ example trên là minh họa contract**, không phải model hoặc kết quả đánh giá có thật. `modelVersion/datasetVersion` khi chạy thật lấy từ artifact manifest. `proposalId` là hash nội dung canonical, không phải bằng chứng quyền hoặc token xác nhận. Baseline trả `method: rank-snake-v1`, modelVersion/datasetVersion null và xác suất/imbalance null; không trình bày điểm rank như xác suất thắng.
+**Baseline:** chọn `Balanced`; token mới trỏ `method=rank-snake-v1`. Cùng tier đầu vào, snake cho A = 101/104/105/108/109, B = 102/103/106/107/110; không đổi chỗ để tối ưu role.
 
-Hash proposal theo cùng JCS/SHA-256, chỉ gồm contract/tournament/rosterVersion, method, model/feature/policy/dataset versions và teams/members đã sắp chuẩn; không gồm chính proposalId, timestamp sinh hoặc nội dung cảnh báo. Model v1 là tuyến tính trên chênh lệch đặc trưng; chưa mô hình hóa map/agent/party synergy hoặc khẳng định hiệu lực trên giải custom từ dữ liệu Competitive.
+```json
+{
+  "preview": {
+    "method": "POST",
+    "url": "/api/admin/tournaments/7/teams/preview",
+    "body": {"strategy": "Balanced", "expectedVersion": "AAAAAAAAAAc="},
+    "status": 200,
+    "response": {
+      "version": "AAAAAAAAAAc=",
+      "rosterVersion": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "proposalId": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "planToken": "7a9b0c11-2222-4333-8444-555566667777",
+      "expiresAtUtc": "2026-11-11T03:10:00Z",
+      "modelSource": "Balanced", "modelVersion": null, "baselineVersion": "rank-snake-v1",
+      "teams": [
+        {"teamName":"Doi A","avgSkillScore":22.6,"members":[{"registrationId":101,"skillScore":27,"assignedRole":"Duelist"},{"registrationId":104,"skillScore":24,"assignedRole":"Initiator"},{"registrationId":105,"skillScore":23,"assignedRole":"Controller"},{"registrationId":108,"skillScore":20,"assignedRole":"Sentinel"},{"registrationId":109,"skillScore":19,"assignedRole":"Flex"}]},
+        {"teamName":"Doi B","avgSkillScore":22.4,"members":[{"registrationId":102,"skillScore":26,"assignedRole":"Duelist"},{"registrationId":103,"skillScore":25,"assignedRole":"Initiator"},{"registrationId":106,"skillScore":22,"assignedRole":"Controller"},{"registrationId":107,"skillScore":21,"assignedRole":"Sentinel"},{"registrationId":110,"skillScore":18,"assignedRole":"Flex"}]}
+      ],
+      "unassigned": [], "scoreSpread": 0.2,
+      "quality": {"predictedWinProbabilityA":null,"predictedImbalance":null,"rankMeanGap":0.2,"roleCoverageValid":true},
+      "warnings": []
+    }
+  },
+  "confirm": {
+    "method": "POST", "url": "/api/admin/tournaments/7/teams",
+    "headers": {"Idempotency-Key":"example-baseline-confirm-001"},
+    "body": {
+      "planToken":"7a9b0c11-2222-4333-8444-555566667777", "expectedVersion":"AAAAAAAAAAc=",
+      "teams":[
+        {"teamName":"Nexora A","members":[{"registrationId":101,"assignedRole":"Duelist"},{"registrationId":104,"assignedRole":"Initiator"},{"registrationId":105,"assignedRole":"Controller"},{"registrationId":108,"assignedRole":"Sentinel"},{"registrationId":109,"assignedRole":"Flex"}]},
+        {"teamName":"Nexora B","members":[{"registrationId":102,"assignedRole":"Duelist"},{"registrationId":103,"assignedRole":"Initiator"},{"registrationId":106,"assignedRole":"Controller"},{"registrationId":107,"assignedRole":"Sentinel"},{"registrationId":110,"assignedRole":"Flex"}]}
+      ]
+    },
+    "status":201, "resultDto":"TeamPageDto", "tournamentStatus":"TeamsAssigned", "createdTeams":2, "createdMembers":10
+  },
+  "rejectIfChanged":[
+    {"change":"OP.GG snapshot changed; tournament version unchanged","status":409,"code":"TeamPlanInvalid","createdTeams":0,"createdMembers":0},
+    {"change":"role policy version changed","status":409,"code":"TeamPlanInvalid","createdTeams":0,"createdMembers":0},
+    {"change":"confirm uses ML token with baseline partition","status":409,"code":"TeamPlanMismatch","createdTeams":0,"createdMembers":0}
+  ]
+}
+```
 
-Đề xuất không tạo Teams/TeamMembers hoặc chuyển trạng thái. Khi Đại triển khai xác nhận, server đọc lại roster/snapshot, quyền và điều kiện giải trong transaction, kiểm tra proposal theo đúng model/policy đã trả; roster/model thay đổi trả 409. Cùng đề xuất đã xác nhận không tạo đội lần hai; khác đề xuất sau xác nhận bị từ chối. Model không còn để kiểm chứng trả lỗi, không tin lại team list từ browser. Lưu được version/input hash/assignment cùng đội rồi mới phát event sau commit. Cách lưu metadata và endpoint xác nhận thuộc S1-D-3/S2-D-4, chưa được bổ sung trong task này.
-
-Không ghi xác suất đội thắng vào `TournamentRegistrations.SkillScore` hay `Teams.AvgSkillScore`: chúng không có cùng ý nghĩa. Việc dùng hai cột hiện có cần Đại thống nhất rõ semantics trước khi ghi.
-
-### 4.4. Lỗi
+### 4.6. Lỗi và mapping HTTP
 
 | HTTP / code | Trường hợp |
 | --- | --- |
-| 400 / INVALID_REQUEST | ContractVersion/strategy sai, ID sai kiểu/trùng, request thiếu trường |
+| 400 / ValidationError | Strategy sai/thiếu, ID sai kiểu/trùng, request thiếu trường hoặc có trường ngoài DTO |
 | 401 / 403 | Chưa đăng nhập/thiếu team.assign; giữ auth chung hiện tại |
-| 404 / TOURNAMENT_NOT_FOUND | Không có giải theo quyền truy cập |
-| 409 / ROSTER_CHANGED, TEAMS_ALREADY_CONFIRMED, TOURNAMENT_NOT_CLOSED | Roster/version đổi, đội đã chốt, trạng thái giải không phù hợp |
-| 422 / UNSUPPORTED_GAME_OR_SIZE, INVALID_ROSTER | Không phải v1 5v5 VALORANT, thiếu/thừa người, khách/Riot ID trùng hoặc không đủ điều kiện |
+| 404 / TournamentNotFound | Không có giải theo quyền truy cập |
+| 409 / VersionConflict | expectedVersion khác binding hoặc rowversion giải hiện tại; tương ứng ROSTER_CHANGED khi aggregate đổi |
+| 409 / TeamPlanInvalid | Hash roster/proposal, model/hash hoặc policy/feature version đổi; roster không hợp lệ. ROSTER_CHANGED khi rowversion chưa đổi và MODEL_VERSION_MISMATCH nội bộ map về lỗi này ở confirm |
+| 409 / InvalidPlanToken, TeamPlanMismatch | Token sai staff/giải/hết hạn/mất binding; phân nhóm hoặc vai trò khác đề xuất gắn token |
+| 409 / TeamsAlreadyFormed, TournamentLocked, IdempotencyConflict | Tương ứng TEAMS_ALREADY_CONFIRMED, TOURNAMENT_NOT_CLOSED và cùng key khác payload |
+| 409 / TeamSizeMismatch, TeamNameConflict | Sai số người/chia không hết (SCRUM-4); tên đội trùng sau trim/case-fold |
+| 422 / UNSUPPORTED_GAME_OR_SIZE | ML ngoài VALORANT 10 người/2 đội × 5; không thu hẹp baseline nhiều đội của SCRUM-4 |
 | 422 / STATS_UNAVAILABLE, STATS_STALE, STATS_SCOPE_MISMATCH | Thiếu/sai nguồn, rank/matches không đạt, snapshot cũ hoặc khác scope |
 | 422 / ROLE_CONSTRAINT_UNSATISFIABLE | Không có phân chia/gán Flex thỏa vai trò |
-| 503 / MODEL_UNAVAILABLE, MODEL_VERSION_MISMATCH | Artifact thiếu/hỏng, khác featureVersion, chưa qua gate đánh giá hoặc không còn version để xác nhận |
+| 503 / MODEL_UNAVAILABLE | Artifact thiếu/hỏng, chưa qua gate đánh giá hoặc schema không tương thích; không tự fallback |
 
-Body đề xuất `{code, message, registrationIds?}`; registrationIds chỉ trả cho staff đã được phép đọc roster. Không trả token, đường dẫn model hoặc lỗi thô của runtime. Không đổi body lỗi của endpoint OP.GG hiện hữu.
+HTTP dùng **ProblemDetails + code** như SCRUM-4, không trả body `{code, message}` riêng như bản SCRUM-9 v1.0; `detail` là thông báo an toàn, `registrationIds?` chỉ cho staff được đọc roster. Các mã PascalCase trên giữ quy ước S1-D-3; lỗi stats/role/model hiện dùng uppercase như bảng. Không trả token, đường dẫn model hoặc lỗi thô trong lỗi. Không đổi body lỗi endpoint OP.GG hiện hữu.
 
 ## 5. Baseline, model và tìm phương án
 
@@ -208,23 +310,23 @@ Metric của chính M1 trên đội do M1 chọn chỉ là **surrogate**, không
 - Không cài package/tạo service Python/GPU hoặc project rỗng trong SCRUM-9. Khi triển khai: Application sở hữu DTO/interface; implementation ML.NET ở Infrastructure, API ghép DI, Domain không phụ thuộc ML.NET/HTTP. Tool training offline không chạy trong request nghiệp vụ.
 - Artifact gồm model + preprocessing, manifest JSON (contract/feature/policy/model/dataset versions, game/platform/queue, supportedScopes/patches, trainingTimeCutoff, modelSha256, splitManifestHash, codeCommit, runtime/package, seed/options), metrics và nguồn dữ liệu. [ML.NET save/load](https://learn.microsoft.com/en-us/dotnet/machine-learning/how-to-guides/save-load-machine-learning-models-ml-net) hỗ trợ đóng gói transformer; chưa có `model.zip` thật để bàn giao.
 - Inference chỉ load artifact tin cậy từ cấu hình server, kiểm tra hash/schema/gate/version lúc khởi động. Không nhận đường dẫn model từ browser. Load một lần; batch prediction theo request, không dùng chung đối tượng prediction mutable giữa các request đồng thời. Không train online hoặc tự thay model đã dùng cho đề xuất đang chờ xác nhận.
-- Nếu model/data/schema không đạt, trả lỗi ở mục 4.4; UI có thể cho người có quyền **chọn rõ** baseline. Baseline vẫn giữ nhãn phương pháp và giới hạn, không đóng yêu cầu ML bằng luồng dự phòng.
+- Nếu model/data/schema không đạt, trả lỗi ở mục 4.6; UI có thể cho người có quyền **chọn rõ** baseline. Baseline vẫn giữ nhãn phương pháp và giới hạn, không đóng yêu cầu ML bằng luồng dự phòng.
 
 ## 10. Blocker và trách nhiệm
 
 | ID | Blocker hiện tại | Người phối hợp / điều kiện gỡ |
 | --- | --- | --- |
-| B1 | Chưa có contract S1-D-3 trong các nguồn đã đọc: eligibility/status/phí, Riot ID sở hữu, policy role, snapshot/proposal metadata, endpoint xác nhận | Đại + Phúc: đối chiếu mục 3–4, cung cấp DTO/status/version/cách lưu; ghi quyết định thực tế, không suy ra từ UI demo |
+| B1 | **Đã có đầu vào contract, không còn blocker “chưa có S1-D-3”**: đã đọc SCRUM-4 v0.7 tại `aad623a`; mục 3–4 bổ sung mapping ML/Balanced → proposal → UUID token → confirm, status/phí và từ chối dữ liệu đổi | Đại + Phúc triển khai cùng mapping mục 4 ở S2-D-4/S2-P-3; kiểm chứng cache/token/transaction và đối chiếu bản bổ sung. Trưởng nhóm duyệt cuối; chưa coi tài liệu hoặc JSON mẫu là tích hợp đạt |
 | B2 | Chưa có dataset trận gốc có nhãn và snapshot trước trận; adapter hiện tại chỉ trả aggregate mùa | Phúc: xác định nguồn/điều kiện sử dụng, thu hoặc nhận tập có manifest và cutoff; đạt data gate. OP.GG homepage hoặc 14 trận của một profile không thay 14 training rows |
 | B3 | Chưa có model/artifact/manifest/metrics; không có training/inference runtime trong repo | Phúc ở S2-P-3: trainer, artifact và kiểm chứng package/CPU/gate; không tạo model từ fixture để đóng blocker |
-| B4 | SQL hiện chưa lưu đủ Riot ID/OP.GG/provenance/model/input version | Đại + Phúc; Trường điều phối migration nếu cần: chốt mapping trong S1-D-3/S2-P-2 trước khi code, không tự đổi schema ở SCRUM-9 |
+| B4 | SQL hiện chưa lưu đủ Riot ID/OP.GG/provenance/model/input version; S1-D-3 đã thiết kế RiotId/rowversion/PlanSnapshot nhưng chưa triển khai trong checkout này | Đại + Phúc ở S2-D-4/S2-P-2; Trường điều phối migration nếu cần: lưu input/output/sourceProposal và metadata mục 4 trong PlanSnapshot, không tự đổi schema ở SCRUM-9 |
 | B5 | Chưa có dataset/holdout cho người chơi mới và trận sau chia đội | Phúc + Đại: ghi phạm vi generalization và thu đánh giá thật; không tự tuyên bố độ cân bằng thực tế từ predicted probability |
 
-Tài liệu là đầu vào để Đại đối chiếu contract; chưa có bằng chứng bước phối hợp đó đã diễn ra.
+Đã đối chiếu tài liệu S1-D-3 thực tế; đây là bằng chứng đọc contract của AI, không phải xác nhận trực tiếp của Đại/Phúc hoặc quyết định nghiệm thu của Trưởng nhóm.
 
 ## 11. Kiểm chứng đã chạy và ma trận bàn giao
 
-Ngày 08/11/2026, từ repo root:
+**Bằng chứng lần trước, ngày 08/11/2026**, từ repo root (giữ nguyên; không chạy lại Node/live trong đợt sửa mapping):
 
 ```powershell
 node --test Backend/integrations/opgg/opgg.test.js frontend/src/client/tournaments/tournamentModel.test.js frontend/src/admin/shared/adminModel.test.js
@@ -237,10 +339,18 @@ git diff --check
 - Kiểm tra tài liệu đạt: 51 link tương đối trên bốn file, hai example JSON parse được, đủ 11 mục và không có whitespace/conflict marker. Lượt kiểm tra heading đầu gặp encoding stdin PowerShell làm mất ký tự Unicode; đổi kiểm tra sang số mục và chạy lại đạt. `git diff --check` đạt; source adapter/frontend/backend và dependency manifest không có diff.
 - Browser suites OP.GG cũ trong repo dựa trên route demo trước auth hiện tại; chưa chạy lại trong task thiết kế này và không dùng báo cáo 22/10 thay bằng chứng mới. Chưa train model/chạy metrics, benchmark inference hoặc API/SQL đề xuất đội vì chúng chưa triển khai. Không cần build ứng dụng cho thay đổi tài liệu.
 
+**Đợt cập nhật 11/11/2026:** chỉ sửa tài liệu/mapping và hai JSON minh họa mục 4.5. Giữ bằng chứng **28/28** trên vì source/test adapter, frontend baseline/model giải, backend và dependency không đổi so với `1b2ceb9`. Kiểm tra tài liệu đạt: `git diff --check`; script Node đọc Markdown xác nhận **2/2 JSON** parse/khớp route/strategy/version/token, đủ 10 thành viên/role, điểm tier/trung bình và phân hoạch snake; **51/51 link tương đối**, đủ 11 mục, không conflict marker. Script chỉ kiểm tra dữ liệu minh họa, không phải Node regression hoặc thực thi endpoint. Không chạy thêm Node regression, live OP.GG, ML, API hoặc SQL; JSON không chứng minh cơ chế từ chối/rollback đã chạy thật.
+
+Lượt so sánh nguyên văn bằng chứng cũ đầu tiên lỗi do mốc tiếng Việt bị encoding stdin PowerShell làm sai; đổi bộ trích đoạn sang regex ASCII, chạy lại đạt và xác nhận nguyên khối bằng chứng 08/11 được giữ nguyên. Không sửa source để xử lý lỗi của script kiểm tra này.
+
+Rà soát bổ sung theo yêu cầu kiểm tra lại: hoàn thiện projection hash roster/provenance và policyVersion, dữ liệu đọc nhất quán khi preview, khóa chống refresh/sửa roster chen ngang confirm, metadata null khi đọc lại Manual và thứ tự A/B khi trả xác suất. Đối chiếu SCRUM-4 v0.7, kiểm tra lại hai JSON, 51 link và diff đạt; bằng chứng 28/28 giữ nguyên. B2–B5 là phụ thuộc dữ liệu/triển khai/đánh giá S2, không phải kết quả ML đã hoàn thành trong task thiết kế SCRUM-9.
+
 | Tiêu chí SCRUM-9 | Bằng chứng / trạng thái |
 | --- | --- |
 | Kiểm kê phần Phúc đã làm, nguồn và feature; giữ contract adapter | Mục 1–2 và kiểm tra Node/live ở trên; model/dataset ngoài nguồn đã cung cấp không được tự giả định có |
-| Input/output, constraint, baseline, split, metric/gate, runtime và blocker | Đặc tả mục 3–10 đã có để owner đối chiếu; chưa có kết quả ML |
-| Đại đối chiếu / Trưởng nhóm nghiệm thu | Chưa có bằng chứng; checklist backlog giữ nguyên, không tự chuyển Done |
+| Input/output, constraint, baseline, split, metric/gate, runtime và blocker | Đặc tả mục 3–10; mapping route/DTO/token và hai luồng ML/baseline ở mục 4 đã bổ sung theo S1-D-3 v0.7; chưa có kết quả ML/tích hợp |
+| Đại đối chiếu / Trưởng nhóm nghiệm thu | Đã đối chiếu nguồn contract do Đại viết; chưa có xác nhận trực tiếp của owner về bản mapping này hoặc duyệt cuối. Checklist backlog giữ nguyên, không tự chuyển Done |
 
 Các ca S2 phải thêm khi triển khai: 9/11 người; duplicate IDs/customer/Riot ID; sai giải/game/status; stats null/stale/khác act/provenance fixture; missing role/Flex đủ và không đủ; model thiếu/sai version; input reorder/A-B symmetry; roster/model đổi trước confirm; xác nhận lặp/restart/concurrency; baseline được chọn rõ khi ML lỗi. Chúng là kế hoạch kiểm thử, **chưa phải tests đã chạy**.
+
+Ca tích hợp bổ sung cho mapping: refresh OP.GG đua confirm không được commit với input đã đổi; khách bị khóa không bị âm thầm bỏ khỏi roster; hai phương pháp cho cùng phân hoạch vẫn lưu metadata đúng token; đảo thứ tự đội khi confirm không đảo nghĩa xác suất A lúc đọc lại; swap chuyển Manual phải xóa quality/proposalId hiện tại nhưng giữ sourceProposal gốc; token hết hạn/mất cache trả InvalidPlanToken còn replay thành công cùng key vẫn trả kết quả cũ.
