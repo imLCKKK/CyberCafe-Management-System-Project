@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, LoaderCircle, LockKeyhole, ShieldCheck, UserRound } from 'lucide-react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getPrincipalDestination, useAuth } from './AuthContext';
+import Brand from '../branding/Brand';
 import './auth.css';
 
 export function LoginPage({ accountType }) {
@@ -37,9 +38,8 @@ export function LoginPage({ accountType }) {
   return (
     <main className="auth-page">
       <section className="auth-panel" aria-labelledby="auth-title">
-        <Link className="auth-brand" to={isCustomer ? '/client/home' : '/admin/dashboard'} aria-label="Nexora Cyber">
-          <span className="auth-brand-mark">N</span>
-          <span><strong>NEXORA CYBER</strong><small>{isCustomer ? 'PLAYER ACCESS' : 'STAFF ACCESS'}</small></span>
+        <Link className="auth-brand" to={isCustomer ? '/client/home' : '/admin/dashboard'} aria-label={`NEXORA CYBER · ${isCustomer ? 'Khách hàng' : 'Nhân viên'}`}>
+          <Brand area={isCustomer ? 'Khách hàng' : 'Nhân viên'}/>
         </Link>
         <div className="auth-heading">
           <span className="auth-icon"><ShieldCheck size={19}/></span>
@@ -63,7 +63,14 @@ export function LoginPage({ accountType }) {
           <Link to={isCustomer ? '/admin/auth' : '/client/auth'}>{isCustomer ? 'Đăng nhập nhân viên' : 'Đăng nhập khách hàng'}</Link>
         </footer>
       </section>
-      <div className="auth-side" aria-hidden="true"><div className="auth-side-mark">NC<span>35</span></div><div className="auth-side-copy"><span>CYBER MANAGEMENT</span><strong>Quản lý tập trung.<br/>Vận hành rõ ràng.</strong></div><div className="auth-side-line"/></div>
+      <div className="auth-side" aria-hidden="true">
+        <img className="auth-side-logo" src="/branding/nexora-cyber.png" width="1254" height="1254" alt=""/>
+        <div className="auth-side-copy">
+          <span>NEXORA CYBER</span>
+          <strong>{isCustomer ? <>Sẵn sàng vào trận.<br/>Trải nghiệm liền mạch.</> : <>Quản lý tập trung.<br/>Vận hành rõ ràng.</>}</strong>
+        </div>
+        <div className="auth-side-line"/>
+      </div>
     </main>
   );
 }

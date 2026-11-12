@@ -143,7 +143,7 @@ export function ComputersPage() {
             {filtered.map((pc) => <Station key={pc.ComputerId} computer={pc}
               room={roomById.get(pc.RoomId).RoomName} type={typeById.get(pc.ComputerTypeId).TypeName}
               onClick={() => { if (!saving) { setActionError(''); select(pc); } }} />)}
-          </div> : <div className="cafe-table-wrap"><table className="cafe-table">
+          </div> : <div className="cafe-table-wrap" tabIndex={0} role="region" aria-label="Danh sách máy tính"><table className="cafe-table">
             <thead><tr><th>Tên máy</th><th>Phòng</th><th>Loại máy</th><th>Giá / giờ</th><th>Trạng thái</th><th /></tr></thead>
             <tbody>{filtered.map((pc) => <tr key={pc.ComputerId}>
               <td><strong>{pc.ComputerName}</strong></td><td>{roomById.get(pc.RoomId).RoomName}</td>

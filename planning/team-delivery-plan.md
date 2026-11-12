@@ -2,14 +2,16 @@
 
 Cập nhật: 31/10/2026. Đây là baseline phân công của nhóm sau khi xác nhận phạm vi với người dùng. Các task dưới đây là công việc cần triển khai; việc dọn thư mục không đồng nghĩa ứng dụng đã có API nghiệp vụ, realtime hoặc thanh toán.
 
-Để đưa lên Jira, dùng [backlog 55 Task độc lập](../codex/SPRINT_TASKS.md): 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI giao Phúc theo yêu cầu mới. Mỗi Task có Summary tiếng Anh nối bằng dấu gạch ngang, Description, Dependencies và Done khi. Sprint, người phụ trách và reviewer ghi ở đầu phần/nhóm, không lặp lại trong từng thẻ; không cần trường Branch riêng. Đã giữ đủ 100 việc nhỏ cũ trong các checklist. Đại và Trường ở S2 có 4 Task vì các API/UI cần bàn giao riêng trước bước tích hợp/đối chiếu. Phúc có 4 Task ở S1/S2 sau khi nhận thêm hai Task UI; ưu tiên bàn giao contract/hook và component ảnh sớm, không bỏ phần ML/realtime. Các gói S1-D…S4-T trong tài liệu này chỉ tổng hợp phạm vi theo người, không tạo thành Task cha/Sub-task trên Jira.
+Cập nhật UI ngày 09/11/2026: Trưởng nhóm trực tiếp thực hiện S1-U-1 và cung cấp logo NEXORA CYBER; S2-U-1 vẫn thuộc Phúc. Giữ lịch baseline và tổng 55 Task.
+
+Để đưa lên Jira, dùng [backlog 55 Task độc lập](../codex/SPRINT_TASKS.md): 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI: S1-U-1 do Trưởng nhóm thực hiện, S2-U-1 do Phúc thực hiện. Mỗi Task có Summary tiếng Anh nối bằng dấu gạch ngang, Description, Dependencies và Done khi. Sprint, người phụ trách và reviewer ghi ở đầu phần/nhóm, không lặp lại trong từng thẻ; không cần trường Branch riêng. Đã giữ đủ 100 việc nhỏ cũ trong các checklist. Đại và Trường ở S2 có 4 Task vì các API/UI cần bàn giao riêng trước bước tích hợp/đối chiếu. Phúc có 3 Task ở S1 và 4 Task ở S2, ưu tiên bàn giao contract/hook và component ảnh sớm, không bỏ phần ML/realtime. Các gói S1-D…S4-T trong tài liệu này chỉ tổng hợp phạm vi theo người, không tạo thành Task cha/Sub-task trên Jira.
 
 **Reviewer duy nhất là Trưởng nhóm**, người dùng đã yêu cầu lập kế hoạch này và trực tiếp duyệt thay đổi. Các thành viên được ghi ở phần phối hợp chỉ hỗ trợ đối chiếu nghiệp vụ/tích hợp. AI hỗ trợ kiểm tra theo [hướng dẫn review](../codex/REVIEW_GUIDE.md); quyết định duyệt và Done cần phản ánh quyết định thực tế của Trưởng nhóm, không suy ra từ test pass.
 
 ## 1. Ràng buộc đã chốt
 
 - **Stack:** React/Vite + ASP.NET Core API + Entity Framework Core + SQL Server.
-- **Nhóm:** Đại, Minh, Phúc, Khang, Trường; năng lực tương đương. Mỗi người sở hữu cả UI, API, dữ liệu và kiểm tra của phần được giao.
+- **Nhóm:** Đại, Minh, Phúc, Khang, Trường; năng lực tương đương. Mỗi người sở hữu cả UI, API, dữ liệu và kiểm tra của phần được giao. Trưởng nhóm trực tiếp thực hiện S1-U-1 theo cập nhật ngày 09/11/2026.
 - **Lịch:** bắt đầu 31/10/2026, hạn 21/11/2026. Bốn sprint trải từ 31/10 đến 19/11 (20 ngày lịch); ngày 10/11 và 15/11 là mốc bàn giao chung giữa hai sprint liền kề. Dự phòng 20–21/11; không coi số ngày lịch là ngày làm việc toàn thời gian.
 - **Phạm vi:** toàn bộ chức năng hiện có, gồm các trang đang là placeholder: đăng nhập/quyền, nhân viên, khách/tài khoản, máy/phiên/tiền giờ, Home/dashboard, sản phẩm/menu/đơn/gợi ý món, ví, kho, hóa đơn/báo cáo, giải đấu/OP.GG và khuyến mãi. Bổ sung bắt buộc **ML hỗ trợ chia đội giải đấu, do Phúc phụ trách**.
 - **Khuyến mãi đã duyệt:** voucher cho đơn món ăn, giảm theo phần trăm hoặc số tiền cố định, ngày hiệu lực, giá trị đơn tối thiểu và giới hạn sử dụng. Không áp voucher này vào tiền giờ.
@@ -94,12 +96,13 @@ Nguồn triển khai: [ZaloPay — hướng dẫn bắt đầu](https://develope
 | Phúc | Máy/phiên/tính tiền giờ, Home/dashboard máy; SignalR, adapter OP.GG; **ML chia đội giải đấu** | Đại tích hợp UI/API lưu đội; module owner tự nối event/UI; ưu tiên ML, không giao thêm UI báo cáo |
 | Khang | Danh mục/sản phẩm, menu/gợi ý, đặt/xử lý/hủy đơn; áp voucher vào đơn | Gọi rule voucher của Trường; ghi lượt dùng, trừ/hoàn ví và tồn trong transaction đơn |
 | Trường | Kho, hóa đơn/bảng kê/in/xuất, báo cáo; schema/API/quy tắc voucher | Đại làm UI CRUD voucher; tái sử dụng biểu đồ hiện có; điều phối thứ tự migration |
+| Trưởng nhóm | S1-U-1: nhận diện NEXORA CYBER/logo/theme dùng chung | Bàn giao token/theme cho các owner; Đại phối hợp màn hình login, Phúc dùng theme cho component ảnh món; giữ quyền duyệt cuối |
 
 **Voucher chỉ có một owner nghiệp vụ: Trường.** Đại chịu màn hình CRUD, Khang chịu nơi áp dụng vào đơn món ăn. Loại giảm phần trăm/cố định, ngày hiệu lực, ngưỡng đơn và hạn mức đều do rule server dùng chung kiểm tra. Chính sách tính tiền và dùng lại lượt sau hủy phải được thống nhất ngày đầu.
 
 Đại điều phối tích hợp; từng owner sửa lỗi module mình. Trường điều phối migration nhưng không viết thay entity của cả nhóm. Trưởng nhóm review và duyệt; luồng tiền/tồn cần bằng chứng và giải thích từ owner liên quan, không chỉ kiểm tra giao diện.
 
-**Phần frontend chuyển cho Phúc theo yêu cầu mới:** S1-U-1 áp nhận diện NEXORA CYBER và theme cyan–tím–đen; S2-U-1 bổ sung ảnh món và component thẻ món theo theme mới. Giữ mã U để tra liên kết. Bảng màu theo ảnh: nền `#0B0F14`, tím `#A855F7`, cyan `#22D3EE`, chữ `#E5F0FF`; concept logo chờ nhóm chốt chiều 31/10/2026, không tự chọn. Phúc làm token/layout trước và tích hợp đúng asset được duyệt; không đổi màu trạng thái nghiệp vụ hàng loạt. Khang giữ logic vòng quay/checkout trong S2-K-3, hồi quy S3-K-2, phối hợp dữ liệu ảnh và nối component Phúc bàn giao. Hai Task UI được tính vào tải Phúc; Trưởng nhóm giữ review cuối, không thêm thành viên hay thẻ trùng.
+**Phân công frontend cập nhật ngày 09/11/2026:** **Trưởng nhóm** trực tiếp thực hiện S1-U-1: nhận diện NEXORA CYBER, logo và theme cyan–tím–đen; **Phúc** tiếp tục thực hiện S2-U-1: ảnh món và component thẻ món theo theme mới. Giữ mã U để tra liên kết. Bảng màu giữ nguyên: nền `#0B0F14`, tím `#A855F7`, cyan `#22D3EE`, chữ `#E5F0FF`. Logo do Trưởng nhóm cung cấp cùng ngày được lưu tại [frontend/public/branding/nexora-cyber.png](../frontend/public/branding/nexora-cyber.png), biểu tượng N neon cyan–tím trên nền đen kèm chữ NEXORA CYBER. Trưởng nhóm triển khai token/layout và tích hợp logo; không đổi màu trạng thái nghiệp vụ hàng loạt. Khang giữ logic vòng quay/checkout trong S2-K-3, hồi quy S3-K-2, phối hợp dữ liệu ảnh và nối component Phúc bàn giao. S1-U-1 được tính vào tải Trưởng nhóm, S2-U-1 vào tải Phúc; tổng 55 Task và quyền duyệt cuối của Trưởng nhóm giữ nguyên.
 
 ## 5. Lịch và mốc giao hàng
 

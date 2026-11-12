@@ -49,7 +49,7 @@ export function OrderingPage() {
   function addSuggestion(id, amount = 1) { quantity(id, (validCart[id] || 0) + amount); setNotice(`Đã thêm ${db.products.find(p => p.id === id)?.name} vào giỏ món.`); }
 
   return <div className="cafe-home client-module ordering-page">
-    <PageHeading eyebrow="TRAM KITCHEN" title={<>Nạp năng lượng, <span>tiếp trận.</span></>} description="Khám phá thực đơn và chọn món yêu thích.">
+    <PageHeading eyebrow="NEXORA KITCHEN" title={<>Nạp năng lượng, <span>tiếp trận.</span></>} description="Khám phá thực đơn và chọn món yêu thích.">
       <button className="home-button" disabled={loading} onClick={reload}><RefreshCw size={16}/> Tải lại thực đơn</button>
     </PageHeading>
     <Feedback notice={notice} error={catalogError} onClear={() => setNotice('')}/>
