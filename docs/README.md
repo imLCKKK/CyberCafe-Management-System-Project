@@ -16,6 +16,7 @@ Giữ các báo cáo cũ để đối chiếu đúng thời điểm. Review/bàn
 
 ## Contract nghiệp vụ
 
+- [SCRUM-9: pipeline ML chia đội](contracts/ml-team-balancing-pipeline.md): kiểm kê OP.GG/baseline, mapping S1-D-3 preview → confirm ML/Balanced và binding token/version, ràng buộc, train/evaluation, metric/runtime và blocker dữ liệu/triển khai.
 - [SCRUM-12: kho, hóa đơn và voucher](contracts/inventory-invoice-voucher.md): mapping schema CyberManagement, quy tắc voucher, phân quyền, hóa đơn và các giao điểm còn chờ xác nhận.
 
 - [SCRUM-13: migration, seed và luồng đọc kho](scrum-13-inventory-setup.md).
