@@ -6,6 +6,7 @@ import { createClientDemo } from '../src/client/shared/demoData.js';
 
 // These HTTP fixtures exercise presentation and keyboard behavior, not SQL or realtime acceptance.
 const baseline = process.env.NEXORA_BASELINE === '1';
+const shortOnly = process.env.NEXORA_SHORT_VIEWPORTS === '1';
 const computers = computerFixture();
 const demo = createClientDemo(new Date('2026-11-09T05:00:00.000Z'));
 const catalog = {
@@ -90,6 +91,71 @@ async function activateFocusedButton() {
   await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
 }
 
+async function mouseClick(selector) {
+  const point = await evaluate(`(() => { const box=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return {x:box.left+box.width/2,y:box.top+box.height/2}; })()`);
+  for (const type of ['mousePressed', 'mouseReleased']) await cdp('Input.dispatchMouseEvent', { type, ...point, button: 'left', clickCount: 1 });
+}
+
+async function checkShortClientSidebar() {
+  const visible = selector => evaluate(`(() => {
+    const element=document.querySelector(${JSON.stringify(selector)});
+    const box=element.getBoundingClientRect();
+    const hit=document.elementFromPoint(box.left+box.width/2,box.top+box.height/2);
+    return box.top>=0 && box.bottom<=innerHeight && box.left>=0 && box.right<=innerWidth && (hit===element || element.contains(hit));
+  })()`);
+  for (const height of [600, 650]) {
+    await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height, deviceScaleFactor: 1, mobile: false });
+    await credentials('client'); await go('/client/home');
+    await screenshot(`${baseline ? 'before' : 'after'}-client-sidebar-1440x${height}-top.png`);
+    await cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 100, y: height / 2, deltaX: 0, deltaY: 900 });
+    if (baseline) {
+      await new Promise(resolve => setTimeout(resolve, 150));
+      await screenshot(`before-client-sidebar-1440x${height}-wheel.png`);
+      continue;
+    }
+    await until('document.querySelector(".client-sidebar").scrollTop > 0');
+    for (const selector of ['.client-support button', '.client-user [aria-label="Đăng xuất"]', '.client-user [aria-label="Mở tài khoản"]'])
+      assert.equal(await visible(selector), true, `Sidebar mouse access at 1440x${height}: ${selector}`);
+    await screenshot(`after-client-sidebar-1440x${height}-wheel.png`);
+
+    // Tab itself must reveal the controls, without calling scrollIntoView on them.
+    await evaluate('window.scrollTo(0,0); document.querySelector(".client-sidebar").scrollTop=0; [...document.querySelectorAll(".client-nav a")].at(-1).focus()');
+    for (const selector of ['.client-support button', '.client-user [aria-label="Đăng xuất"]', '.client-user [aria-label="Mở tài khoản"]']) {
+      await press('Tab');
+      assert.equal(await evaluate(`document.activeElement === document.querySelector(${JSON.stringify(selector)})`), true, 'Sidebar keyboard order');
+      assert.equal(await visible(selector), true, `Sidebar Tab access at 1440x${height}: ${selector}`);
+    }
+    await screenshot(`after-client-sidebar-1440x${height}-keyboard.png`);
+    await mouseClick('.client-support button'); await until('Boolean(document.querySelector("dialog[open]"))');
+    await press('Escape'); await until('!document.querySelector("dialog[open]")');
+    await mouseClick('.client-user [aria-label="Mở tài khoản"]'); await until('location.pathname === "/client/account"');
+    await go('/client/home');
+    await cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 100, y: height / 2, deltaX: 0, deltaY: 900 });
+    await until('document.querySelector(".client-sidebar").scrollTop > 0');
+    await mouseClick('.client-user [aria-label="Đăng xuất"]'); await until('Boolean(document.querySelector(".auth-form"))');
+  }
+}
+
+async function checkShortLogin() {
+  for (const [width, height] of [[1440, 600], [1440, 650], [320, 600]]) {
+    await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+    for (const area of ['admin', 'client']) {
+      await evaluate('localStorage.removeItem("cybermanagement.auth.v1")');
+      await go(`/${area}/auth`, 'document.querySelector(".auth-form")');
+      await until('document.querySelector(".auth-backdrop")?.naturalWidth > 0');
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), true, `Login has no horizontal overflow at ${width}x${height}`);
+      if (width > 900) assert.equal(await evaluate('document.querySelector(".auth-panel").getBoundingClientRect().left >= innerWidth/2'), true, 'Login form occupies the right-hand negative space');
+      await evaluate('document.querySelector("#auth-identifier").focus()');
+      for (const selector of ['#auth-password', '.auth-submit', '.auth-footer a']) {
+        await press('Tab');
+        assert.equal(await evaluate(`document.activeElement === document.querySelector(${JSON.stringify(selector)})`), true, 'Login keyboard order');
+        assert.equal(await evaluate(`(() => { const box=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return box.top>=0 && box.bottom<=innerHeight; })()`), true, `Login keyboard reveals ${selector} at ${width}x${height}`);
+      }
+      await screenshot(`after-${area}-login-${width}x${height}.png`);
+    }
+  }
+}
+
 async function checkDialogKeyboard() {
   await credentials('client');
   await go('/client/home');
@@ -145,13 +211,14 @@ try {
       if (url.pathname.startsWith('/api/')) (window.__brandingRequests ||= []).push(url.pathname);
       if (fixtures[url.pathname]) return Response.json(fixtures[url.pathname]);
       if (url.pathname === '/api/customers/me/wallet') return Response.json(${JSON.stringify(wallet)});
+      if (url.pathname === '/api/auth/customer/logout') return new Response(null, { status: 204 });
       if (url.pathname.startsWith('/hubs/realtime')) return new Response(null, { status: 503 });
       if (url.pathname.startsWith('/api/')) return Response.json({ message: 'Presentation fixture has no response for this request.' }, { status: 503 });
       return originalFetch(request, options);
     };
   })()` });
   await evaluate('localStorage.clear()');
-  for (const width of [1440, 1024, 390, 320]) {
+  for (const width of shortOnly ? [] : [1440, 1024, 390, 320]) {
     await cdp('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     for (const route of routes) {
       await credentials(route.startsWith('/admin/') ? 'admin' : 'client');
@@ -173,7 +240,9 @@ try {
       }
     }
   }
-  if (!baseline) {
+  await checkShortClientSidebar();
+  if (!baseline) await checkShortLogin();
+  if (!baseline && !shortOnly) {
     await cdp('Emulation.setDeviceMetricsOverride', { width: 1024, height: 900, deviceScaleFactor: 1, mobile: false });
     await credentials('admin');
     await go('/admin/dashboard');
@@ -200,11 +269,11 @@ try {
     await checkNavigationKeyboard('client');
     await checkDialogKeyboard();
     await checkTableKeyboard();
-    const assets = await evaluate(`Promise.all(['/branding/nexora-cyber.png', document.querySelector('link[rel="icon"]').getAttribute('href')].map(async url => ({ url, status: (await fetch(url)).status })))`);
+    const assets = await evaluate(`Promise.all(['/branding/nexora-cyber.png', '/branding/nexora-login-background.png', document.querySelector('link[rel="icon"]').getAttribute('href')].map(async url => ({ url, status: (await fetch(url)).status })))`);
     assert.ok(assets.every(asset => asset.status === 200), `Brand assets load: ${JSON.stringify(assets)}`);
-    assert.deepEqual(errors, []);
   }
-  console.log(JSON.stringify({ passed: true, baseline, viewportChecks: observations.length, widths: [1440, 1024, 390, 320], keyboard: !baseline }));
+  if (!baseline) assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ passed: true, baseline, shortOnly, viewportChecks: observations.length, widths: shortOnly ? [1440, 320] : [1440, 1024, 390, 320], shortSidebarHeights: [600, 650], shortLoginChecks: baseline ? 0 : 6, keyboard: !baseline }));
 } catch (error) {
   console.error('Branding failure state:', await evaluate('JSON.stringify({url:location.href, body:document.body.innerHTML.slice(0,3000), requests:window.__brandingRequests, resources:performance.getEntriesByType("resource").slice(-8).map(entry=>({name:entry.name,status:entry.responseStatus}))})'));
   await screenshot('branding-timeout.png');

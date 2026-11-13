@@ -1,7 +1,8 @@
 .client-shell { min-height: 100vh; display: flex; background: var(--bg); color: var(--text); }
 .client-main { flex: 1; min-width: 0; background: var(--bg); }
 .client-page { padding: 24px 30px; }
-.client-sidebar { width: 232px; min-width: 232px; height: 100dvh; position: sticky; top: 0; display: flex; flex-direction: column; padding: 24px 16px 16px; background: var(--panel); border-right: 1px solid var(--line); }
+.client-sidebar { width: 232px; min-width: 232px; height: 100dvh; position: sticky; top: 0; display: flex; flex-direction: column; padding: 24px 16px 16px; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; scrollbar-gutter: stable; scrollbar-width: thin; scroll-padding-block: 16px; }
+.client-sidebar > * { flex-shrink: 0; }
 .client-brand { display: flex; align-items: center; padding: 0 0 24px; border-bottom: 1px solid var(--line); min-height: 76px; }
 .client-nav-title { margin: 24px 8px 12px; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: 1.2px; }
 .client-nav { display: flex; flex-direction: column; gap: 5px; padding: 0; }
@@ -48,7 +49,7 @@
 }
 @media (max-width: 700px) {
   .client-shell { flex-direction: column; }
-  .client-sidebar { width: 100%; min-width: 0; height: auto; position: relative; padding: 16px 16px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .client-sidebar { width: 100%; min-width: 0; height: auto; position: relative; padding: 16px 16px 0; border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; scrollbar-gutter: auto; }
   .client-brand { min-height: 44px; padding: 0 90px 16px 0; border: 0; }
   .client-nav-title, .client-support { display: none; }
   .client-nav { flex-direction: row; overflow-x: auto; gap: 6px; padding: 0 0 12px; }
