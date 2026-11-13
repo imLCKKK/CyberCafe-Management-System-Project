@@ -11,7 +11,7 @@ export function CustomerPagination({ data, onPage, label = 'Trang' }) {
 }
 
 export function WalletHistory({ wallet, onPage }) {
-  return <div className="customer-wallet-history"><div className="home-table-wrap cafe-table-wrap"><table className="home-table cafe-table client-data-table"><thead><tr>
+  return <div className="customer-wallet-history"><div className="home-table-wrap cafe-table-wrap" tabIndex={0} role="region" aria-label="Lịch sử giao dịch ví"><table className="home-table cafe-table client-data-table"><thead><tr>
     <th>Giao dịch</th><th>Thời gian</th><th>Số tiền</th><th>Số dư sau</th>
   </tr></thead><tbody>{wallet.transactions.map((row) => <tr key={row.transactionId}>
     <td><strong>{walletTypeLabel(row.type)}</strong><small className="client-table-sub">GD{row.transactionId}{row.description ? ` · ${row.description}` : ''}</small></td>

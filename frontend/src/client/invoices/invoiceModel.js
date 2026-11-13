@@ -28,7 +28,7 @@ export function filterReceipts(receipts, db, { session = 'all', payment = 'all',
 }
 
 export function orderPaymentText(order) {
-  if (!order.cash) return order.refundPending > 0 ? 'Ví TRAM · Chờ hoàn tiền món hủy' : 'Ví TRAM · Đã thanh toán';
+  if (!order.cash) return order.refundPending > 0 ? 'Ví NEXORA CYBER · Chờ hoàn tiền món hủy' : 'Ví NEXORA CYBER · Đã thanh toán';
   if (order.cashDue > 0) return 'Tiền mặt · Chờ thu';
   return order.cashPaid > 0 ? 'Tiền mặt · Đã thu' : 'Tiền mặt · Không phải thu';
 }
@@ -36,7 +36,7 @@ export function orderPaymentText(order) {
 export function receiptText(receipt, db, account, now = new Date()) {
   const productName = (item) => db.products.find((product) => product.id === item.product_id)?.name || `Món #${item.product_id}`;
   return [
-    'TRAM / BẢNG KÊ PHIÊN CHƠI', `Mã: PC${receipt.id}`, `Khách hàng: ${account.display_name}`, `Điện thoại: ${account.phone}`,
+    'NEXORA CYBER / BẢNG KÊ PHIÊN CHƠI', `Mã: PC${receipt.id}`, `Khách hàng: ${account.display_name}`, `Điện thoại: ${account.phone}`,
     `Máy: ${receipt.computer?.code || '—'}`, `Bắt đầu: ${dateTime(receipt.session.started_at)}`,
     `Kết thúc: ${receipt.session.ended_at ? dateTime(receipt.session.ended_at) : 'Phiên đang hoạt động'}`,
     `Thời gian chơi: ${minutesLabel(receipt.session.started_at, receipt.session.ended_at || now)}`,

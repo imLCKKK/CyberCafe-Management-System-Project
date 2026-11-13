@@ -14,7 +14,7 @@ export function InvoicesPage() {
   const sum = (key) => rows.reduce((total, row) => total + row[key], 0);
   const detail = receipts.find((row) => row.id === selected);
   function download(row) {
-    try { const url = URL.createObjectURL(new Blob(['\uFEFF' + receiptText(row, db, row.account)], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `TRAM-PC${row.id}.txt`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch { setError('Không thể tải bảng kê, hãy kiểm tra quyền trình duyệt.'); }
+    try { const url = URL.createObjectURL(new Blob(['\uFEFF' + receiptText(row, db, row.account)], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `NEXORA-PC${row.id}.txt`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch { setError('Không thể tải bảng kê, hãy kiểm tra quyền trình duyệt.'); }
   }
   return <AdminPage title="Hóa đơn & thanh toán" description="Đối chiếu chi phí theo phiên và xác nhận các khoản tiền mặt đã thu.">
     <Notice notice={notice} error={error} clear={clear}/>

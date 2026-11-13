@@ -11,7 +11,7 @@ export function PaymentBadge({ receipt }) {
 export default function ReceiptDetail({ receipt, db, account, now, print = false }) {
   const session = receipt.session;
   return <div className="invoice-receipt-content">
-    <div className="receipt-brand invoice-receipt-brand"><span className="home-eyebrow">TRAM / KHÔNG GIAN CHƠI</span><h3>Bảng kê #PC{receipt.id}</h3><p>{account.display_name} · {account.phone}</p><div className="invoice-receipt-badges"><Badge status={session.status}/><PaymentBadge receipt={receipt}/></div></div>
+    <div className="receipt-brand invoice-receipt-brand"><span className="home-eyebrow">NEXORA CYBER / KHÔNG GIAN CHƠI</span><h3>Bảng kê #PC{receipt.id}</h3><p>{account.display_name} · {account.phone}</p><div className="invoice-receipt-badges"><Badge status={session.status}/><PaymentBadge receipt={receipt}/></div></div>
     <div className="invoice-session-meta">
       <div><span>Máy sử dụng</span><strong>{receipt.computer?.code || '—'}</strong></div>
       <div><span>Thời gian chơi</span><strong>{minutesLabel(session.started_at, session.ended_at || now)}</strong></div>

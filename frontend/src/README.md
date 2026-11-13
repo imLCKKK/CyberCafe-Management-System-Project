@@ -4,6 +4,45 @@
 SQL Server chưa cấp dữ liệu nghiệp vụ cho các màn hình này. OP.GG là một
 integration riêng để đọc thống kê game, không phải API quản lý phòng máy.
 
+## Nhận diện NEXORA CYBER — S1-U-1
+
+Logo gốc do Trưởng nhóm cung cấp ngày 09/11/2026 nằm tại
+[`public/branding/nexora-cyber.png`](../public/branding/nexora-cyber.png).
+[`nexora-mark.svg`](../public/branding/nexora-mark.svg) là bản biểu tượng N
+dựng theo mẫu gốc để hiển thị rõ trên favicon và các vùng nhỏ; PNG gốc được
+giữ nguyên làm asset tham chiếu.
+
+Theo ảnh chụp Trưởng nhóm gửi ngày 12/11/2026, màn hình đăng nhập dùng
+[`nexora-login-background.png`](../public/branding/nexora-login-background.png):
+phòng máy neon cyan–tím, nhận diện ở bên trái và form ở vùng trống bên phải.
+Nền được tạo bằng công cụ image_gen dựa trên ảnh tham chiếu, lưu trong repo;
+nguồn và prompt ở [`branding/README.md`](../public/branding/README.md).
+Form thu về một cột trên mobile; cửa sổ thấp vẫn cuộn tới đủ trường và nút.
+
+Admin, client và auth dùng chung [`Brand`](shared/branding/Brand.jsx):
+`<Brand area="Quản trị"/>`, `<Brand area="Khách hàng"/>`; `compact` chỉ ẩn chữ
+về thị giác, vẫn giữ tên thương hiệu cho công cụ hỗ trợ. Nhãn khu vực tách
+khỏi tên NEXORA CYBER.
+
+Token chung ở [`app/theme.css`](app/theme.css): `--bg` đen `#0B0F14`,
+`--accent` cyan `#22D3EE`, `--purple` tím `#A855F7`, `--text` sáng `#E5F0FF`;
+`--panel`, `--panel2`, `--muted`, `--line` dùng cho bề mặt/chữ/viền. Màu
+`--success`, `--warning`, `--danger`, `--info` dành cho trạng thái nghiệp vụ.
+CSS module dùng token này; layout sidebar/header do `app/layout.css` và
+`app/client.css` quản lý. Giữ các khóa dữ liệu demo bên dưới khi đổi thương hiệu.
+
+Dialog admin/client dùng `shared/dialogFocus.js` để vòng Tab/Shift+Tab nằm
+trong modal; Escape và trả focus về nút mở vẫn dùng lifecycle của dialog.
+Bảng dài có vùng cuộn được đặt tên và nhận focus để cuộn bằng phím mũi tên.
+
+Chạy `npm.cmd --prefix frontend run test:frontend -- branding` từ repo root
+để kiểm tra nhận diện, kích thước 1440/1024/390/320px, điều hướng bàn phím,
+dialog và cuộn bảng bằng phím. Suite dùng HTTP fixture cho phần trình bày;
+không thay thế kiểm chứng SQL, realtime hay nghiệp vụ backend.
+Suite cũng kiểm tra sidebar khách ở 1440×600/650: cuộn bằng bánh xe, Tab tự
+đưa nút hỗ trợ/đăng xuất/tài khoản vào vùng nhìn thấy và click các nút thực tế.
+Ảnh trước–sau nằm trong thư mục artifacts của từng lần chạy, cần đính kèm khi review.
+
 ## Đi từ đâu?
 
 `main.jsx` → `app/routes.jsx` → `AdminLayout` hoặc `ClientLayout` → trang của
