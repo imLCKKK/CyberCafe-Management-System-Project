@@ -5,7 +5,7 @@
 | Task | Define-Order-Checkout-Contracts / S1-K-2 / SCRUM-11 |
 | Owner | Khang; Minh đối chiếu ví/gateway, Trường đối chiếu tồn/voucher/chứng từ |
 | Reviewer cuối | Trưởng nhóm |
-| Phiên bản | 0.4, ngày 08/11/2026, chốt phương án thiết kế theo ủy quyền trực tiếp của người dùng; chờ Trưởng nhóm duyệt cuối |
+| Phiên bản | 0.5, ngày 14/11/2026, Trưởng nhóm chọn thanh toán đủ khi đặt rồi nhân viên mới nhận món để làm |
 | Backend đích | CyberManagement .NET 10 / SQL Server, nền 35 bảng |
 | Phụ thuộc | S1-M-1 và S1-T-1; giao diện gateway bàn giao tiếp cho S1-M-2 |
 
@@ -60,6 +60,8 @@ hoàn thiện cạnh tranh/hủy/hoàn thuộc S3-K-1. Không tick Done chỉ v�
 
 ## 2. Quy ước và bất biến
 
+**Quyết định thanh toán ngày 14/11/2026.** Luồng phục vụ là đặt món → thanh toán đủ → nhân viên nhận món → chuẩn bị/phục vụ. Confirm dòng Pending sang Confirmed là nhân viên nhận món để bắt đầu làm. Server kiểm tra số còn phải thu bằng 0 và khoản thu đã được xác minh dưới khóa trước mỗi confirm. Cash được thu khi các dòng còn Pending, nhân viên có payment.create xác nhận thực nhận. Wallet ghi nhận debit khi tạo đơn, ZaloPay ghi nhận sau callback/query hợp lệ. Đơn 0 đồng sau giảm dùng NotRequired. Quy tắc áp dụng cho cả đơn khách và nhân viên đặt thay.
+
 - JSON camelCase; enum là chuỗi phân biệt hoa/thường. ID là int dương. Thời gian API dùng ISO 8601 UTC (`Z`),
   tính toán bằng một mốc `now` phía server cho mỗi transaction; UI hiển thị giờ Việt Nam (+07:00).
 - Tiền là số nguyên VND, C# decimal. Tạm giới hạn mỗi số tiền và tổng đơn ở `999_999_999` VND,
@@ -97,14 +99,14 @@ Khách đọc/yêu cầu hủy chỉ được thao tác dữ liệu của mình;
 | `POST /api/client/orders` | CreateOrderRequest → 201 OrderDto | Customer; CustomerId từ `customer_id`; phiên Active thuộc khách |
 | `GET /api/client/orders` | `page=1&pageSize=20`, tối đa 100 → OrderPageDto | Customer; luôn lọc theo claim |
 | `GET /api/client/orders/{orderId}` | 200 OrderDto | Customer sở hữu đơn |
-| `POST /api/client/orders/{orderId}/cancellation-requests` | CancellationRequest → 201 CancellationDto | Customer sở hữu đơn; chỉ tạo yêu cầu, không tự hoàn |
+| `POST /api/client/orders/{orderId}/cancellation-requests` | CancellationRequest → 201 CancellationDto | Customer sở hữu đơn; chỉ tạo yêu cầu; Cash đã có khoản thu Succeeded trả 409 CashCancellationLocked |
 | `POST /api/admin/orders` | StaffCreateOrderRequest → 201 OrderDto | `order.create`; Wallet/ZaloPay thêm `payment.create`; Waiter chỉ tạo Cash |
 | `GET /api/admin/orders` | page/pageSize như client, thêm status/customerId tùy chọn → OrderPageDto | `order.view` |
 | `GET /api/admin/orders/{orderId}` | 200 OrderDto | `order.view` |
-| `POST /api/admin/orders/{orderId}/items/{orderDetailId}/confirm` | VersionRequest → 200 OrderDto | `order.status.update` |
-| `POST /api/admin/orders/{orderId}/cancellations` | CancelOrderRequest → 200 OrderDto | `order.cancel`; nếu phát sinh hoàn ví thêm `wallet.refund`, gateway thêm `payment.refund` |
+| `POST /api/admin/orders/{orderId}/items/{orderDetailId}/confirm` | VersionRequest → 200 OrderDto | `order.status.update` và server xác minh đã thanh toán đủ hoặc NotRequired |
+| `POST /api/admin/orders/{orderId}/cancellations` | CancelOrderRequest → 200 OrderDto | `order.cancel`; hoàn ví thêm `wallet.refund`, gateway thêm `payment.refund`; Cash đã có khoản thu Succeeded trả 409 CashCancellationLocked |
 | `POST /api/admin/orders/{orderId}/cancellation-requests/{requestId}/reject` | RejectCancellationRequest → 200 OrderDto | `order.cancel` |
-| `POST /api/admin/orders/{orderId}/cash-collections` | VersionRequest → 200 OrderDto | `payment.create`; server tính khoản còn phải thu |
+| `POST /api/admin/orders/{orderId}/cash-collections` | CashCollectionRequest → 200 OrderDto | `payment.create`; xác nhận đã nhận đủ tiền mặt khi món còn Pending, server tính số tiền |
 | `GET /api/admin/orders/{orderId}/refunds` | page/pageSize như trên → 200 RefundPageDto, có cả Pending/Succeeded/Failed | `order.view` và `payment.refund`; không cấp cho Customer/Cashier/Waiter |
 | `GET /api/admin/orders/{orderId}/refunds/{refundId}` | 200 RefundDto | `order.view` và `payment.refund`; Refund phải thuộc đơn trên route |
 | `POST /api/admin/orders/{orderId}/refunds/{refundId}/approve` | VersionRequest → 200 RefundDto, chưa đồng nghĩa đã hoàn | `order.view` và `payment.refund`; chỉ Refund ZaloPay Pending chưa duyệt; Failed/Succeeded/đã duyệt trả 409 nếu không phải replay đã lưu |
@@ -134,6 +136,7 @@ entity EF không được dùng trực tiếp làm request/response.
 | StaffCreateOrderRequest | Như CreateOrderRequest nhưng `gamingSessionId: int?`, thêm `customerId: int` bắt buộc |
 | CreateOrderItem | `productId: int`, `quantity: int` 1..99; không lặp productId; giữ thứ tự dòng để phân bổ đồng dư |
 | VersionRequest | `expectedVersion: string` bắt buộc, token rowversion dạng base64, server cấp; không tự tăng tại client |
+| CashCollectionRequest | VersionRequest + `cashReceived: bool` bắt buộc true để xác nhận thực nhận đủ tiền mặt; server tính số còn phải thu từ snapshot đơn |
 | CancellationRequest | `itemIds: int[]?`, `reason: string` trim 1..250; null nghĩa toàn đơn; mảng phải khác rỗng, không trùng, cùng đơn; hủy cả số lượng của dòng |
 | CancelOrderRequest | CancellationRequest + expectedVersion; thêm `cancellationRequestId: int?`; nếu có phải Pending và khớp tập dòng yêu cầu |
 | RejectCancellationRequest | VersionRequest + `reason: string` trim 1..250; requestId trên route phải Pending |
@@ -220,14 +223,14 @@ các tổ hợp khác → Mixed. Riêng AwaitingPayment/Expired được xác đ
 
 | Nguồn → đích | Điều kiện / tác động |
 | --- | --- |
-| Tạo Wallet → Pending | SQL chấp nhận đơn và debit cùng transaction; đây là thời điểm “xác nhận đơn” với ví, trước khi nhân viên xác nhận từng món |
+| Tạo Wallet → Pending | SQL chấp nhận đơn, debit ví và Payment Succeeded cùng transaction; món chờ nhân viên nhận sau thanh toán |
 | Tạo Cash → Pending | Giữ/trừ tồn, dùng lượt voucher; PendingCollection; chưa có khoản thu |
 | Tạo đơn 0 đồng → Pending | Bất kỳ phương thức; NotRequired, giữ tồn/lượt nhưng không tạo khoản thu hay yêu cầu gateway |
 | Tạo ZaloPay → AwaitingPayment | Tổng > 0; giữ tồn/lượt, lưu Payment Pending và mã merchant trước lời gọi ngoài SQL |
 | AwaitingPayment → Pending | Server xác minh thu đúng giao dịch/số tiền, giữ chỗ còn hạn; không trừ tồn/lượt lần nữa |
 | AwaitingPayment → Expired | Hết hạn hoặc tạo gateway bị từ chối dứt khoát; hủy các dòng, giải phóng tồn/lượt một lần; chưa chứng minh provider chưa thu |
-| Pending/Mixed → Confirmed/Mixed | Chỉ confirm dòng Pending; gateway phải đã Succeeded/NotRequired; chưa áp dụng cho AwaitingPayment/Expired |
-| Pending/Mixed → Cancelled/Mixed | Admin/Manager duyệt hủy dòng Pending; hoàn/giảm phải thu và trả tồn theo mục 7 |
+| Pending/Mixed → Confirmed/Mixed | Nhân viên có order.status.update nhận dòng Pending để làm sau khi server xác minh đã thanh toán đủ hoặc NotRequired cho cả Wallet/Cash/ZaloPay. AwaitingPayment/Expired bị chặn |
+| Pending/Mixed → Cancelled/Mixed | Admin/Manager duyệt hủy dòng Pending theo mục 7. Cash đã có khoản thu Succeeded khóa hủy dù dòng còn Pending |
 | AwaitingPayment → Cancelled | Chỉ hủy toàn đơn; vô hiệu giữ chỗ và giải phóng; payment tiếp tục được đối soát nếu còn chưa rõ |
 | Expired/Cancelled + thu muộn | Giữ nguyên đơn và tồn/lượt đã giải phóng; ghi nhận khoản thực thu, tạo nghĩa vụ hoàn/đối soát, không khôi phục đơn |
 
@@ -243,6 +246,29 @@ dòng trước, yêu cầu Pending liên quan được Rejected cùng transactio
 Duyệt yêu cầu phải kiểm tra lại toàn bộ tập dòng dưới khóa; nếu có dòng không còn hợp lệ trả 409,
 không duyệt một phần. Hủy trực tiếp dòng đóng các yêu cầu Pending giao nhau thành Rejected
 (hoặc Approved nếu đúng request được duyệt); ghi người xử lý, thời gian và lý do trong cùng transaction.
+
+### 5.1. Thanh toán đủ trước khi nhân viên nhận món — 14/11/2026
+
+Nhân viên có order.status.update chủ động confirm dòng Pending sau khi thanh toán đủ. Confirmed biểu thị món đã được nhận để chuẩn bị/phục vụ. Mỗi lần confirm, server khóa nguồn theo mục 8, kiểm tra version, trạng thái đơn/dòng và đối chiếu khoản thu thành công với giá trị các dòng còn hiệu lực. Khoản thu phải đủ cho toàn bộ phần còn phục vụ, số còn phải thu bằng 0. Đơn có tổng phải trả bằng 0 được xác minh NotRequired.
+
+| Phương thức | Căn cứ đã thanh toán | Thao tác của nhân viên |
+| --- | --- | --- |
+| Wallet | Debit OrderPayment, ledger và Payment Succeeded đã commit khi tạo đơn | Đọc trạng thái đã thanh toán rồi confirm món |
+| Cash | Nhân viên có payment.create nhận đủ tiền, POST cash-collections với cashReceived=true, Payment Succeeded đã commit | Confirm món sau kết quả thu thành công |
+| ZaloPay | Callback/query hợp lệ, Payment Succeeded và đơn đã trở về Pending trong hạn giữ chỗ | Đọc trạng thái đã thanh toán rồi confirm món |
+| 0 đồng sau giảm | Server tính PayableAmount=0 và NotRequired | Confirm món theo quyền order.status.update |
+
+Đơn Cash PendingCollection và ZaloPay AwaitingPayment hiển thị “Chờ thanh toán”. Nút nhận/làm món chỉ hoạt động khi server xác minh đủ tiền. Gọi trực tiếp endpoint confirm khi chưa đủ điều kiện trả 409 PaymentRequired, giữ trạng thái dòng, tồn và sổ tiền. Waiter có thể nhận món đã thanh toán theo order.status.update, thao tác xác nhận thu tiền mặt cần payment.create.
+
+Server quyết định trạng thái thanh toán từ khoản thu đã lưu và snapshot giá/giảm. Request confirm nhận expectedVersion theo VersionRequest. Giao diện cập nhật từ OrderDto sau commit, phát event tới nhóm được phép. Trường hợp callback/query chưa đến hoặc bị lỗi tiếp tục chờ thanh toán cho tới khi server xác minh được kết quả hoặc đơn hết hạn theo mục 7.2.
+
+Ví dụ body CashCollectionRequest dưới đây minh họa nhân viên xác nhận đã nhận đủ tiền. Sau thành công, lấy version mới từ OrderDto cho request confirm món.
+
+```json
+{"expectedVersion":"AAAAAAAAAAE=","cashReceived":true}
+```
+
+Tiêu chí triển khai S2 gồm Cash chưa thu bị chặn confirm, Cash thu đủ trước confirm, Wallet thiếu tiền rollback tạo đơn, ZaloPay pending/sai chữ ký bị chặn, callback hợp lệ vẫn chờ nhân viên nhận món, đơn 0 đồng nhận được, thu/confirm lặp và cạnh tranh thu–hủy xử lý đúng khóa/version.
 
 ## 6. Snapshot, voucher và tồn
 
@@ -275,13 +301,15 @@ theo policy thông thường; không tự suy từ hoàn tiền là hàng đã q
 | Wallet đặt đơn | Khóa khách và nguồn theo mục 8, xử lý phí phiên theo phương án mục 7.3 trước khi xét số dư đơn; tìm khóa `OrderPayment:{orderId}`, gọi WalletLedger.Record với `OrderPayment`, amount âm; phí phiên/đơn/tồn/usage/ledger/Payment cùng transaction |
 | Wallet hủy dòng | Khóa nguồn, hoàn netAmount snapshot bằng `OrderRefund`, khóa `OrderRefund:{orderId}:{orderDetailId}`; liên kết Refund với khoản thu gốc và ledger; khách Locked vẫn nhận được hoàn |
 | Cash tạo/chờ | PendingCollection; không debit/credit ví, không ghi khoản thu Succeeded; không áp TTL của gateway, nhân viên xử lý hoặc người có order.cancel hủy theo trạng thái |
-| Cash thu | Chỉ khi tất cả dòng còn hiệu lực Confirmed, PayableAmount > 0; người có payment.create xác nhận thực nhận; server ghi đúng số còn phải thu, không lấy amount từ browser |
+| Cash thu | PayableAmount > 0, còn dòng Pending và mọi dòng còn hiệu lực đều Pending. Nhân viên có payment.create gửi cashReceived=true sau khi thực nhận đủ tiền. Server ghi Payment Succeeded theo số còn phải thu, tăng version, món tiếp tục Pending chờ nhân viên nhận để làm |
 | Cash hủy trước thu | Giảm PayableAmount; trả tồn theo dòng; không tạo Refund và không cộng ví |
-| Cash đã thu | Hủy dòng Confirmed luôn 409 trong checkout V1, kể cả Admin/Manager; không tạo Refund từ thao tác hủy không hợp lệ. Điều chỉnh sai khoản thu thuộc nghiệp vụ tiền có audit ở S3, cần payment.refund, bằng chứng thực hoàn và nguồn gốc; không tự hoàn ví |
+| Cash đã thu | Quyết định 14/11/2026 khóa yêu cầu hủy khách và thao tác hủy admin khi đơn đã có khoản thu Succeeded, kể cả món còn Pending. Trả 409 CashCancellationLocked. Quản lý xử lý ngoại lệ tại quầy qua nghiệp vụ tiền có audit ở S3, cần payment.refund, bằng chứng thực hoàn và nguồn gốc |
 
 Khóa ledger và khóa HTTP là hai lớp khác nhau: ledger ngăn trừ/hoàn cùng nguồn hai lần;
 khóa HTTP ngăn tạo nhiều OrderId từ cùng ý định. Không ghép khóa client dài vào khóa ledger.
 Tổng Refund Pending + Succeeded không vượt khoản thu gốc hoặc giá trị hủy đủ điều kiện.
+
+**Hủy đơn tiền mặt đã thu — quyết định 14/11/2026.** Khi Cash đã có khoản thu Succeeded, UI khóa nút yêu cầu hủy và hủy trực tiếp, hiển thị “Đã thu tiền, liên hệ quản lý để xử lý tại quầy”. API kiểm tra lại khoản thu dưới khóa và trả 409 CashCancellationLocked cho cả request khách và admin. Nếu có yêu cầu hủy gửi trước lúc thu, thao tác duyệt sau lúc thu cũng bị từ chối. Thu và hủy cạnh tranh chỉ cho một kết quả hợp lệ theo version/khóa. Khoản thu đã commit được giữ để đối soát. Ngoại lệ quản lý ghi nhận theo nghiệp vụ điều chỉnh tiền có audit ở S3.
 Yêu cầu hoàn khác khóa cũng không được hoàn lại cùng dòng. Wallet hủy cả đơn ghi các khoản hoàn
 theo dòng chưa hoàn với khóa OrderRefund ở bảng trên. ZaloPay hủy toàn đơn có thể dùng một Refund
 OrderDetailId null cho phần còn lại: amount do server tính từ tập dòng chưa được bao phủ bởi Refund
@@ -553,6 +581,8 @@ có thể chưa có ProblemDetails; client phải xử lý được bằng HTTP 
 | 409 ProductUnavailable / InsufficientStock | Món ngừng bán, thiếu tồn tại lúc giữ khóa |
 | 409 VoucherInvalid / VoucherLimitExceeded | Mã không hợp lệ/hết hạn/không đạt ngưỡng/hết lượt |
 | 409 InsufficientWalletBalance | Không đủ tiền sau tính giá/giảm; không có đơn/ledger/tồn/usage mới |
+| 409 PaymentRequired | Confirm món khi số còn phải thu > 0 hoặc khoản thu chưa được server xác minh; giữ trạng thái món và tiền/tồn |
+| 409 CashCancellationLocked | Yêu cầu/duyệt hủy Cash đã có khoản thu Succeeded, kể cả dòng Pending; giữ khoản thu, tồn và trạng thái món |
 | 409 InvalidOrderTransition / OrderVersionConflict | Confirm/hủy/thu sai trạng thái hoặc version cũ |
 | 409 CancellationConflict / IdempotencyConflict | Trùng yêu cầu Pending hoặc dùng lại key khác payload |
 | 409 RefundReplacementNotAllowed / RefundReplacementConflict | Tiền nhiệm không phải Refund ZaloPay Failed đủ điều kiện, còn attempt chưa rõ, nguồn/tiền đã hoàn hoặc đang giữ không đủ, kênh cấm hoàn, hoặc đã có yêu cầu thay thế trực tiếp |
@@ -568,7 +598,7 @@ có thể chưa có ProblemDetails; client phải xử lý được bằng HTTP 
 | Minh | Payments neo OrderId; adapter tạo/query/hoàn purpose Order, worker đối soát | Unique operationKey/mã provider; RefundOfPaymentId; lưu Pending trước gọi ngoài transaction; không ghi tiền từ redirect |
 | Khang + Minh | GET Refunds/RefundDto, POST approve/replacements và logic ứng dụng mục 7.4 | Admin đọc được refundId/nguồn/amount/thông tin duyệt; thay thế Failed bằng khoản mới có nguồn/lineage và cùng transaction/hạn mức; không hủy lại món |
 | Trường | Inventory.ApplySale/ApplyReturn; Voucher.ValidateAndUse/ReleaseForCancelledOrder | Tồn khả dụng + lịch sử; một usage/đơn; snapshot/phân bổ và giải phóng idempotent |
-| Trường | Invoice.IssueForOrders/IssueForSession; Invoice.ApplyFinancialChange | Hóa đơn gộp chỉ liên kết nguồn, không thu lại; OrderDetailId truy snapshot; thu/hủy/hoàn cập nhật đúng hóa đơn nếu đã phát hành |
+| Trường | Invoice.IssueForOrders; Invoice.ApplyFinancialChange | Hóa đơn món chỉ lấy nguồn OrderId/OrderDetailId và liên kết khoản thu đã có. Phí phiên phát hành riêng bằng IssueForSession theo quyết định 14/11/2026 |
 | Phúc | Hạ tầng realtime theo S1-P-2 | Khang nối event sau commit vào nhóm customer/nhân viên được server cấp quyền |
 | Phúc + Minh | SessionSettlement.BeforeWalletDebit theo mục 7.3 | Quyết toán phí theo một policy chung trước khi chi ví cho đơn; cùng khóa/transaction, replay không ghi phí mới |
 
@@ -579,6 +609,8 @@ chuyển kết quả đã xác minh vào use case đơn, không gọi HTTP vòng
 Không tạo hóa đơn riêng cho mỗi checkout để lách Payment.InvoiceId bắt buộc. Khoản thu/hoàn lưu ở
 Payments theo nguồn OrderId, InvoiceId null trước phát hành theo thiết kế S1-T-1; cần migration mới.
 Khi nhân viên phát hành hóa đơn theo tập đơn/phiên, nối các khoản đã có, không debit/thu lần hai.
+
+Quyết định 14/11/2026 chọn xuất riêng hóa đơn món ăn và tiền giờ. IssueForOrders nhận tập OrderId cụ thể cùng khách, các dòng chỉ mang OrderDetailId. IssueForSession chỉ nhận nguồn SessionCharge và orderIds rỗng. Hóa đơn món vẫn truy được GamingSessionId của đơn để đối soát, còn hóa đơn tiền giờ tự đóng chỉ chứa phí giờ. Snapshot hóa đơn lịch sử gộp được đọc/in theo dữ liệu đã lưu.
 Hủy/hoàn sau phát hành cập nhật chứng từ đã gắn nguồn, không gắn sang hóa đơn tùy ý cùng khách/phiên.
 Wallet ledger là nguồn tiền ví, Payment Wallet là dòng đối soát: báo cáo không cộng cả hai;
 nạp ví không phải doanh thu món. Khoản Refund Pending không được tính là đã trả tiền khách.
@@ -644,10 +676,12 @@ Bản 0.4 tiếp tục chốt chính sách theo ủy quyền mới, vẫn cần 
 Các owner là người nhận đầu vào và phối hợp triển khai; việc hoàn thành Task vẫn cần Trưởng nhóm duyệt cuối.
 Nếu thay đổi lựa chọn dưới đây, ghi quyết định mới cùng lý do và cập nhật các hợp đồng bị ảnh hưởng.
 
+**Bổ sung trực tiếp của Trưởng nhóm ngày 14/11/2026.** D02 được đổi sang thanh toán đủ trước nhận món và khóa hủy Cash đã thu. D12/D13 ghi actor System và xuất riêng hóa đơn tiền giờ/món ăn theo lựa chọn được xác nhận lại trong phiên làm việc. Trưởng nhóm trực tiếp hoàn thiện phần contract Sprint 1, Khang/Minh/Phúc/Trường triển khai các phần S2 theo phân công module.
+
 | Mã | Quyết định đã chốt | Lý do | Owner phối hợp triển khai |
 | --- | --- | --- | --- |
 | D01 | Ví trừ ngay khi server chấp nhận tạo đơn và commit thành công, trước confirm từng món; OrderPayment âm, OrderRefund dương; gốc 0 đồng không có ledger/Payment | Khách biết số tiền đã trả khi đặt; đơn và tiền cùng rollback; phù hợp WalletLedger và demo hiện có | Khang + Minh |
-| D02 | Chỉ hủy cả dòng Pending; hủy toàn đơn có dòng Confirmed bị từ chối. Cash thu sau khi mọi dòng còn hiệu lực Confirmed, thu từng đơn, không áp TTL gateway. Quyền theo mục 3, không mở quyền hủy/hoàn cho Cashier/Waiter | Không hoàn hàng đã chuẩn bị/phục vụ bằng luồng hủy thông thường; cash chưa thu không tạo tiền hoàn giả | Khang + Minh + Trường |
+| D02 | Quyết định 14/11/2026 chọn thanh toán đủ trước nhận món. Cash thu đủ khi món còn Pending rồi nhân viên confirm để làm. Cash đã có khoản thu Succeeded khóa hủy, quản lý xử lý ngoại lệ tại quầy. Wallet debit khi tạo, ZaloPay xác minh thu trước confirm, hủy Pending theo mục 7. Quyền và xử lý lặp theo mục 3/8 | Thu tiền ngay lúc đặt, kiểm soát quyền nhận món, thu tiền và hủy bằng dữ liệu server | Khang + Minh + Trường |
 | D03 | Products.Stock là tồn khả dụng; tạo đơn ghi Sale âm/dòng, hủy/expired ghi Return dương một lần. Callback/confirm không trừ thêm; không phục hồi tồn khi thu muộn | Một cách ghi tồn cho ba phương thức, ngăn bán vượt và trả tồn lặp | Khang + Trường |
 | D04 | Một voucher/đơn, chỉ tiền món; %/fixed, ngưỡng trước giảm, hiệu lực theo now server; làm tròn AwayFromZero, phân bổ đồng dư theo mục 6. Usage chiếm lượt khi tạo; partial không nhả, full cancel/expired nhả một lần | Khớp contract Trường, giữ lịch sử và số hoàn theo snapshot, không tính lại voucher sau hủy | Trường + Khang; Đại nhận rule dùng chung |
 | D05 | Giữ chỗ nội bộ ZaloPay 15 phút từ lúc nhận đơn, không gia hạn. Xác nhận lần đầu dưới khóa tại/sau hạn hoặc sau hủy là thu muộn; ghi thực thu, giữ đơn đã hủy/expired, không cấp lại món. Worker hết hạn mỗi 15 giây và lúc startup | Ranh giới xử lý tái hiện được, không chiếm tồn vô hạn; cùng luật cho callback và worker | Khang + Minh + Trường |
@@ -657,6 +691,8 @@ Nếu thay đổi lựa chọn dưới đây, ghi quyết định mới cùng l�
 | D09 | Phí phiên tích lũy theo giây: ceil(P*s/3600), trừ phần SessionCharge đã thu; worker 60 giây, khi đóng/phục hồi và trước OrderPayment. Quyết toán phí trước khi xét số dư món, thiếu tiền rollback request; không thu trả trước chu kỳ song song | Không để món tiêu phần tiền giờ đã phát sinh; tính lại tổng tránh trùng phí và sai số làm tròn | Phúc + Minh + Trường + Khang |
 | D10 | Giữ DTO/route/error/version/idempotency của bản này; event thông báo sau commit, client GET lại. SQL tiền đích decimal(18,0), tỷ lệ DiscountValue decimal(18,2); giới hạn API vẫn 999_999_999 VND | Dùng chung một hợp đồng; giữ tỷ lệ lẻ, số nguyên JSON an toàn và chặn việc tự nâng giới hạn tiền khi đổi schema | Khang + Minh + Trường; Phúc nối event |
 | D11 | Chọn thiết kế chứng từ 1.7 tại 761333c, Git path docs/contracts/inventory-invoice-voucher.md: Payments neo nguồn trước hóa đơn, InvoiceIssueRequests, ConfirmedAt/ProviderOccurredAt/PaymentTimeBasis. Giữ lineage/approval bổ sung ở bản này; schema base vẫn e14a362, nền code SCRUM-11 là 66f1a29 | Có khóa phát hành bền vững và mốc báo cáo rõ khi provider thiếu giờ thực hoàn; không thu lại khi nối hóa đơn | Trường + Minh + Khang; Phúc cung cấp nguồn phí |
+| D12 | Quyết định 14/11/2026 chọn System tự quyết toán/đóng phiên khi hết tiền, lưu riêng người mở, quyền nội bộ và khóa/hash bền vững theo contract phiên mục 5.1 và chứng từ mục 6.3.2 | Truy đúng actor và nguồn thu qua retry/restart | Phúc + Minh + Trường |
+| D13 | Quyết định 14/11/2026 chọn xuất riêng hóa đơn món và tiền giờ. IssueForOrders chỉ gồm dòng món, IssueForSession chỉ gồm phí giờ với orderIds rỗng. Mỗi nguồn lên chứng từ một lần | Đơn món được trả tiền khi đặt, tiền giờ được chốt chứng từ độc lập khi hết tiền | Trường + Khang + Phúc |
 
 ### 11.3. Phụ thuộc triển khai và duyệt cuối
 
@@ -666,7 +702,7 @@ bằng chứng trước khi tuyên bố hoàn tất tích hợp; quyền chốt 
 | Việc cần hoàn thành | Người/module phụ trách | Bằng chứng cần có |
 | --- | --- | --- |
 | Duyệt cuối SCRUM-11 bản 0.4 | Trưởng nhóm | Quyết định review thực tế; checklist Task vẫn chưa tick trong phiên này |
-| Đồng bộ các giao điểm đã chọn | Minh/Trường/Phúc phối hợp Khang; Đại nhận mapping actor | Contract/interface của provider khớp D01–D11; phần khác ảnh chụp nguồn được cập nhật bằng commit/PR khi triển khai, không chỉ sửa mô tả checkout |
+| Đồng bộ các giao điểm đã chọn | Trưởng nhóm hoàn thiện contract S1, các owner triển khai S2 theo module | Contract/interface của provider khớp D01–D13, phần triển khai được chứng minh bằng code/migration/kiểm thử tương ứng |
 | Tích hợp code/migration đúng backend chung | Owner bảng, Trường điều phối | Chuỗi migration mới, source/DTO/DI dùng chung DbContext, không sửa migration đã áp hoặc giả dữ liệu actor |
 | Cấu hình và kiểm chứng gateway | Minh | Sandbox/HTTPS/adapter thực tế, hạn provider, khả năng partial và kết quả query/hoàn; không coi lựa chọn TTL nội bộ là test sandbox |
 | Chứng minh nhất quán và giao diện | Các task S2/S3 của owner | Các ca mục 12: rollback/retry/cạnh tranh, không thu/hoàn trùng, nguồn chứng từ và UI/API/SQL/realtime khớp |
@@ -688,8 +724,13 @@ Các ca dưới là yêu cầu bàn giao cho S2/S3, **chưa được chạy tron
 | Voucher %/fixed, trần, ngưỡng, đồng dư, giảm 100% | Tổng giảm dòng bằng giảm đơn; không vượt subtotal; đơn 0 không tạo khoản tiền 0 |
 | Khách khác/phiên khác; Waiter thu/hủy; Cashier hoàn; token cũ sau khóa | 404/403/409 theo contract; không ghi side effect; khách Locked vẫn nhận hoàn được duyệt |
 | Yêu cầu hủy lặp, confirm đua hủy, version cũ | Khách không tự hoàn; chỉ một chuyển trạng thái, yêu cầu liên quan được đóng đúng; lỗi không ghi tồn/ví |
+| Cash chưa thu, Waiter gọi trực tiếp confirm | 409 PaymentRequired, món tiếp tục Pending, SQL giữ tồn/sổ tiền |
+| Cash nhân viên xác nhận cashReceived=true khi món Pending → nhận món | Thu đủ đúng một Payment Succeeded, response tăng version, confirm dùng version mới và order.status.update |
+| Cash đã thu nhưng món còn Pending, khách/admin yêu cầu hủy | 409 CashCancellationLocked, khoản thu và trạng thái/tồn giữ nguyên, UI hướng dẫn liên hệ quản lý tại quầy |
+| ZaloPay chưa xác minh hoặc redirect giả thành công → confirm | PaymentRequired, tiếp tục chờ xác minh; callback hợp lệ cập nhật Paid nhưng nhân viên vẫn phải nhận món |
+| Hóa đơn món và hóa đơn tự đóng tiền giờ | Chứng từ mới mỗi loại nguồn riêng, orderIds rỗng cho phí giờ, các khoản đã thu chỉ được liên kết một lần |
 | Hủy dòng đã giảm / hủy toàn bộ / hủy lặp | Hoàn netAmount một lần, Return một lần; partial không hoàn lượt, full hoàn đúng một lượt |
-| Cash trước/sau confirm, thu lặp, đơn 0 | Chờ thu không debit; thu đúng khoản còn lại một lần, không giả Paid khi chưa thực nhận |
+| Cash thu đủ khi Pending rồi mới confirm, thu lặp, đơn 0 | Chờ thu bị chặn confirm, thu đúng khoản còn lại một lần, đơn 0 dùng NotRequired |
 | Gateway Pending, callback sai/lặp/TopUp nhầm Order | Không tự Paid từ redirect hoặc dữ liệu sai; callback hợp lệ ghi một lần; không mở transaction lúc chờ |
 | Hết hạn đua callback, callback sau hủy, provider đã thu nhưng SQL rollback | Không giữ/trả tồn/lượt hai lần, không hồi sinh đơn; query giao dịch cũ để ghi nhận và đối soát khoản thực thu |
 | P1: hết hạn → thu muộn → GET Refunds → duyệt → worker → retry | Admin đọc được đúng refundId/orderId/khoản thu gốc/amount/nguồn/trạng thái duyệt; expectedVersion từ DTO dùng được; approve chỉ đổi thông tin duyệt, worker xác minh hoàn một lần; replay trả cùng ID, không thêm khoản hoàn |

@@ -122,9 +122,13 @@ Quy tắc tiền:
 
 ## 5. Thời điểm thu tiền và điểm gọi chung
 
+**Quyết định 14/11/2026.** Trưởng nhóm trực tiếp hoàn thiện contract còn dang dở của Sprint 1, chốt giao điểm tự quyết toán, đóng phiên và phát hành hóa đơn khi hết tiền. Worker dùng actor System từ ngữ cảnh nội bộ, cùng transaction và khóa với nguồn phiên. Người mở được lưu riêng, actor System và metadata quyết toán được audit theo [contract phiên mục 5.1](002-computer-session-contract.md#51-quyết-định-tự-đóng-phiên-và-người-thực-hiện--14112026). Minh triển khai ví/ledger/Payment ở S2-M-1, phối hợp Phúc ở S2-P-1 và Trường ở S2-T-2.
+
 Phúc: phí `ceil(priceSnapshotPerHour * elapsedSeconds / 3600)` tính tích lũy theo tổng thời gian;
 worker 60 giây, quyết toán khi đóng/restart và trước debit khác. Chỉ thu chênh lệch với phí đã commit;
 không thu trả trước chu kỳ song song. Mỗi lần thu ghi SessionCharge/ledger/Payment Succeeded nguyên tử.
+
+Payment mỗi lần thu neo SessionChargeId và WalletTransactionId, có InvoiceId nullable trước phát hành. Quyết định 14/11/2026 chọn hóa đơn tiền giờ chỉ chứa các phí chưa có chứng từ của phiên, còn đơn món có hóa đơn riêng. Phát hành liên kết các khoản thu đã commit theo nguồn, các trường hợp retry/restart tra lại cùng khóa.
 
 Khang: kiểm tra replay đơn trước; khóa khách/phiên và gọi
 `SessionSettlement.BeforeWalletDebit(customerId, gamingSessionId?, nowUtc)` như D09, rồi mới xét số dư
@@ -135,7 +139,9 @@ Hủy dòng Pending hoàn netAmount snapshot bằng `OrderRefund`, chỉ một l
 Trường: mỗi debit/credit dịch vụ liên kết Payment/Refund qua WalletTransactionId duy nhất,
 nguồn Order/SessionCharge và OperationKey; InvoiceId có thể null trước phát hành theo D11.
 Báo cáo lấy ledger ví cho thu/hoàn dịch vụ, không cộng lại Payment ví; nạp ví không phải doanh thu.
-Cash thu sau confirm và gateway giữ/thu/hoàn theo contract checkout, không do writer ví tự quyết.
+Quyết định 14/11/2026 yêu cầu đơn món được thanh toán đủ trước khi nhân viên nhận để làm. Cash được nhân viên có payment.create xác nhận thực nhận khi dòng còn Pending. Wallet ghi debit khi tạo đơn, ZaloPay xác minh thu qua callback/query, sau đó nhân viên có order.status.update mới confirm món. Luồng gateway giữ/thu/hoàn theo [contract checkout mục 5.1](004-order-checkout-contract.md#51-thanh-toán-đủ-trước-khi-nhân-viên-nhận-món--14112026).
+
+Đơn Cash đã có khoản thu Succeeded khóa yêu cầu hủy của khách và hủy từ admin, kể cả dòng Pending. Quản lý xử lý ngoại lệ tại quầy qua nghiệp vụ tiền có audit, kiểm tra payment.refund và bằng chứng thực hoàn theo contract checkout mục 7.1.
 
 ## 6. Nạp tại quầy và khoảng trống schema
 

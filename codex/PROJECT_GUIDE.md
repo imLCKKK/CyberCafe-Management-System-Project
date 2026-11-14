@@ -4,6 +4,10 @@ Cập nhật 02/11/2026 theo quyết định dùng backend 35 bảng; giữ lị
 
 Cập nhật UI ngày 09/11/2026: Trưởng nhóm trực tiếp thực hiện `S1-U-1 — Apply-Nexora-Branding-Theme` và cung cấp logo NEXORA CYBER; `S2-U-1` (ảnh món/component thẻ món) vẫn thuộc Phúc.
 
+Quyết định ngày 14/11/2026 giao **Trưởng nhóm trực tiếp hoàn thiện các phần dang dở của Sprint 1**, gồm chốt và đồng bộ contract phiên/ví/chứng từ tại S1-P-1, S1-M-1 và S1-T-1. Actor tự đóng/phát hành khi hết tiền là System, người mở phiên được lưu riêng. Trưởng nhóm tự hoàn tất phần thiết kế/bàn giao Sprint 1. Phúc thực hiện phiên/worker ở S2-P-1, Minh thực hiện ví ở S2-M-1 và Trường thực hiện hóa đơn ở S2-T-2. Contract hiện hành nằm ở [phiên mục 5.1](../Backend/docs/002-computer-session-contract.md#51-quyết-định-tự-đóng-phiên-và-người-thực-hiện--14112026) và [chứng từ mục 6.3.2](../docs/contracts/inventory-invoice-voucher.md#632-phát-hành-tự-động-với-actor-system--quyết-định-14112026).
+
+Lựa chọn xác nhận lại ngày 14/11/2026 bổ sung contract S1-K-2 yêu cầu đơn món thanh toán đủ trước khi nhân viên nhận để làm. Cash đã thu khóa hủy, quản lý xử lý ngoại lệ tại quầy. Hóa đơn món ăn và hóa đơn tiền giờ xuất riêng. Mỗi lần thu phí giờ có SessionCharge/ledger/Payment cùng transaction, tự đóng phát hành phí giờ chưa có chứng từ với actor System. Trưởng nhóm tự hoàn thiện thiết kế Sprint 1, các owner triển khai S2 theo phân công module.
+
 ## 1. Dự án làm gì và đã chốt điều gì?
 
 Hệ thống quản lý phòng máy: admin/nhân viên quản lý máy, phiên, khách, ví, món/đơn, kho, nhân viên, hóa đơn, báo cáo, giải đấu và khuyến mãi; khách dùng web để xem phiên, gọi món, dùng ví và đăng ký giải.
@@ -15,6 +19,7 @@ Hệ thống quản lý phòng máy: admin/nhân viên quản lý máy, phiên, 
 | Demo | Hai máy mở web trên cùng LAN, dùng chung API/SQL; SignalR báo thay đổi, mục tiêu cập nhật trong 2 giây được đo khi nghiệm thu |
 | Máy trạm | Không xây phần mềm khóa/điều khiển Windows |
 | Thanh toán | ZaloPay sandbox chính thức cho nạp ví và thanh toán đơn món; giữ ví/tiền mặt/nạp tại quầy; không dùng tiền thật |
+| Thu tiền món | Quyết định 14/11/2026 yêu cầu thanh toán đủ rồi nhân viên mới nhận món để làm. Cash do nhân viên xác nhận thực thu, Wallet/ZaloPay do server xác minh |
 | Khuyến mãi | Voucher món ăn giảm % hoặc số tiền cố định, ngày hiệu lực, đơn tối thiểu, hạn mức; server tính và lưu snapshot trên chứng từ |
 | Giải đấu | Quản lý giải/đăng ký/đội, thống kê OP.GG; bắt buộc có ML hỗ trợ chia đội, Phúc phụ trách |
 | Nhận diện | NEXORA CYBER; nền đen `#0B0F14`, tím `#A855F7`, cyan `#22D3EE`, chữ `#E5F0FF`. Logo do Trưởng nhóm cung cấp ngày 09/11/2026: [nexora-cyber.png](../frontend/public/branding/nexora-cyber.png), biểu tượng N neon cyan–tím trên nền đen kèm chữ NEXORA CYBER. Trưởng nhóm thực hiện logo/theme chung trong S1-U-1 |
@@ -121,7 +126,7 @@ Người dùng thao tác React
 | Phúc | Máy/phiên/tiền giờ/Home, SignalR, OP.GG, **ML chia đội**, ảnh món/component thẻ món |
 | Khang | Danh mục/sản phẩm/menu/gợi ý/đơn/checkout/hủy; tích hợp voucher và gateway vào đơn |
 | Trường | Kho/chứng từ/hóa đơn/báo cáo; API/rule voucher; điều phối thứ tự migration |
-| Trưởng nhóm | Trực tiếp thực hiện S1-U-1: nhận diện NEXORA CYBER/logo/theme chung; giữ quyền review và duyệt cuối |
+| Trưởng nhóm | Trực tiếp thực hiện S1-U-1 và hoàn thiện các phần dang dở/contract liên module của Sprint 1 theo quyết định 14/11/2026, giữ quyền review và duyệt cuối |
 
 Owner không đồng nghĩa reviewer. Tất cả Task gửi **Trưởng nhóm** duyệt. Trường điều phối migration nhưng từng owner viết entity/config của mình; Phúc cung cấp realtime chung nhưng từng owner tự nối event/UI module mình.
 

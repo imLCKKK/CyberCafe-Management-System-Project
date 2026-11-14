@@ -2,6 +2,8 @@
 
 Ngày soạn: 03/11/2026. Task tham chiếu: `S1-P-1 — Implement-Computer-Queries-Session-Rules` trong [backlog](../../codex/SPRINT_TASKS.md). Nền đối chiếu: nhánh `dev`, commit `a975f8d`, CyberManagement/SQL Server 35 bảng.
 
+**Quyết định Trưởng nhóm ngày 14/11/2026.** Hệ thống tự quyết toán, đóng phiên và phát hành hóa đơn khi hết tiền, ghi actor `System` và giữ riêng người mở phiên. Trưởng nhóm trực tiếp hoàn thiện các phần contract dang dở của Sprint 1 tại S1-P-1/S1-M-1/S1-T-1. Phúc triển khai phiên/worker S2-P-1, Minh triển khai ví S2-M-1 và Trường triển khai chứng từ S2-T-2. Phân công và thiết kế hiện hành được ghi tại mục 5.1.
+
 **Trạng thái cập nhật 06/11/2026:** login `S1-D-2` đã tích hợp ở `903e055`. Đã kiểm chứng Chrome → API thật → SQL Server: login, đọc máy/phòng/loại, đổi trạng thái, reload giữ dữ liệu; tài khoản chỉ xem gọi PATCH trả 403 và truy vấn SQL độc lập xác nhận bản ghi không đổi. Bộ hồi quy có 138 checks SQL đạt. Trưởng nhóm điều phối và chốt phương án tiền giờ/chứng từ; không chờ từng owner xác nhận mới bàn giao code SCRUM-7. Các điểm giao nhau cụ thể được ghi ở mục 5; chưa coi phương án S2 là đã triển khai hoặc nghiệm thu. Không đổi schema/thu tiền; test chỉ áp 4 migration hiện có lên DB thử ngẫu nhiên gồm 35 bảng nghiệp vụ và tự dọn đúng DB đó.
 
 ## 1. Phạm vi và nền hiện tại
@@ -53,7 +55,7 @@ D(t) = C(t) - tổng SessionCharge đã commit   // Khoản thu thêm
 - Đề xuất tác vụ thu mỗi 60 giây tính từ `StartTime`; thu bổ sung khi đóng, trước một thao tác debit ví khác và khi phục hồi. Tác vụ trễ dùng thời gian thực tế, không giả định mỗi lần chạy đúng 60 giây.
 - `D > 0`: thu đúng chênh lệch trong transaction mục 5. `D == 0`: không thêm ledger 0 đồng; có thể tiến mốc đã xử lý khi trạng thái còn nhất quán. `D < 0`: dừng và báo lệch sổ, không tự hoàn tiền.
 - `TotalCost` là tổng khoản thu đã commit, bằng tổng `SessionCharge.Amount`; `LastChargedAt` là mốc thời gian đã quyết toán. Giá ước tính trên UI không ghi đè hai trường này.
-- Phí phiên mới là số nguyên VND. Schema ví hiện cho phép hai chữ số thập phân: không tự làm tròn/xóa số dư cũ; chỉ dùng `floor(WalletBalance)` làm ngân sách phí nguyên đồng. Quy ước tiền lẻ này cần Minh xác nhận.
+- Phí phiên và các khoản ghi ví/Payment mới là số nguyên VND, theo decimal(18,0) của base SCRUM-13 và contract ví mục 4. Dữ liệu lịch sử có tiền lẻ được đối soát trước migration. Công thức ngân sách dùng floor(WalletBalance) theo quy ước phí nguyên đồng đã chốt.
 
 Ví dụ `P = 10.000`: tổng phí tại 0/60/120/180 giây là 0/167/334/500 đồng; ba khoản thu là 167/167/166 đồng. Một giờ luôn 10.000 đồng dù tác vụ chạy trễ hoặc được gọi lại.
 
@@ -74,28 +76,54 @@ Ví dụ `P = 10.000`: tổng phí tại 0/60/120/180 giây là 0/167/334/500 đ
 | --- | --- |
 | Nguồn số dư | `Customers.WalletBalance` và `WalletTransactions` trong SQL; không lấy ví từ browser |
 | Gọi debit | Nhận `CustomerId`, số tiền server tính, nguồn `GamingSession`/ID khoản thu, khóa nghiệp vụ và thời điểm UTC; dùng chung transaction của caller, không tự commit bên trong |
-| Một khoản thu | Ghi `SessionCharge`, ledger, cập nhật ví/`TotalCost`/`LastChargedAt` nguyên tử; lỗi giữa chừng rollback tất cả |
+| Một khoản thu | Mỗi D > 0 ghi `SessionCharge`, debit ledger `GamingCharge`, Payment Type=Payment/Method=Wallet/Status=Succeeded và cập nhật ví/`TotalCost`/`LastChargedAt` cùng transaction. Payment có SessionChargeId, WalletTransactionId, OperationKey, InvoiceId nullable trước phát hành |
 | Chống lặp | Khóa nghiệp vụ bền vững theo phiên và mốc kết thúc khoản thu; cùng khóa/cùng nội dung trả kết quả cũ, khác nội dung trả xung đột; cần ràng buộc unique tại SQL |
 | Cạnh tranh | Mở/đóng phiên, tác vụ thu, debit khác và sửa trạng thái phải khóa dữ liệu chung theo thứ tự thống nhất; chạy nhiều API instance vẫn chỉ ghi một lần |
-| Quy ước ledger | Đề xuất `Type = GamingCharge`, `Amount = -D`, `BalanceAfter` bằng số dư sau thu; cần Minh xác nhận dấu và tên loại trước khi code |
-| Chứng từ mỗi lần thu | `SessionCharge` là nguồn phí gắn trực tiếp với ledger; không dựa vào nội dung `Description` để truy vết/chống lặp |
-| Hóa đơn kết thúc | Đề xuất một hóa đơn tiền giờ cho phiên có tổng phí dương, dòng chi tiết theo snapshot; `Payment` liên kết các ledger đã thu. Lập hóa đơn không debit lại ví; phiên 0 đồng không sinh ledger/payment tiền |
-| Đối soát | Tổng phí phiên = tổng khoản thu = tổng debit tiền giờ quy về số dương = tổng payment tiền giờ = tổng hóa đơn tiền giờ; món/hoàn tiền đối chiếu theo nguồn riêng, không cộng lại vào phí giờ |
-| Doanh thu | Nạp ví không là doanh thu tiền giờ. Trường xác nhận thời điểm ghi nhận và cách thể hiện khoản đã thu khi phiên còn mở để tránh đếm cả ledger và hóa đơn |
+| Quy ước ledger | `Type = GamingCharge`, `Amount = -D`, `BalanceAfter` bằng số dư sau thu theo contract ví mục 4–5 đã được Trưởng nhóm chọn để bàn giao Sprint 1 |
+| Chứng từ mỗi lần thu | SessionCharge gắn với ledger và Payment ngay tại lần thu. Khi đóng, phát hành hóa đơn từ các nguồn đã thu chưa có chứng từ, liên kết Payment.InvoiceId |
+| Hóa đơn kết thúc | Quyết định 14/11/2026 chọn hóa đơn chỉ chứa phí giờ chưa xuất chứng từ của phiên, orderIds rỗng. Payment đã thu được liên kết theo SessionChargeId. Món ăn phát hành hóa đơn riêng theo nguồn đơn |
+| Đối soát | Tổng SessionCharge.Amount = tổng debit tiền giờ quy về số dương = tổng Payment thu tiền giờ. Sau khi phát hành đủ nguồn, tổng các dòng InvoiceDetails có SessionChargeId của phiên bằng tổng phí. Hoàn/điều chỉnh được đối soát riêng theo nguồn |
+| Doanh thu | Tiền giờ ghi nhận theo debit ledger GamingCharge đã commit, dùng CreatedAt UTC và múi giờ báo cáo Việt Nam. Payment Wallet là dòng đối soát. Nạp ví theo nguồn TopUp được báo riêng theo contract chứng từ mục 7 |
 
-Khi đóng có thu bổ sung, khoản thu cuối, kết thúc phiên, trạng thái máy và hóa đơn/payment phải cùng transaction. Nếu tất cả phí đã thu trước đó, transaction đóng chỉ lập chứng từ/thay trạng thái, không thu lại. Hóa đơn tự đóng cần actor hợp lệ vì `Invoice.EmployeeId` bắt buộc: đề xuất lưu người mở để làm actor khi hết tiền; Trường phải xác nhận trước triển khai, không tự dùng tài khoản admin/ID giả.
+Khi đóng có thu bổ sung, khoản thu cuối, kết thúc phiên, trạng thái máy và hóa đơn/payment phải cùng transaction. Nếu tất cả phí đã thu trước đó, transaction đóng chỉ lập chứng từ/thay trạng thái. Quyết định 14/11/2026 chọn actor `System` cho tự đóng, còn người mở phiên được lưu riêng. Migration bổ sung cho `Invoice.EmployeeId` nullable cùng `ActorType` và ràng buộc tại mục 5.1 cho phép phát hành đúng nguồn thực hiện.
 
-Các thiếu hụt schema hiện đã xác minh: `GamingSession` chưa có snapshot giá/người mở/lý do đóng; `SessionCharge` chưa liên kết ledger hoặc có khóa chống lặp; `WalletTransaction` chưa có định danh nguồn/khóa nghiệp vụ; chưa có ràng buộc duy nhất phiên chưa đóng theo máy/khách hay hóa đơn tiền giờ theo phiên. **Chỉ ghi yêu cầu dữ liệu tại đây; tên cột, cơ chế khóa và migration cần đề xuất/duyệt riêng ở S2 cùng Minh/Trường.** SCRUM-7 không thay schema hoặc coi các bảo đảm tiền này đã được thực thi.
+Các thiếu hụt schema hiện đã xác minh gồm snapshot giá/người mở/lý do đóng trên GamingSession, liên kết ledger và khóa chống lặp cho SessionCharge/WalletTransaction, ràng buộc phiên chưa đóng theo máy/khách và nguồn hóa đơn. Dữ liệu actor được chốt tại mục 5.1 ngày 14/11/2026 làm đầu vào triển khai Sprint 2. Phúc/Minh/Trường thực hiện migration và kiểm thử phần module mình, dựa trên entity/config và lịch sử migration thực tế.
 
 ### Đối chiếu SCRUM-12 ngày 06/11/2026
 
-Đã đối chiếu [contract kho/chứng từ](../../docs/contracts/inventory-invoice-voucher.md) tại `dev 95f33fc`. Trưởng nhóm điều phối/chốt chung; các yêu cầu xác nhận owner trong phương án ban đầu bên trên là đầu việc phối hợp S2, không phải điều kiện chặn bàn giao API/UI máy. Có ba điểm cụ thể cần thống nhất trước triển khai tiền/chứng từ:
+Đã đối chiếu [contract kho/chứng từ](../../docs/contracts/inventory-invoice-voucher.md) tại `dev 95f33fc`. Ba giao điểm dưới đây đã được đồng bộ theo quyết định Trưởng nhóm ngày 14/11/2026 để bàn giao thiết kế Sprint 1.
 
-- **Payment từng lần thu:** bảng mục 5 hiện mô tả nguyên tử `SessionCharge`/ledger/ví và liên kết Payment khi kết thúc, chưa quy định tạo Payment mỗi lần thu. SCRUM-12 mục 6.2 yêu cầu debit/ledger/Payment Succeeded cùng transaction, có `SessionChargeId`, `WalletTransactionId` và `InvoiceId` nullable trước phát hành. Cần bổ sung Payment vào transaction mỗi khoản thu; khi đóng chỉ liên kết các khoản đã có, không tạo lại khoản thu hoặc debit lần hai.
-- **Actor tự đóng:** SCRUM-7 đề xuất người mở phiên làm actor; SCRUM-12 mục 6.3.1 yêu cầu `invoice.create` và `employeeId` từ principal đã xác thực, đồng thời đưa employeeId vào RequestHash. Worker tự đóng không có principal tương tác, và người mở có thể bị khóa/mất quyền. Cần chốt quyền/actor hệ thống và giữ cùng actor/operationKey qua retry, không giả ID nhân viên hoặc bỏ kiểm tra quyền.
-- **Phạm vi hóa đơn/đối soát:** SCRUM-7 đề xuất một hóa đơn tiền giờ theo phiên và đẳng thức tổng phí = tổng hóa đơn tiền giờ; SCRUM-12 mục 3.3/6.3.1 cho phép gộp món và phát hành bổ sung cho nguồn chưa lên hóa đơn. Nếu dùng hóa đơn gộp, phải đối soát riêng các dòng `SessionChargeId`, không so tổng phí với toàn bộ TotalAmount. Cần chốt một hóa đơn mỗi phiên hay nhiều lần phát hành theo nguồn trước thiết kế unique index/migration.
+- **Payment từng lần thu đã đồng bộ 14/11/2026.** Mỗi khoản thu D > 0 lưu SessionCharge, ledger, Payment Succeeded cùng transaction theo contract ví mục 4–5 và SCRUM-12 mục 6.2. Payment neo SessionChargeId/WalletTransactionId và có InvoiceId nullable trước phát hành. Replay lấy nguồn đã commit, phát hành hóa đơn liên kết các khoản thu đó.
+- **Actor tự đóng đã chốt 14/11/2026.** Mục 5.1 và SCRUM-12 mục 6.3.2 dùng actor `System`, quyền nội bộ cho worker và hash yêu cầu hệ thống có version riêng. Trưởng nhóm chốt và đồng bộ contract trong phạm vi Sprint 1.
+- **Phạm vi hóa đơn đã chốt 14/11/2026.** Xuất riêng hóa đơn món ăn và tiền giờ. Hóa đơn tự đóng chỉ lấy phí giờ của phiên chưa lên chứng từ, orderIds rỗng. Đối soát theo từng SessionChargeId qua tất cả chứng từ đã phát hành của phiên. Nguồn đã có hóa đơn được giữ để truy vết và bảo vệ unique nguồn.
 
 SCRUM-12 mục 6.2.1 đã đề xuất thứ tự khóa `Customer → Computer → GamingSession → SessionCharge → ... → Payment → Invoice`. API đổi trạng thái hiện chỉ khóa máy và kiểm tra phiên/bảo trì, không ghi ví/chứng từ; chưa thấy xung đột trong luồng được kiểm chứng. Writer tiền S2 phải theo thứ tự chung này, không giữ Computer rồi quay lại khóa Customer. Đây là yêu cầu tích hợp tương lai, không phải bằng chứng writer ví đã được kiểm tra.
+
+### 5.1. Quyết định tự đóng phiên và người thực hiện — 14/11/2026
+
+Trưởng nhóm đã chọn tự quyết toán, đóng phiên và phát hành hóa đơn khi ví hết khả năng tài trợ giây tiếp theo theo mục 4. Người thực hiện đóng/phát hành là hệ thống, độc lập với trạng thái đăng nhập, khóa hoặc quyền hiện tại của nhân viên đã mở phiên.
+
+**Phạm vi hóa đơn đã được người dùng chọn.** Tiền giờ và món ăn xuất hóa đơn riêng. Tự đóng chụp tập SessionCharge đã thu, thuộc phiên và chưa có InvoiceDetail dưới khóa. Hóa đơn tiền giờ có orderIds rỗng, các dòng chỉ mang SessionChargeId, Discount=0 và PromotionId null. Nếu còn nguồn phí thì tạo một hóa đơn mới cho tập nguồn đó. Phiên 0 đồng hoặc đã có chứng từ cho toàn bộ phí thì lưu kết quả đóng với invoiceId null, UI đọc các chứng từ có sẵn của phiên khi cần. Retry lấy kết quả đóng đã lưu. Các đơn món dùng hóa đơn riêng theo nguồn OrderId/OrderDetailId.
+
+| Trường hợp | Actor | Kiểm tra quyền |
+| --- | --- | --- |
+| Nhân viên đóng và phát hành hóa đơn | `Staff`, EmployeeId từ JWT đã xác thực | Nhân viên Active, `session.end`, `invoice.create` và quyền với nguồn |
+| Worker tự đóng vì hết tiền | `System`, ActorKey `SessionBilling`, EmployeeId null | Application cấp ngữ cảnh nội bộ cho tác vụ quyết toán, xác minh phiên/khách và điều kiện hết tiền dưới khóa |
+| Phục hồi sau restart | Actor đã lưu cho thao tác, cùng khóa nguồn | Đọc SQL và tiếp tục quy trình tự đóng theo cùng điều kiện và khóa |
+
+Actor của worker được tạo trong tiến trình server. API công khai xác thực nhân viên bằng JWT và từ chối trường actor/quyền hệ thống do browser gửi. Quyền xem hóa đơn của staff/customer tiếp tục xét theo principal và ownership của nguồn.
+
+**Dữ liệu đích cho S2.** GamingSession bổ sung `OpenedByEmployeeId` để truy người mở, `ClosedByActorType`, `ClosedByEmployeeId` nullable và `CloseReason`. Tự đóng lưu `ClosedByActorType=System`, `ClosedByEmployeeId=null`, `CloseReason=InsufficientBalance`. Đóng thủ công lưu Staff và EmployeeId từ principal hiện tại. Dữ liệu phiên lịch sử thiếu bằng chứng người mở/đóng được giữ nullable và đánh dấu cần đối soát trong kế hoạch backfill.
+
+Invoice bổ sung `ActorType` với hai giá trị Staff/System và đổi `EmployeeId` thành nullable. Ràng buộc Staff yêu cầu EmployeeId hợp lệ, System yêu cầu EmployeeId null và GamingSessionId có giá trị. Hóa đơn hiện có mang EmployeeId được backfill Staff. UI/DTO/in hiển thị “Hệ thống” cho System và tên nhân viên cho Staff. Audit của tự đóng dùng EmployeeId null, ghi actor, lý do, phiên và khóa thao tác.
+
+**Transaction và retry.** Thực hiện theo khóa Customer → Computer → GamingSession → SessionCharge → ledger/Payment → Invoice. Mỗi khoản thu ghi SessionCharge, debit `GamingCharge`, Payment Succeeded và số dư nguyên tử. Tác vụ đóng chỉ thu chênh lệch chưa ghi nhận, liên kết các khoản đã thu vào chứng từ và lưu EndTime/actor/lý do cùng trạng thái máy trong một transaction. SignalR phát sau commit. Các kiểm tra khách Active, ngân sách và tính nhất quán sổ ví áp dụng tại bước quyết toán.
+
+Khóa tự đóng là `SessionAutoClose:{gamingSessionId}`, khóa phát hành là `SessionAutoInvoice:{gamingSessionId}`. Lưu kết quả đóng bền vững cùng transaction. Hai worker hoặc worker cạnh tranh với đóng thủ công phải đọc lại trạng thái dưới khóa phiên, giữ kết quả đóng đã commit. Retry/restart dùng kết quả và khóa cũ. Payload/hash hệ thống được quy định tại [contract chứng từ mục 6.3.2](../../docs/contracts/inventory-invoice-voucher.md#632-phát-hành-tự-động-với-actor-system--quyết-định-14112026).
+
+**Người thực hiện.** Trưởng nhóm trực tiếp hoàn thiện phần contract còn dang dở của Sprint 1 và tự chốt/bàn giao các giao điểm phiên/ví/chứng từ. Phúc triển khai phiên/worker tại S2-P-1, Minh triển khai ví/ledger tại S2-M-1, Trường triển khai phát hành/hiển thị/in hóa đơn tại S2-T-2. Mỗi owner thực hiện schema/migration và kiểm thử SQL/realtime cho phần mình theo contract chung này.
+
+**Kiểm chứng khi triển khai.** Thử người mở đã đăng xuất, bị khóa hoặc mất quyền mà tự đóng vẫn ghi đúng System. Thử giả actor từ browser, SQL rollback giữa thu và phát hành, hai worker, worker cạnh tranh đóng thủ công, retry và restart sau commit. Mỗi ca phải đối chiếu số dư, ledger, Payment, EndTime, actor, InvoiceIssueRequests và nguồn InvoiceDetails. Kết quả cần bảo đảm ví không âm, mỗi khoản phí chỉ thu một lần và mỗi nguồn chỉ xuất hiện trên một hóa đơn. Đây là tiêu chí triển khai S2, phần code hiện tại vẫn ở mức API máy và entity nền.
 
 ## 6. Contract API cho phần máy của SCRUM-7
 
@@ -151,7 +179,7 @@ Lỗi nghiệp vụ dùng ProblemDetails theo [ApiExceptionHandler](../src/Cyber
 | Backend bước 2 | Đã được phép và triển khai API máy/loại/phòng, lưu trạng thái, DI/policy và kiểm thử; schema giữ nguyên |
 | Công thức, chu kỳ thu, giới hạn hết tiền, tính giờ lúc API dừng | Phương án ở mục 3–4; Trưởng nhóm điều phối/chốt, owner phối hợp S2; không chặn bàn giao máy |
 | Số dư khả dụng, quy ước ledger, transaction chung và khóa khách đang có phiên | Phương án mục 3–5; Trưởng nhóm điều phối Minh/Phúc và các caller ví khi triển khai S2 |
-| Chứng từ, actor tự đóng, doanh thu và yêu cầu migration | Ba điểm giao nhau với SCRUM-12 ở mục 5 được bàn giao cho Trưởng nhóm chốt trước S2 |
+| Chứng từ, actor tự đóng, doanh thu và yêu cầu migration | Đã đồng bộ thiết kế Sprint 1 ngày 14/11/2026 tại mục 5–5.1. Kiểm chứng triển khai được giao cho các task S2 tương ứng |
 | Kiểm tra backend | Build solution đạt, 0 warning/error; 129 kiểm tra HTTP/persistence đạt trên InMemory và 138 đạt trên SQL Server (gồm auth và máy); 8 request đổi trạng thái đồng thời đều trả 200, không deadlock và trạng thái cuối đúng |
 | Fixture SQL đã được duyệt | Đã tạo DB riêng `CyberManagement_AuthChecks_a128bf9faa18483d932d62edc5bc4bf9`, áp 4 migration hiện có, xác nhận 35 bảng nghiệp vụ, chạy checks và xóa DB thử thành công; exit code 0 |
 | Giới hạn lần chạy SQL | Lần đầu lỗi hỗ trợ mã hóa trong sandbox trước khi tạo DB; chạy lại ngoài sandbox với cùng cấu hình kết nối đã pass. Kết quả cạnh tranh ở đây chỉ bao phủ đổi trạng thái, chưa kiểm chứng nghiệp vụ phiên/tiền hoặc fault injection giữa transaction |
