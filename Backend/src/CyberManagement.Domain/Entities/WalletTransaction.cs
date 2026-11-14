@@ -14,6 +14,21 @@ public class WalletTransaction
 
     public string? Description { get; set; }
 
+    // Nullable for ledger rows recorded before the shared wallet writer was introduced.
+    public string? OperationKey { get; set; }
+
+    public string? Kind { get; set; }
+
+    public string? SourceType { get; set; }
+
+    public string? SourceId { get; set; }
+
+    public int? OriginalDebitId { get; set; }
+
+    public string? ActorType { get; set; }
+
+    public int? ActorEmployeeId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Customer Customer { get; set; } = null!;

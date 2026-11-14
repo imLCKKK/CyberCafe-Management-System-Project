@@ -6,13 +6,18 @@ import { useAuth } from '../../shared/auth/AuthContext';
 import { createCustomer, customerDate, customerStatus, getCustomerProfile, getCustomers, getCustomerWallet, walletMoney } from '../../shared/customerWalletApi.js';
 import { useCustomerQuery } from '../../shared/useCustomerQuery.js';
 import { CustomerPagination, WalletHistory } from '../../shared/WalletHistory';
+import { useRealtime } from '../../shared/realtime/useRealtime';
+
+const walletEvents = ['WalletChanged'];
 
 function CustomerDetails({ customerId, canViewWallet, onClose }) {
+  const { accessToken } = useAuth();
   const [page, setPage] = useState(1);
   const loadProfile = useCallback((signal) => getCustomerProfile(customerId, signal), [customerId]);
   const loadWallet = useCallback((signal) => getCustomerWallet({ customerId, page, signal }), [customerId, page]);
   const profile = useCustomerQuery(`customer:${customerId}`, loadProfile);
   const wallet = useCustomerQuery(`customer-wallet:${customerId}:${page}`, loadWallet, canViewWallet);
+  useRealtime({ enabled: canViewWallet, accessToken, events: walletEvents, onEvent: (_eventName, message) => { if (message.entityId === customerId) wallet.reload(); }, onReady: wallet.reload, onAuthFailure: wallet.reload });
   return <DetailDialog title="Hồ sơ khách hàng" onClose={onClose}>
     {profile.loading ? <p role="status">Đang tải hồ sơ…</p> : profile.error ? <><p role="alert" className="cafe-error">{profile.error.message}</p><button className="cafe-button" onClick={profile.reload}>Thử lại hồ sơ</button></> : profile.data && <>
       <Row label="Mã khách">KH{profile.data.customerId}</Row><Row label="Họ và tên">{profile.data.fullName}</Row><Row label="Số điện thoại">{profile.data.phone}</Row>

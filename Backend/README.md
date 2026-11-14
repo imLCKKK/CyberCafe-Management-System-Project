@@ -1,4 +1,4 @@
-# Backend CyberManagement — 35 bảng
+# Backend CyberManagement
 
 Quyết định của Trưởng nhóm ngày 02/11/2026: dùng **database SQL Server mới 35 bảng** và backend CyberManagement làm nền chung. Mở [CyberManagement.slnx](CyberManagement.slnx). `src/CyberManagement.API` là HTTP host duy nhất; adapter [OP.GG](integrations/opgg/README.md) vẫn chạy Node/Vite riêng.
 
@@ -15,7 +15,37 @@ Owner triển khai module xuyên các tầng và UI. Application/Domain không d
 
 SCRUM-5 đã nối tạo/đọc khách và đọc hồ sơ/ví chính chủ qua API/SQL; xem
 [contract hồ sơ và ví](docs/003-customer-wallet-contract.md). Task này không thêm hoặc sửa schema/migration đã có trong base.
-Credit/debit/refund, nạp tại quầy và realtime writer thuộc S2; contract ghi rõ điểm gọi transaction chung.
+SCRUM-21 / S2-M-1 triển khai shared credit/debit/refund và nạp tại quầy qua transaction SQL chung;
+writer không tự SaveChanges/commit. Hai migration bổ sung giữ ledger/Approved lịch sử, tính tiền tặng
+cho Pending và tạo model 39 bảng/bảy migration trên base SCRUM-13. Bảng dự án bên trên mô tả nền gốc.
+Quyết định phiên/đơn ngày 14/11 giữ nguyên; gateway ZaloPay, worker phiên và checkout theo task riêng.
+
+## SCRUM-21: nạp tiền mặt và tiền tặng
+
+Khách chọn tám mức nạp tại `/client/wallet`; admin có `wallet.topup` thu đủ tiền mặt rồi duyệt tại
+`/admin/topups`. Server lưu riêng Amount/BonusAmount/TotalAmount, cộng tổng bằng một ledger.
+Mỗi khách chỉ có một Pending, key/retry/duyệt đồng thời không cộng ví lần nữa. Chi tiết API, bảng tiền tặng,
+source/actor/refund, migration và điểm nối các module: [hợp đồng ví](docs/003-customer-wallet-contract.md).
+
+Từ repository root:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-counter-topup.ps1
+```
+
+Script dùng DB riêng, API 5094/frontend 5176 và giữ dữ liệu demo. Tài khoản fixture và thao tác thử ở
+[mục 7 hợp đồng ví](docs/003-customer-wallet-contract.md#71-demo-nạp-tiền-mặt-trên-db-riêng).
+Kiểm tra SQL không thay DB demo; mỗi runner tạo và dọn DB ngẫu nhiên riêng:
+
+```powershell
+$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=127.0.0.1\SQLEXPRESS;Integrated Security=True;TrustServerCertificate=True'
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --wallet-only
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --wallet-migration-checks
+Remove-Item Env:AUTH_CHECKS_SQL_CONNECTION
+```
+
+Writer/money checks yêu cầu SQL thật; InMemory bỏ qua ca ghi tiền. Đây là hướng dẫn chạy, không phải
+kết quả pass. Realtime hai máy LAN và quyết định duyệt/Done cần bằng chứng và Trưởng nhóm xác nhận.
 
 
 

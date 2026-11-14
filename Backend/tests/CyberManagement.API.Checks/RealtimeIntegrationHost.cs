@@ -12,6 +12,8 @@ using CyberManagement.Application.Security;
 using CyberManagement.Domain.Entities;
 using CyberManagement.Infrastructure.Persistance;
 using CyberManagement.Infrastructure.Repositories;
+using CyberManagement.Application.Wallets;
+using CyberManagement.Infrastructure.Wallets;
 using CyberManagement.Infrastructure.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -67,6 +69,8 @@ internal static class RealtimeIntegrationHost
                 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
                 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
                 builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
+                builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
+                builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
                 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
                 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
                 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();

@@ -11,6 +11,8 @@
     "test:catalog": "node --test src/shared/catalog/catalog.test.js",
     "test:catalog:sql": "node tests/catalog-sql-runner.mjs",
     "test:customer-wallet": "node --test src/shared/customerWalletApi.test.js",
+    "test:counter-topups": "node --test src/shared/counterTopUpApi.test.js",
+    "test:counter-topups:render": "node tests/counter-topups-render.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

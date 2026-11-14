@@ -10,5 +10,6 @@ public static class ApiPolicies
     public const string WalletView = "permission:wallet.view";
     public const string TournamentView = "permission:tournament.view";
     public const string TournamentManage = "permission:tournament.manage";
+    public const string WalletTopUp = "permission:wallet.topup";
     public const string RealtimeConnect = "realtime.connect";
 }
