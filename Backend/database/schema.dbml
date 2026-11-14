@@ -137,6 +137,7 @@ Table dbo.InventoryTransactions {
   Before int [not null]
   CreatedAt datetimeoffset [not null]
   EmployeeId int [null]
+  OperationKey nvarchar(200) [null]
   OrderDetailId int [null]
   OrderId int [null]
   ProductId int [not null]
@@ -147,6 +148,7 @@ Table dbo.InventoryTransactions {
   Type nvarchar(50) [not null]
   indexes {
     (EmployeeId) [name: 'IX_InventoryTransactions_EmployeeId']
+    (OperationKey) [name: 'IX_InventoryTransactions_OperationKey', unique]
     (OrderDetailId, Type) [name: 'IX_InventoryTransactions_OrderDetailId_Type', unique]
     (OrderId) [name: 'IX_InventoryTransactions_OrderId']
     (ProductId) [name: 'IX_InventoryTransactions_ProductId']

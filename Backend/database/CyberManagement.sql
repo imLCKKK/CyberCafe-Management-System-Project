@@ -2333,3 +2333,40 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114071953_AddInventoryMovementOperationKey'
+)
+BEGIN
+    ALTER TABLE [InventoryTransactions] ADD [OperationKey] nvarchar(200) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114071953_AddInventoryMovementOperationKey'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_InventoryTransactions_OperationKey] ON [InventoryTransactions] ([OperationKey]) WHERE [OperationKey] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114071953_AddInventoryMovementOperationKey'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [InventoryTransactions] ADD CONSTRAINT [CK_InventoryTransactions_OperationKey] CHECK ([OperationKey] IS NULL OR LEN(LTRIM(RTRIM([OperationKey]))) > 0)');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114071953_AddInventoryMovementOperationKey'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261114071953_AddInventoryMovementOperationKey', N'10.0.14');
+END;
+
+COMMIT;
+GO

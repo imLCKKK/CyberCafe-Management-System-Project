@@ -26,6 +26,9 @@ public static class DependencyInjection
                 b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<IInventoryQueries, InventoryQueries>();
+        services.AddScoped<IInventoryRepository, InventoryRepository>();
+        services.AddScoped<IInventoryMovementRepository,InventoryMovementRepository>();
+        services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
         services.AddScoped<ICatalogRepository, CatalogRepository>();
         services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
         services.AddScoped<IComputerRepository, ComputerRepository>();
