@@ -11,6 +11,7 @@ public class TournamentRegistrationConfiguration : IEntityTypeConfiguration<Tour
         builder.ToTable("TournamentRegistrations");
         builder.HasKey(x => x.RegistrationId);
 
+        builder.Property(x => x.RiotId).HasMaxLength(128);
         builder.Property(x => x.PreferredRole).HasMaxLength(50);
         builder.Property(x => x.WinRate).HasPrecision(5, 2);
         builder.Property(x => x.SkillScore).HasPrecision(6, 2);

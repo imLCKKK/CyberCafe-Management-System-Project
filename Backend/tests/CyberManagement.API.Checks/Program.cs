@@ -90,6 +90,7 @@ builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
@@ -243,6 +244,7 @@ try
     {
         checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
         checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+        checks += await TournamentChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
     }
     if (!customerOnly)
         checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);

@@ -10,6 +10,8 @@ public class TournamentRegistration
 
     public int RankId { get; set; }
 
+    public string? RiotId { get; set; }
+
     public string? PreferredRole { get; set; }
 
     public decimal WinRate { get; set; }

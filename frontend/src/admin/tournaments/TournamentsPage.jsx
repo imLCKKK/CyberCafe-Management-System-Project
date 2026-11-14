@@ -1,53 +1,180 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
-import { Flag, Plus, Trophy, Users, UsersRound } from 'lucide-react';
-import { useAdmin } from '../shared/AdminContext';
-import { AdminPage, StatCard, Panel, Table, Toolbar, Filter, Status, Notice, FormDialog, DetailDialog, Row } from '../shared/AdminUI';
-import { dateTime, matches } from '../shared/adminModel';
-import { generateTeams, registerAdminParticipant, saveTournament, transitionTournament } from '../shared/tournamentAdminModel';
-import { DonutChart } from '../shared/Charts';
-import { fetchParticipantStats, getParticipants, saveParticipantStats } from '../../client/tournaments/tournamentModel';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Plus, Trophy, Users } from 'lucide-react';
+import { useAuth } from '../../shared/auth/AuthContext';
+import { getAccessToken, expireSession } from '../../shared/auth/api';
+import { useRealtime } from '../../shared/realtime/useRealtime';
+import {
+  createTournament, getTournamentGames, getTournamentRegistrations, getTournaments,
+  transitionTournament, updateTournament,
+} from '../../shared/tournamentApi';
+import { AdminPage, DetailDialog, Filter, FormDialog, Notice, Panel, Row, Status, Table, Toolbar, StatCard } from '../shared/AdminUI';
+import { dateTime, matches, money } from '../shared/adminModel';
 
-const inputDate = (value) => new Date(Date.parse(value) + 7 * 3600000).toISOString().slice(0, 16);
+const hourOffset = 7 * 60 * 60 * 1000;
+const inputDate = (value) => new Date(Date.parse(value) + hourOffset).toISOString().slice(0, 16);
+const utcDate = (value) => new Date(`${value}:00+07:00`).toISOString();
+const eventNames = ['TournamentChanged', 'RegistrationChanged'];
+
 export function TournamentsPage() {
-  const { db: common, tournamentDb: db, commitTournament: commit, tournamentWarning: warning } = useAdmin();
-  const [query, setQuery] = useState(''), [status, setStatus] = useState('all'), [editing, setEditing] = useState(undefined), [selected, setSelected] = useState(null), [action, setAction] = useState(null), [notice, setNotice] = useState(''), [error, setError] = useState('');
-  const [registrationTour, setRegistrationTour] = useState(null);
-  const [syncing, setSyncing] = useState(null);
-  const syncRequest = useRef(null);
-  useEffect(() => () => syncRequest.current?.abort(), []);
-  async function syncParticipant(row) {
-    if (syncRequest.current) return;
+  const { principal, loading: authLoading, accessToken } = useAuth();
+  const [tournaments, setTournaments] = useState([]);
+  const [games, setGames] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('all');
+  const [editing, setEditing] = useState(undefined);
+  const [selectedId, setSelectedId] = useState(null);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+
+  const reload = useCallback(() => setRefreshVersion((version) => version + 1), []);
+  const connectionStatus = useRealtime({
+    enabled: principal?.type === 'employee' && principal.permissions?.includes('tournament.view'),
+    accessToken,
+    events: eventNames,
+    onEvent: reload,
+    onReady: reload,
+    onAuthFailure: (code) => {
+      if (getAccessToken() !== accessToken) return;
+      if (code === 401) expireSession({ accessToken, accountType: 'employee' });
+      else reload();
+    },
+  });
+
+  useEffect(() => {
+    if (authLoading) return undefined;
     const controller = new AbortController();
-    syncRequest.current = controller; setSyncing(row.RegistrationId); setError('');
-    const timeout = setTimeout(() => controller.abort(), 30000);
-    try {
-      const stats = await fetchParticipantStats(row, { baseUrl: import.meta.env.VITE_VALORANT_API_BASE_URL?.trim() || '/api', signal: controller.signal });
-      if (controller.signal.aborted) return;
-      commit((data) => saveParticipantStats(data, row.RegistrationId, row.RiotId, stats));
-      setNotice(`Đã đồng bộ ${row.RiotId}: ${stats.rank?.label || 'OP.GG chưa có rank'}.`);
-    } catch (err) { if (syncRequest.current === controller) setError(controller.signal.aborted ? 'Đồng bộ quá thời gian chờ. Hãy thử lại.' : err.message); }
-    finally { clearTimeout(timeout); if (syncRequest.current === controller) { syncRequest.current = null; setSyncing(null); } }
+    setLoading(true);
+    setError('');
+    Promise.all([getTournaments('admin', controller.signal), getTournamentGames('admin', controller.signal)])
+      .then(([rows, availableGames]) => {
+        setTournaments(rows);
+        setGames(availableGames);
+        setSelectedId((current) => current && rows.some((row) => row.id === current) ? current : null);
+      })
+      .catch((cause) => { if (!controller.signal.aborted) setError(cause.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [accessToken, authLoading, principal, refreshVersion]);
+
+  useEffect(() => {
+    if (!selectedId) { setRegistrations([]); return undefined; }
+    const controller = new AbortController();
+    getTournamentRegistrations('admin', selectedId, controller.signal)
+      .then(setRegistrations)
+      .catch((cause) => { if (!controller.signal.aborted) setError(cause.message); });
+    return () => controller.abort();
+  }, [accessToken, selectedId, refreshVersion]);
+
+  const filtered = useMemo(() => tournaments.filter((row) =>
+    matches(query, row.name, row.id) && (status === 'all' || row.status === status)), [tournaments, query, status]);
+  const selected = tournaments.find((row) => row.id === selectedId);
+  const canManage = principal?.permissions?.includes('tournament.manage') === true;
+  const fields = [
+    { name: 'gameId', label: 'Trò chơi', options: games.filter((game) => game.isActive).map((game) => [game.gameId, game.gameName]) },
+    { name: 'name', label: 'Tên giải đấu', maxLength: 150 },
+    { name: 'registrationStartUtc', label: 'Mở đăng ký (giờ Việt Nam)', type: 'datetime-local' },
+    { name: 'registrationEndUtc', label: 'Đóng đăng ký (giờ Việt Nam)', type: 'datetime-local' },
+    { name: 'startTimeUtc', label: 'Bắt đầu thi đấu (giờ Việt Nam)', type: 'datetime-local' },
+    { name: 'entryFee', label: 'Lệ phí mỗi người (VND)', type: 'number', min: 0, max: 999999999, step: 1 },
+  ];
+  const initial = editing
+    ? {
+      gameId: String(editing.gameId), name: editing.name,
+      registrationStartUtc: inputDate(editing.registrationStartUtc),
+      registrationEndUtc: inputDate(editing.registrationEndUtc),
+      startTimeUtc: inputDate(editing.startTimeUtc), entryFee: String(editing.entryFee),
+    }
+    : {
+      gameId: String(games.find((game) => game.isActive)?.gameId || ''),
+      name: '',
+      registrationStartUtc: inputDate(new Date().toISOString()),
+      registrationEndUtc: inputDate(new Date(Date.now() + 86400000).toISOString()),
+      startTimeUtc: inputDate(new Date(Date.now() + 2 * 86400000).toISOString()),
+      entryFee: '0',
+    };
+
+  async function save(form) {
+    const payload = {
+      gameId: Number(form.gameId),
+      name: form.name,
+      registrationStartUtc: utcDate(form.registrationStartUtc),
+      registrationEndUtc: utcDate(form.registrationEndUtc),
+      startTimeUtc: utcDate(form.startTimeUtc),
+      entryFee: Number(form.entryFee),
+    };
+    if (editing) await updateTournament(editing.id, payload);
+    else await createTournament(payload);
+    setNotice(editing ? 'Đã cập nhật giải đấu.' : 'Đã tạo giải đấu ở trạng thái bản nháp.');
+    reload();
   }
-  const registrations = (id) => db.TournamentRegistrations.filter((row) => row.TournamentId === id && row.Status !== 'Cancelled');
-  const rows = db.Tournaments.filter((row) => matches(query, row.TournamentName, row.TournamentId) && (status === 'all' || row.Status === status));
-  const detail = db.Tournaments.find((row) => row.TournamentId === selected);
-  const fields = [{ name: 'TournamentName', label: 'Tên giải đấu', maxLength: 100 }, { name: 'GameId', label: 'Trò chơi', options: db.Games.filter((row) => row.IsActive).map((row) => [row.GameId, row.GameName]) }, { name: 'RegistrationStart', label: 'Mở đăng ký (giờ Việt Nam)', type: 'datetime-local' }, { name: 'RegistrationEnd', label: 'Đóng đăng ký (giờ Việt Nam)', type: 'datetime-local' }, { name: 'StartTime', label: 'Bắt đầu thi đấu (giờ Việt Nam)', type: 'datetime-local' }];
-  const initial = editing ? { ...editing, RegistrationStart: inputDate(editing.RegistrationStart), RegistrationEnd: inputDate(editing.RegistrationEnd), StartTime: inputDate(editing.StartTime) } : { TournamentName: '', GameId: db.Games[0]?.GameId, RegistrationStart: inputDate(new Date().toISOString()), RegistrationEnd: inputDate(new Date(Date.now() + 86400000).toISOString()), StartTime: inputDate(new Date(Date.now() + 2 * 86400000).toISOString()) };
-  const regName = (registration) => db.Customers.find((row) => row.CustomerId === registration.CustomerId)?.FullName || `KH${registration.CustomerId}`;
-  return <AdminPage title="Quản lý giải đấu" description="Tạo giải, quản lý đăng ký và xếp đội; đồng bộ với mục Giải đấu của người chơi." actions={<button className="cafe-button primary" onClick={() => setEditing(null)}><Plus size={16}/>Tạo giải đấu</button>}>
-    <Notice notice={notice} error={error || warning} clear={() => { setNotice(''); setError(''); }}/>
-    <div className="cafe-stats"><StatCard label="Tổng giải đấu" value={db.Tournaments.length} icon={Trophy}/><StatCard label="Mở đăng ký" value={db.Tournaments.filter((row) => row.Status === 'Open').length} icon={Flag}/><StatCard label="Lượt đăng ký hiện hữu" value={db.TournamentRegistrations.filter((row) => row.Status !== 'Cancelled').length} icon={Users}/><StatCard label="Đội đã xếp" value={db.Teams.length} icon={UsersRound}/></div>
-    <Panel title="Danh sách giải đấu" description="Giải mới lưu ở trạng thái bản nháp, mở đăng ký khi đã sẵn sàng.">
-      <Toolbar query={query} onQuery={setQuery} placeholder="Tìm tên hoặc mã giải đấu…" onReset={() => { setQuery(''); setStatus('all'); }}><Filter label="Trạng thái giải" value={status} onChange={setStatus} options={['all', 'Draft', 'Open', 'Closed', 'TeamsAssigned', 'Finished', 'Cancelled'].map((value, index) => [value, ['Tất cả trạng thái', 'Bản nháp', 'Mở đăng ký', 'Đóng đăng ký', 'Đã chia đội', 'Kết thúc', 'Đã hủy'][index]])}/></Toolbar>
-      <Table rows={rows} idKey="TournamentId" resetKey={query + status} columns={[{ key: 'name', label: 'Giải đấu', sortValue: (row) => row.TournamentName, render: (row) => <><button className="admin-link" onClick={() => setSelected(row.TournamentId)}>{row.TournamentName}</button><small>#{row.TournamentId} · {db.Games.find((game) => game.GameId === row.GameId)?.GameName} · Miễn phí</small></> }, { key: 'time', label: 'Lịch đăng ký / Thi đấu', render: (row) => <>{dateTime(row.RegistrationEnd)}<small>Thi đấu: {dateTime(row.StartTime)}</small></> }, { key: 'count', label: 'Đăng ký', render: (row) => `${registrations(row.TournamentId).length} người` }, { key: 'status', label: 'Trạng thái', render: (row) => <Status value={row.Status}/> }, { key: 'actions', label: '', render: (row) => <div className="admin-actions"><button className="cafe-button" onClick={() => setSelected(row.TournamentId)}>Quản lý</button>{['Draft', 'Open', 'Closed'].includes(row.Status) && <button className="cafe-button" onClick={() => setEditing(row)}>Sửa</button>}</div> }]}/>
+
+  async function changeStatus(tournament, toStatus) {
+    try {
+      await transitionTournament(tournament.id, toStatus);
+      setNotice(toStatus === 'RegistrationOpen' ? 'Đã mở đăng ký.' : 'Đã đóng đăng ký.');
+      setError('');
+      reload();
+    } catch (cause) { setError(cause.message); }
+  }
+
+  const statusOptions = [
+    ['all', 'Tất cả trạng thái'], ['Draft', 'Bản nháp'],
+    ['RegistrationOpen', 'Mở đăng ký'], ['RegistrationClosed', 'Đóng đăng ký'],
+  ];
+  const openCount = tournaments.filter((row) => row.status === 'RegistrationOpen').length;
+  const registrationCount = tournaments.reduce((sum, row) => sum + row.registeredCount, 0);
+
+  return <AdminPage live title="Quản lý giải đấu" description="Quản lý giải và danh sách đăng ký từ dữ liệu máy chủ." actions={canManage && <button className="cafe-button primary" onClick={() => setEditing(null)}><Plus size={16}/>Tạo giải đấu</button>}>
+    <Notice notice={notice} error={error} clear={() => { setNotice(''); setError(''); }}/>
+    <div className="cafe-stats">
+      <StatCard label="Tổng giải đấu" value={tournaments.length} icon={Trophy}/>
+      <StatCard label="Mở đăng ký" value={openCount} icon={Trophy}/>
+      <StatCard label="Lượt đăng ký" value={registrationCount} icon={Users}/>
+    </div>
+    <Panel title="Danh sách giải đấu" description={connectionStatus === 'connected' ? 'Đồng bộ realtime đang hoạt động.' : 'Danh sách được đọc trực tiếp từ SQL.'}>
+      <Toolbar query={query} onQuery={setQuery} placeholder="Tìm tên hoặc mã giải đấu…" onReset={() => { setQuery(''); setStatus('all'); }}>
+        <Filter label="Trạng thái giải" value={status} onChange={setStatus} options={statusOptions}/>
+      </Toolbar>
+      {loading && <p role="status">Đang tải giải đấu…</p>}
+      <Table rows={filtered} idKey="id" resetKey={query + status} columns={[
+        { key: 'name', label: 'Giải đấu', sortValue: (row) => row.name, render: (row) => <><button className="admin-link" onClick={() => setSelectedId(row.id)}>{row.name}</button><small>#{row.id} · {row.gameName} · {row.entryFee === 0 ? 'Miễn phí' : `${money(row.entryFee)} / người`}</small></> },
+        { key: 'time', label: 'Lịch đăng ký / Thi đấu', render: (row) => <>{dateTime(row.registrationEndUtc)}<small>Thi đấu: {dateTime(row.startTimeUtc)}</small></> },
+        { key: 'count', label: 'Đăng ký', render: (row) => `${row.registeredCount} người` },
+        { key: 'status', label: 'Trạng thái', render: (row) => <Status value={row.status}/> },
+        { key: 'actions', label: '', render: (row) => <div className="admin-actions"><button className="cafe-button" onClick={() => setSelectedId(row.id)}>Quản lý</button>{canManage && ['Draft', 'RegistrationOpen', 'RegistrationClosed'].includes(row.status) && <button className="cafe-button" onClick={() => setEditing(row)}>Sửa</button>}</div> },
+      ]}/>
     </Panel>
-    <div style={{ marginTop: 22 }}><Panel title="Trạng thái đăng ký" description="Các lượt đăng ký trong hệ thống giải đấu."><DonutChart label="đăng ký" data={['Registered', 'Assigned', 'Cancelled'].map((value, index) => ({ name: ['Đã đăng ký', 'Đã xếp đội', 'Đã hủy'][index], value: db.TournamentRegistrations.filter((row) => row.Status === value).length }))}/></Panel></div>
-    {editing !== undefined && <FormDialog title={editing ? 'Chỉnh sửa giải đấu' : 'Tạo giải đấu'} fields={fields} initial={initial} description="Các giải hiện tại miễn phí đăng ký. Thời gian hiển thị và nhập theo giờ Việt Nam." onClose={() => setEditing(undefined)} onSave={(form) => { commit((data) => saveTournament(data, form)); setNotice('Đã lưu giải đấu.'); }}/>}
-    {detail && <DetailDialog title={detail.TournamentName} onClose={() => setSelected(null)}><Notice notice={notice} error={error} clear={() => { setNotice('' ); setError('' ); }}/><Row label="Trạng thái"><Status value={detail.Status}/></Row><Row label="Mở / Đóng đăng ký">{dateTime(detail.RegistrationStart)} → {dateTime(detail.RegistrationEnd)}</Row><Row label="Thi đấu">{dateTime(detail.StartTime)}</Row><div className="admin-actions" style={{ marginTop: 18 }}>{detail.Status === 'Draft' && <button className="cafe-button primary" onClick={() => setAction({ id: detail.TournamentId, status: 'Open', title: 'Mở đăng ký giải đấu?' })}>Mở đăng ký</button>}{detail.Status === 'Open' && <button className="cafe-button" onClick={() => setAction({ id: detail.TournamentId, status: 'Closed', title: 'Đóng đăng ký giải đấu?' })}>Đóng đăng ký</button>}{detail.Status === 'Closed' && <><button className="cafe-button" onClick={() => setAction({ id: detail.TournamentId, status: 'Open', title: 'Mở lại đăng ký?' })}>Mở lại</button><button className="cafe-button primary" onClick={() => setAction({ id: detail.TournamentId, status: 'teams', title: 'Chia đội theo rank OP.GG?' })}>Chia đội</button></>}{detail.Status === 'TeamsAssigned' && <button className="cafe-button primary" onClick={() => setAction({ id: detail.TournamentId, status: 'Finished', title: 'Đánh dấu kết thúc giải?' })}>Kết thúc giải</button>}{!['Finished', 'Cancelled'].includes(detail.Status) && <button className="cafe-button" onClick={() => setAction({ id: detail.TournamentId, status: 'Cancelled', title: 'Hủy giải và các lượt đăng ký?' })}>Hủy giải</button>}</div>
-      {detail.Status === 'Open' && <div className="cafe-dialog-actions"><button className="cafe-button primary" onClick={() => setRegistrationTour(detail.TournamentId)}>Thêm người tham gia</button></div>}<h3 className="admin-section-title">Người tham gia ({registrations(detail.TournamentId).length})</h3><Table rows={registrations(detail.TournamentId)} idKey="RegistrationId" columns={[{ key: 'name', label: 'Người chơi', render: regName }, { key: 'RiotId', label: 'Riot ID' }, { key: 'rank', label: 'Hạng', render: (row) => getParticipants(db, detail.TournamentId).find((entry) => entry.RegistrationId === row.RegistrationId)?.rank }, { key: 'PreferredRole', label: 'Vai trò' }, { key: 'status', label: 'Trạng thái', render: (row) => <Status value={row.Status}/> }, { key: 'sync', label: 'OP.GG', render: (row) => <button className="cafe-button" disabled={syncing !== null} onClick={() => syncParticipant(row)}>{syncing === row.RegistrationId ? 'Đang tải…' : 'Đồng bộ rank'}</button> }]}/>
-      <h3 className="admin-section-title">Đội thi đấu</h3>{db.Teams.filter((team) => team.TournamentId === detail.TournamentId).map((team) => <div className="admin-team-card" key={team.TeamId}><h4>{team.TeamName} · Điểm rank OP.GG TB: {Number(team.AvgSkillScore).toFixed(1)}</h4>{db.TeamMembers.filter((member) => member.TeamId === team.TeamId).map((member) => <div className="admin-detail-line" key={member.RegistrationId}><span>{regName(db.TournamentRegistrations.find((row) => row.RegistrationId === member.RegistrationId) || {})}</span><small>{member.AssignedRole}</small></div>)}</div>)}{!db.Teams.some((team) => team.TournamentId === detail.TournamentId) && <p className="admin-form-note">Chưa chia đội. Cần đóng đăng ký và đủ người để có ít nhất hai đội đầy đủ.</p>}
+    {editing !== undefined && <FormDialog
+      title={editing ? 'Chỉnh sửa giải đấu' : 'Tạo giải đấu'}
+      fields={fields} initial={initial}
+      description="Giải mới ở trạng thái bản nháp. Phí được nhập theo VND nguyên; đăng ký giải có phí chưa khả dụng cho đến khi tích hợp thanh toán ví."
+      onClose={() => setEditing(undefined)}
+      onSave={save}/>}
+    {selected && <DetailDialog title={selected.name} onClose={() => setSelectedId(null)}>
+      <Notice notice={notice} error={error} clear={() => { setNotice(''); setError(''); }}/>
+      <Row label="Trạng thái"><Status value={selected.status}/></Row>
+      <Row label="Trò chơi">{selected.gameName} · đội {selected.teamSize} người</Row>
+      <Row label="Lệ phí">{selected.entryFee === 0 ? 'Miễn phí' : `${money(selected.entryFee)} / người`}</Row>
+      <Row label="Mở / đóng đăng ký">{dateTime(selected.registrationStartUtc)} → {dateTime(selected.registrationEndUtc)}</Row>
+      <Row label="Thi đấu">{dateTime(selected.startTimeUtc)}</Row>
+      <div className="admin-actions" style={{ marginTop: 18 }}>
+        {canManage && selected.status === 'Draft' && <button className="cafe-button primary" onClick={() => void changeStatus(selected, 'RegistrationOpen')}>Mở đăng ký</button>}
+        {canManage && selected.status === 'RegistrationOpen' && <button className="cafe-button" onClick={() => void changeStatus(selected, 'RegistrationClosed')}>Đóng đăng ký</button>}
+        {canManage && selected.status === 'RegistrationClosed' && Date.parse(selected.registrationEndUtc) > Date.now()
+          && <button className="cafe-button primary" onClick={() => void changeStatus(selected, 'RegistrationOpen')}>Mở lại đăng ký</button>}
+      </div>
+      <h3 className="admin-section-title">Người tham gia ({registrations.length})</h3>
+      <Table rows={registrations} idKey="id" columns={[
+        { key: 'customerName', label: 'Người chơi' },
+        { key: 'riotId', label: 'Riot ID' },
+        { key: 'rankName', label: 'Hạng' },
+        { key: 'preferredRole', label: 'Vai trò' },
+        { key: 'status', label: 'Trạng thái', render: (row) => <Status value={row.status}/> },
+        { key: 'registeredAtUtc', label: 'Thời gian', render: (row) => dateTime(row.registeredAtUtc) },
+      ]}/>
     </DetailDialog>}
-    {action && <FormDialog title={action.title} description={action.status === 'teams' ? 'Chia đội theo rank đã đồng bộ từ OP.GG bằng cách phân bổ luân phiên. Không dùng hoặc tạo giả số liệu OP.GG. Số người phải chia hết cho kích thước đội.' : 'Thay đổi trạng thái sẽ hiển thị ở trang giải đấu của người chơi.'} submit="Xác nhận" onClose={() => setAction(null)} onSave={() => { commit((data) => action.status === 'teams' ? generateTeams(data, action.id) : transitionTournament(data, action.id, action.status)); setNotice('Đã cập nhật giải đấu.'); }}/>}
-    {registrationTour && <FormDialog title="Đăng ký người tham gia" initial={{ customerId: common.customers[0]?.id, riotId: '', role: 'Flex' }} fields={[{ name: 'customerId', label: 'Khách hàng', options: common.customers.map((customer) => [customer.id, common.accounts.find((account) => account.id === customer.account_id)?.display_name || `KH${customer.id}`]) }, { name: 'riotId', type: 'riot-id', label: 'Riot ID' }, { name: 'role', label: 'Vai trò', options: ['Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex'].map((role) => [role, role]) }]} description="Đăng ký miễn phí cho khách tại quầy. Chỉ nhập Riot ID và vai trò; rank tự lấy từ OP.GG. Mỗi khách và Riot ID chỉ đăng ký một lần. Hồ sơ OP.GG phải công khai (Public); nếu đang Private, cần chuyển sang Public để truy vấn rank và thống kê." onClose={() => setRegistrationTour(null)} onSave={(form) => { const customer = common.customers.find((row) => row.id === Number(form.customerId)); const account = common.accounts.find((row) => row.id === customer?.account_id); const saved = commit((data) => registerAdminParticipant(data, registrationTour, account, customer, form)); setNotice('Đã đăng ký. Đang lấy rank từ OP.GG.'); void syncParticipant(saved.TournamentRegistrations.at(-1)); }}/>}
   </AdminPage>;
 }

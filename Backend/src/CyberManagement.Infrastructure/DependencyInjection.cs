@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
         services.AddScoped<IComputerRepository, ComputerRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<ITournamentRepository, TournamentRepository>();
         services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
         services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
 
