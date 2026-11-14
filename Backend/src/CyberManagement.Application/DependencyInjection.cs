@@ -16,6 +16,7 @@ namespace CyberManagement.Application
             services.AddScoped<IComputerService, ComputerService>();
             services.AddScoped<CatalogService>();
             services.AddScoped<ICustomerService, CustomerService>();
+            services.AddScoped<CounterTopUpService>();
             services.AddScoped<IRequestValidator<LoginCommand>, LoginCommandValidator>();
             services.AddScoped<IRequestValidator<CustomerLoginCommand>, CustomerLoginCommandValidator>();
             services.AddScoped<IInventoryService, InventoryService>();

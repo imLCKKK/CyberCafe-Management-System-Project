@@ -13,6 +13,7 @@ import {
   Menu, 
   ChevronRight,
   LogOut,
+  Banknote,
 } from 'lucide-react';
 import './layout.css';
 import { AdminProvider } from '../admin/shared/AdminContext';
@@ -23,6 +24,7 @@ const menu = [
   ['/admin/dashboard', 'Tổng quan', LayoutDashboard],
   ['/admin/computers', 'Máy', Monitor],
   ['/admin/customers', 'Khách hàng', Users],
+  ['/admin/topups', 'Nạp tại quầy', Banknote],
   ['/admin/orders', 'Order', ShoppingCart],
   ['/admin/products', 'Sản phẩm', Package],
   ['/admin/inventory', 'Kho', Package],
@@ -48,6 +50,7 @@ function AdminShell() {
         '/admin/products': ['product.view'], '/admin/inventory': ['stockreceipt.view'],
         '/admin/invoices': ['invoice.view'], '/admin/tournaments': ['tournament.view'], '/admin/staff': ['employee.view'],
         '/admin/reports': ['report.view'],
+        '/admin/topups': ['wallet.topup'],
       }[path];
       return !permissions || permissions.some((permission) => principal.permissions.includes(permission));
     })

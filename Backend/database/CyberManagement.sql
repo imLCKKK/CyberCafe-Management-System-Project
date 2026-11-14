@@ -2370,3 +2370,249 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    DECLARE @var31 nvarchar(max);
+    SELECT @var31 = QUOTENAME([d].[name])
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[WalletTransactions]') AND [c].[name] = N'Type');
+    IF @var31 IS NOT NULL EXEC(N'ALTER TABLE [WalletTransactions] DROP CONSTRAINT ' + @var31 + ';');
+    ALTER TABLE [WalletTransactions] ALTER COLUMN [Type] nvarchar(50) COLLATE Latin1_General_100_BIN2 NOT NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    ALTER TABLE [WalletTransactions] ADD [ActorEmployeeId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    ALTER TABLE [WalletTransactions] ADD [ActorType] nvarchar(10) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    ALTER TABLE [WalletTransactions] ADD [Kind] nvarchar(10) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    ALTER TABLE [WalletTransactions] ADD [OperationKey] nvarchar(100) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    ALTER TABLE [WalletTransactions] ADD [OriginalDebitId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    ALTER TABLE [WalletTransactions] ADD [SourceId] nvarchar(100) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    ALTER TABLE [WalletTransactions] ADD [SourceType] nvarchar(50) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    CREATE TABLE [CounterTopUpRequests] (
+        [RequestId] int NOT NULL IDENTITY,
+        [CustomerId] int NOT NULL,
+        [RequestKey] uniqueidentifier NOT NULL,
+        [Amount] decimal(18,0) NOT NULL,
+        [Status] nvarchar(20) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [CreatedAt] datetime2 NOT NULL,
+        [ApprovedAt] datetime2 NULL,
+        [ApprovedByEmployeeId] int NULL,
+        [CashAmountReceived] decimal(18,0) NULL,
+        [WalletTransactionId] int NULL,
+        CONSTRAINT [PK_CounterTopUpRequests] PRIMARY KEY ([RequestId]),
+        CONSTRAINT [CK_CounterTopUpRequests_Amount] CHECK ([Amount] IN (10000,20000,30000,50000,100000,200000,300000,500000)),
+        CONSTRAINT [CK_CounterTopUpRequests_State] CHECK (([Status] = N'Pending' AND [ApprovedAt] IS NULL AND [ApprovedByEmployeeId] IS NULL AND [CashAmountReceived] IS NULL AND [WalletTransactionId] IS NULL) OR ([Status] = N'Approved' AND [ApprovedAt] IS NOT NULL AND [ApprovedAt] >= [CreatedAt] AND [ApprovedByEmployeeId] IS NOT NULL AND [CashAmountReceived] IS NOT NULL AND [CashAmountReceived] = [Amount] AND [WalletTransactionId] IS NOT NULL)),
+        CONSTRAINT [FK_CounterTopUpRequests_Customers_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customers] ([CustomerId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_CounterTopUpRequests_Employees_ApprovedByEmployeeId] FOREIGN KEY ([ApprovedByEmployeeId]) REFERENCES [Employees] ([EmployeeId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_CounterTopUpRequests_WalletTransactions_WalletTransactionId] FOREIGN KEY ([WalletTransactionId]) REFERENCES [WalletTransactions] ([TransactionId]) ON DELETE NO ACTION
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    CREATE INDEX [IX_WalletTransactions_ActorEmployeeId] ON [WalletTransactions] ([ActorEmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_WalletTransactions_OperationKey] ON [WalletTransactions] ([OperationKey]) WHERE [OperationKey] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    CREATE INDEX [IX_WalletTransactions_OriginalDebitId] ON [WalletTransactions] ([OriginalDebitId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_WalletTransactions_SourceType_SourceId_Type] ON [WalletTransactions] ([SourceType], [SourceId], [Type]) WHERE [SourceType] IS NOT NULL AND [SourceId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [WalletTransactions] ADD CONSTRAINT [CK_WalletTransactions_WriterMetadata] CHECK (([OperationKey] IS NULL AND [Kind] IS NULL AND [SourceType] IS NULL AND [SourceId] IS NULL AND [OriginalDebitId] IS NULL AND [ActorType] IS NULL AND [ActorEmployeeId] IS NULL) OR ([OperationKey] IS NOT NULL AND LEN(LTRIM(RTRIM([OperationKey]))) > 0 AND [Kind] IS NOT NULL AND [Kind] IN (''Credit'',''Debit'',''Refund'') AND [SourceType] IS NOT NULL AND LEN(LTRIM(RTRIM([SourceType]))) > 0 AND [SourceId] IS NOT NULL AND LEN(LTRIM(RTRIM([SourceId]))) > 0 AND [ActorType] IS NOT NULL AND (([ActorType] = ''Staff'' AND [ActorEmployeeId] IS NOT NULL) OR ([ActorType] = ''System'' AND [ActorEmployeeId] IS NULL)) AND [BalanceAfter] >= 0 AND (([Kind] = ''Debit'' AND [Amount] < 0 AND [OriginalDebitId] IS NULL) OR ([Kind] = ''Credit'' AND [Amount] > 0 AND [OriginalDebitId] IS NULL) OR ([Kind] = ''Refund'' AND [Amount] > 0 AND [OriginalDebitId] IS NOT NULL AND [OriginalDebitId] <> [TransactionId]))))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    CREATE INDEX [IX_CounterTopUpRequests_ApprovedByEmployeeId] ON [CounterTopUpRequests] ([ApprovedByEmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_CounterTopUpRequests_CustomerId_RequestKey] ON [CounterTopUpRequests] ([CustomerId], [RequestKey]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_CounterTopUpRequests_WalletTransactionId] ON [CounterTopUpRequests] ([WalletTransactionId]) WHERE [WalletTransactionId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_CounterTopUpRequests_PendingCustomer] ON [CounterTopUpRequests] ([CustomerId]) WHERE [Status] = N''Pending''');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    ALTER TABLE [WalletTransactions] ADD CONSTRAINT [FK_WalletTransactions_Employees_ActorEmployeeId] FOREIGN KEY ([ActorEmployeeId]) REFERENCES [Employees] ([EmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    ALTER TABLE [WalletTransactions] ADD CONSTRAINT [FK_WalletTransactions_WalletTransactions_OriginalDebitId] FOREIGN KEY ([OriginalDebitId]) REFERENCES [WalletTransactions] ([TransactionId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261114112809_WalletLedgerCounterTopUps', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112818_CounterTopUpBonuses'
+)
+BEGIN
+    ALTER TABLE [CounterTopUpRequests] ADD [BonusAmount] decimal(18,0) NOT NULL DEFAULT 0.0;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112818_CounterTopUpBonuses'
+)
+BEGIN
+    ALTER TABLE [CounterTopUpRequests] ADD [TotalAmount] decimal(18,0) NOT NULL DEFAULT 0.0;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112818_CounterTopUpBonuses'
+)
+BEGIN
+    UPDATE [CounterTopUpRequests]
+    SET [BonusAmount] = CASE WHEN [Status] = N'Pending' THEN
+        CASE [Amount] WHEN 50000 THEN 5000 WHEN 100000 THEN 15000
+            WHEN 200000 THEN 35000 WHEN 300000 THEN 50000 WHEN 500000 THEN 100000 ELSE 0 END
+        ELSE 0 END;
+    UPDATE [CounterTopUpRequests] SET [TotalAmount] = [Amount] + [BonusAmount];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112818_CounterTopUpBonuses'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [CounterTopUpRequests] ADD CONSTRAINT [CK_CounterTopUpRequests_Bonus] CHECK ([BonusAmount] >= 0 AND [TotalAmount] = [Amount] + [BonusAmount])');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114112818_CounterTopUpBonuses'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261114112818_CounterTopUpBonuses', N'10.0.14');
+END;
+
+COMMIT;
+GO

@@ -8,5 +8,6 @@ public static class ApiPolicies
     public const string CustomerView = "permission:customer.view";
     public const string CustomerCreate = "permission:customer.create";
     public const string WalletView = "permission:wallet.view";
+    public const string WalletTopUp = "permission:wallet.topup";
     public const string RealtimeConnect = "realtime.connect";
 }
