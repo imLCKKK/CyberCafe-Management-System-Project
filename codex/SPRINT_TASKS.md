@@ -14,6 +14,10 @@ Cập nhật nền backend/DB ngày 02/11/2026; giữ lịch baseline ngày 31/1
 
 Ngày **10/11** và **15/11** được nhóm dùng làm ngày bàn giao chung của hai sprint liền kề: Task hoàn tất của sprint trước được review/bàn giao để sprint sau tích hợp; một Task vẫn chỉ thuộc một sprint.
 
+**Làm rõ phạm vi ngày 14/11/2026.** Trưởng nhóm trực tiếp hoàn thiện các phần dang dở của **Sprint 1**, gồm chốt và đồng bộ contract phiên/ví/chứng từ tại S1-P-1, S1-M-1 và S1-T-1. Actor tự đóng/phát hành là System, người mở phiên được lưu riêng. Trưởng nhóm tự hoàn tất phần thiết kế/bàn giao Sprint 1. Phân công triển khai Sprint 2 theo từng module gồm Phúc ở S2-P-1, Minh ở S2-M-1 và Trường ở S2-T-2. Quyết định kỹ thuật được ghi ở [contract phiên mục 5.1](../Backend/docs/002-computer-session-contract.md#51-quyết-định-tự-đóng-phiên-và-người-thực-hiện--14112026).
+
+**Bàn giao contract bổ sung 14/11/2026.** Trưởng nhóm đã chọn thanh toán đủ trước nhận món, Cash đã thu khóa hủy và xuất riêng hóa đơn món/tiền giờ. S1-K-2 cập nhật bản 0.5, S1-T-1 cập nhật contract chứng từ 1.9, S1-P-1/S1-M-1 đồng bộ Payment mỗi lần thu và actor System. Các thay đổi này là thiết kế Sprint 1 để owner triển khai S2 theo module.
+
 Theo yêu cầu trực tiếp ngày **09/11/2026**, **S1-U-1 — Apply-Nexora-Branding-Theme** chuyển từ Phúc sang **Trưởng nhóm** (người dùng trực tiếp thực hiện); **S2-U-1 — Add-Food-Images-Menu-Cards** vẫn thuộc **Phúc**. Giữ mã tham chiếu để không đứt liên kết đã dùng; chữ U là mã lịch sử của phần UI. Tổng số Task và lịch sprint giữ nguyên. Trưởng nhóm giữ quyền duyệt cuối; các owner kiểm tra chéo luồng bị ảnh hưởng.
 
 ### Đối chiếu các yêu cầu frontend mới
@@ -147,6 +151,8 @@ Assignee: **Minh**. Reviewer: **Trưởng nhóm**. Phối hợp: Đại; Trườ
 
 #### S1-M-1 — Implement-Customer-Wallet-Queries
 
+**Đồng bộ 14/11/2026.** Contract ví mục 5 ghi Payment Succeeded cùng SessionCharge/ledger tại mỗi lần thu, InvoiceId nullable trước phát hành. Đơn món thanh toán đủ trước nhân viên nhận để làm, Cash đã thu khóa hủy, chứng từ món/tiền giờ xuất riêng theo lựa chọn Trưởng nhóm.
+
 Jira: **SCRUM-5**. Contract/API hiện tại: [hồ sơ và ví](../Backend/docs/003-customer-wallet-contract.md).
 Ngày 08/11/2026 người dùng chọn nạp quầy thu tiền xong mới cộng ví, không nạp nợ.
 Tạo/đọc khách và query ví thuộc task này; writer credit/debit/refund và realtime thuộc S2-M-1.
@@ -195,6 +201,8 @@ Assignee: **Phúc**. Reviewer: **Trưởng nhóm**. Phối hợp: Đại; Minh �
 
 #### S1-P-1 — Implement-Computer-Queries-Session-Rules
 
+**Đồng bộ 14/11/2026.** Trưởng nhóm đã chốt Payment tại mỗi lần thu, actor System tự đóng và hóa đơn tiền giờ riêng chỉ chứa phí chưa có chứng từ. Contract phiên mục 5–5.1 là đầu vào thiết kế đã thống nhất cho S2.
+
 **Description:**
 
 - Chốt vòng đời máy/phiên, công thức tiền giờ, làm tròn, hết tiền và phục hồi sau restart.
@@ -210,6 +218,8 @@ Assignee: **Phúc**. Reviewer: **Trưởng nhóm**. Phối hợp: Đại; Minh �
 **Gom từ mã cũ:** `S1-P-01`, `S1-P-02`. Đây là mã tra cứu, không tạo lại các thẻ cũ.
 
 #### S1-P-2 — Implement-SignalR-LAN-Sync
+
+**Ghi nhận xác nhận Trưởng nhóm ngày 14/11/2026.** Trong phiên review Sprint 1, Trưởng nhóm cho biết đã thử hai máy LAN và chạy ổn. Bằng chứng local tự động được giữ riêng trong hướng dẫn SCRUM-8. Các số đo local chỉ phản ánh kiểm tra trên một máy.
 
 **Description:**
 
@@ -269,10 +279,10 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 #### S1-K-2 — Define-Order-Checkout-Contracts
 
 **Tài liệu bàn giao:** [Hợp đồng đơn món và checkout](../Backend/docs/004-order-checkout-contract.md),
-phiên bản 0.4 ngày 08/11/2026; sau review 66f1a29, người dùng ủy quyền AI chốt các lựa chọn còn mở.
-Mục 11.2 ghi D01–D11 cùng căn cứ/lý do; việc chốt thiết kế không còn chờ phản hồi riêng của owner.
+phiên bản 0.5 ngày 14/11/2026, cập nhật quyết định thanh toán đủ trước khi nhân viên nhận món để làm.
+Mục 11.2 ghi D01–D13 cùng căn cứ/lý do, D02/D12/D13 được cập nhật theo lựa chọn Trưởng nhóm ngày 14/11/2026.
 Mục 11.3 tách phụ thuộc code/migration/kiểm chứng và duyệt cuối; chưa ghi các owner đã đồng ý,
-chưa đánh dấu Done. Trưởng nhóm review bản 0.4 trước khi duyệt cuối.
+chưa đánh dấu Done. Trưởng nhóm review bản 0.5 trước khi duyệt cuối.
 
 **Description:**
 
@@ -293,6 +303,8 @@ chưa đánh dấu Done. Trưởng nhóm review bản 0.4 trước khi duyệt c
 Assignee: **Trường**. Reviewer: **Trưởng nhóm**. Phối hợp: Khang; Minh đối chiếu tiền, Đại đối chiếu contract voucher.
 
 #### S1-T-1 — Define-Inventory-Invoice-Voucher-Contracts
+
+**Quyết định bổ sung 14/11/2026.** Trưởng nhóm đã chốt Payment tại mỗi lần thu, actor System tự đóng và xuất riêng chứng từ tiền giờ/món ăn theo contract chứng từ 1.9. Phần thiết kế còn dang dở của Sprint 1 được Trưởng nhóm trực tiếp hoàn thiện để owner triển khai Sprint 2. Những ghi chú chờ tại mốc 05/11 bên dưới là lịch sử đối chiếu, trạng thái thiết kế hiện hành nằm ở contract mục 6.5.
 
 **Trạng thái đối chiếu 05/11/2026:** PR #8 đã merge vào `dev` tại `229d7af`, chưa phải nghiệm thu của
 Trưởng nhóm. [Contract kho/chứng từ/voucher](../docs/contracts/inventory-invoice-voucher.md) có bổ sung

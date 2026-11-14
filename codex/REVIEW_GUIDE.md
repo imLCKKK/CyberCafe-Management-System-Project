@@ -12,6 +12,9 @@ Kết quả review gửi trực tiếp trong chat theo dạng lỗi, ảnh hư�
 
 ## 1. Xác định phạm vi review
 
+- Quyết định 14/11/2026 giao Trưởng nhóm tự hoàn thiện các phần dang dở/contract của Sprint 1, gồm actor System tại contract phiên mục 5.1 và chứng từ mục 6.3.2. Review phần thiết kế/bàn giao Sprint 1 theo quyết định Trưởng nhóm đã chốt. Khi review triển khai Sprint 2, ghi nhận Phúc phụ trách S2-P-1, Minh phụ trách S2-M-1 và Trường phụ trách S2-T-2, kiểm tra quyền System nội bộ, migration/backfill, rollback/retry/restart/cạnh tranh và hiển thị actor theo code/bằng chứng.
+- Lựa chọn xác nhận lại ngày 14/11/2026 yêu cầu trả đủ tiền trước nhân viên nhận món, Cash đã thu khóa hủy và xuất riêng hóa đơn món/tiền giờ. Review S1-K-2 theo contract checkout 0.5, các giao điểm theo contract chứng từ 1.9. Khi kiểm tra S2, xét PaymentRequired, CashCancellationLocked, quyền thu/nhận món và unique từng nguồn chứng từ.
+
 - Xác định task/Jira key, người thực hiện, nhánh hoặc PR, base và head cần so sánh. Nếu chưa có key Jira, dùng mã tham chiếu trong backlog; không bịa issue đã tồn tại.
 - Đọc **Description**, **Dependencies**, từng mục **Done khi** và điều kiện Done chung trong backlog. Description xác định phần phải làm; Done khi là checklist đối chiếu bằng chứng, không chỉ đánh dấu đã viết code. Đọc các quyết định nghiệp vụ liên quan. Không chấm Task thiết kế như Task triển khai; không bỏ qua phần tích hợp đã ghi trong tiêu chí.
 - Kiểm tra Git: thay đổi đã commit, staged, unstaged và file mới chưa tracked. Phân biệt diff task với thay đổi có sẵn của người khác. Không reset/clean/checkout đè để tạo môi trường review.

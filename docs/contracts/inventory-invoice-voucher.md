@@ -5,10 +5,12 @@
 | Công việc           | Define-Inventory-Invoice-Voucher-Contracts                               |
 | Mã Jira / kế hoạch  | SCRUM-12 / S1-T-1                                                        |
 | Người phụ trách     | Lê Vũ Huy Trường                                                         |
-| Phiên bản           | 1.7 - bổ sung sau review 05/11/2026, chờ duyệt                            |
+| Phiên bản           | 1.9 - chốt xuất riêng tiền giờ/món và thanh toán trước phục vụ ngày 14/11/2026 |
 | Backend đích        | CyberManagement, cấu trúc Backend/src, ApplicationDbContext, nền 35 bảng |
 | Phụ thuộc           | SCRUM-2 / S1-D-1 và SCRUM-5 / S1-M-1                                     |
 | Trạng thái bàn giao | Đề nghị review; các đầu vào và xác nhận còn chờ được liệt kê tại mục 9   |
+
+**Quyết định Trưởng nhóm ngày 14/11/2026.** Luồng hết tiền tự quyết toán, đóng phiên và phát hành hóa đơn với actor System đã được Trưởng nhóm chốt. Trưởng nhóm trực tiếp hoàn thiện contract còn dang dở của Sprint 1 tại S1-P-1/S1-M-1/S1-T-1. Phúc triển khai phiên/worker tại S2-P-1, Minh triển khai ví tại S2-M-1 và Trường triển khai hóa đơn tại S2-T-2. Mục 6.3.2 quy định quyền nội bộ, dữ liệu actor và retry của luồng này.
 
 ## 1. Mục đích và phạm vi
 
@@ -23,7 +25,7 @@ Phạm vi bàn giao gồm:
 
 - Mapping schema và phân loại giữ nguyên, thay đổi, thêm mới.
 - Quy tắc voucher, API/DTO và permission cho từng endpoint.
-- Phát hành hóa đơn gộp, snapshot và cập nhật thu/hủy/hoàn.
+- Phát hành hóa đơn món ăn và hóa đơn tiền giờ riêng, snapshot và cập nhật thu/hủy/hoàn.
 - Nguồn doanh thu, nguyên tắc chống tính trùng và phân chia migration.
 - Kết quả đối chiếu nguồn, đầu vào còn chờ và tiêu chí nghiệm thu.
 
@@ -196,16 +198,14 @@ Tên món snapshot còn phải bổ sung trong code nguồn khi triển khai; kh
 
 ### 3.3. Hóa đơn
 
-Giữ mô hình Invoice, InvoiceOrder và InvoiceDetail của nền đích. Một hóa đơn có thể chứa một hoặc nhiều đơn;
-GamingSessionId vẫn nullable như nguồn. Nguồn đơn được liên kết qua InvoiceOrders.
+Quyết định ngày 14/11/2026 chọn xuất riêng hóa đơn món ăn và hóa đơn tiền giờ. Giữ mô hình Invoice, InvoiceOrder và InvoiceDetail của nền đích. Hóa đơn món có thể chứa một hoặc nhiều đơn cùng khách được chọn theo InvoiceOrders, các dòng chỉ mang OrderDetailId. Hóa đơn tiền giờ có GamingSessionId, orderIds rỗng và các dòng chỉ mang SessionChargeId. GamingSessionId trên hóa đơn món có thể dùng để truy phiên của các đơn đã chọn.
 
 - InvoiceId, CustomerId, EmployeeId, GamingSessionId, PromotionId dùng int/int? theo entity nguồn.
-- EmployeeId là nhân viên chốt/phát hành; không tạo AccountId. Không phát hành chứng từ nhân viên
+- EmployeeId là nhân viên chốt/phát hành đối với actor Staff. Thiết kế System tại mục 6.3.2 dùng EmployeeId null, ActorType System và nguồn GamingSession. Không phát hành chứng từ nhân viên
   bằng cách giả CustomerId là EmployeeId. Khách xem dữ liệu của mình, không tự phê duyệt phát hành.
 - InvoiceOrder lưu cặp (InvoiceId, OrderId), khóa chính kép và hai FK như configuration Đại.
   Tất cả đơn gộp phải cùng CustomerId với Invoice; nếu có GamingSessionId thì đơn phải thuộc phiên đó.
-- Hóa đơn có ít nhất một nguồn: đơn được nối hoặc phí phiên; có thể chứa cả phí phiên và món.
-  Không tính một dòng món/phí phiên lần hai khi tính tổng.
+- Hóa đơn phát hành mới có ít nhất một nguồn và tuân theo một loại nguồn, món hoặc tiền giờ. Application kiểm tra cả tập nguồn dưới khóa. Hóa đơn lịch sử đã có cả hai loại được đọc/in theo snapshot gốc để truy vết dữ liệu đã phát hành.
 - Khóa chính kép nguồn chỉ chặn trùng cùng cặp; chưa ngăn một OrderId nằm ở hai hóa đơn khác nhau.
   Yêu cầu nghiệp vụ: không ghi nhận cùng đơn/phí phiên vào hai hóa đơn phát hành.
   Khi triển khai phải kiểm soát nguồn dưới khóa transaction và bổ sung unique nguồn phù hợp;
@@ -390,7 +390,7 @@ bắt buộc kiểm tra. Cashier/Waiter/Technician gửi trực tiếp request P
 
 Ma trận trên là tiêu chí kiểm thử module khi triển khai. Phạm vi kiểm chứng hiện có được ghi tại mục 10.
 
-## 6. Điểm gọi nội bộ và phát hành hóa đơn gộp
+## 6. Điểm gọi nội bộ và phát hành hóa đơn theo loại nguồn
 
 Contract logic dưới đây để triển khai sau, chưa phải interface có sẵn trên nguồn Đại.
 Trường cung cấp rule kho/voucher/chứng từ; Khang/Phúc gọi trong nghiệp vụ của họ.
@@ -401,21 +401,18 @@ Trường cung cấp rule kho/voucher/chứng từ; Khang/Phúc gọi trong nghi
 | Voucher.ValidateAndUse            | đơn đã tính giá, code, CustomerId từ auth                                           | Snapshot giảm, phân bổ từng dòng, một usage/đơn                                |
 | Voucher.ReleaseForCancelledOrder  | orderId, nguồn hủy đã xác minh                                                      | Hủy toàn đơn mới hoàn lượt đúng một lần                                        |
 | Invoice.IssueForOrders            | danh sách orderIds, CustomerId, EmployeeId từ principal nhân viên, operationKey     | Một hóa đơn và các InvoiceOrder; trả lại kết quả cũ khi retry cùng thao tác    |
-| Invoice.IssueForSession           | sessionId đã kết thúc, các đơn chưa lên hóa đơn được chọn, EmployeeId, operationKey | Phí phiên và đơn được chọn lên cùng chứng từ; không đưa lại nguồn đã phát hành |
+| Invoice.IssueForSession           | sessionId đã kết thúc, orderIds rỗng, actor Staff/System, operationKey | Chứng từ chỉ gồm phí giờ đã thu chưa có hóa đơn của phiên, liên kết Payment theo SessionChargeId |
 | Invoice.ApplyFinancialChange      | nguồn thu/hủy/hoàn đã xác minh, operationKey                                        | Cập nhật phần tiền liên quan trong hóa đơn, không cộng/trừ hai lần             |
 
 - Nhân viên chốt/phát hành hóa đơn khi nghiệp vụ yêu cầu, theo tập đơn/phiên được chọn.
-  Không tự tạo một hóa đơn cho từng lần đặt rồi lại gộp chúng; phát hành theo lần chốt tập nguồn đã chọn.
-  Nguồn lưu khoản thu trước phát hành đã được owner Trường chốt về thiết kế tại mục 6.1;
-  quy tắc liên kết hóa đơn và chống thu/hoàn lặp được chốt thiết kế tại mục 6.2–6.4.
-  Schema nền chưa có các thay đổi này; xác nhận liên module còn chờ mục 6.5.
+  IssueForOrders chụp tập đơn món được chọn, IssueForSession chụp tập phí giờ chưa có chứng từ theo quyết định 14/11/2026. Nguồn thu lưu trước phát hành theo mục 6.1. Các yêu cầu migration/điểm gọi và kiểm chứng triển khai được bàn giao cho S2 theo mục 6.5.
 - Đơn trả ví trước khi chốt vẫn giữ debit và snapshot; phát hành không trừ ví thêm lần nữa.
   Cash chưa thu là Unpaid (API Pending); thu được xác minh mới Paid.
   Gateway chưa xác minh không Paid. Phiên dùng phí đã tính, không tự thu phí lần hai.
-- Hóa đơn gộp chỉ Paid khi tổng phải trả còn lại đã thanh toán đủ theo nguồn thực.
+- Hóa đơn món gộp nhiều đơn chỉ Paid khi tổng phải trả còn lại đã thanh toán đủ theo nguồn thực.
   Khi đã phát hành không tùy ý thêm/bớt đơn để đổi snapshot; hủy/hoàn có truy vết riêng.
 - Nhân viên phải có permission invoice.create; khách xem hóa đơn theo CustomerId của token.
-  Tác vụ tự động không giả nhân viên: chỉ thực hiện khi có cơ chế actor hệ thống được nhóm định nghĩa.
+  Worker tự đóng dùng actor System và ngữ cảnh nội bộ đã chốt tại mục 6.3.2.
 - Caller mở transaction/DbContext chung; module con không tự commit hoặc mở transaction lồng.
   Kiểm tra cùng khách/cùng phiên trước khi nối; khóa các đơn theo ID tăng dần và kiểm tra nguồn
   đã được lập chứng từ trước khi tạo InvoiceOrder. Mọi caller theo thứ tự khóa mục 6.2.1.
@@ -564,6 +561,7 @@ không dùng thời điểm chạy migration làm ConfirmedAt của giao dịch 
   thì server phân số tiền còn phải thu thành các dòng, tổng bằng tiền đã nhận được xác nhận và
   lưu tất cả trong một transaction. Mỗi dòng có khóa con như cash:{batchId}:order:{orderId};
   retry giữ nguyên batchId, tập nguồn và số tiền. Không dùng cùng OperationKey cho nhiều dòng.
+  Theo quyết định 14/11/2026, đơn món Cash thu đủ khi các dòng còn Pending, sau commit nhân viên mới được confirm để làm. Các phương thức Wallet/ZaloPay cũng phải được server xác minh thanh toán đủ trước confirm theo contract checkout mục 5.1. Đơn Cash đã có khoản thu Succeeded khóa luồng hủy thông thường, quản lý xử lý ngoại lệ có audit tại quầy.
 - ZaloPay: commit dòng Payment Pending và mã merchant gắn OrderId trước khi gọi provider;
   sau đó gọi ngoài SQL transaction. Callback/query cập nhật chính dòng đã có dưới khóa,
   không insert thêm khi nhận lại cùng giao dịch; Succeeded không ghi thu lại hoặc quay về Pending/Failed.
@@ -674,7 +672,7 @@ khóa nghiệp vụ mới và kiểm tra lại quyền/hạn mức/nguồn hủy
 
 ### 6.3. Phát hành hóa đơn chỉ liên kết và đối soát
 
-1. Caller xác minh quyền invoice.create, cùng khách/cùng phiên và tập nguồn chưa lên chứng từ khác.
+1. Caller Staff xác minh invoice.create, caller System xác minh ngữ cảnh nội bộ theo mục 6.3.2. Kiểm tra cùng khách/cùng phiên và tập nguồn chưa lên chứng từ khác, hóa đơn mới chỉ gồm một loại nguồn món hoặc tiền giờ.
    Khóa nguồn theo thứ tự chung, tạo Invoice/InvoiceOrders và các dòng snapshot trong cùng transaction.
 2. Gắn InvoiceId cho các dòng thu/hoàn Succeeded có InvoiceId null thuộc tập nguồn đã chọn,
    sau khi đối chiếu ledger ví. Không đổi InvoiceId đã khác null sang hóa đơn khác.
@@ -714,7 +712,9 @@ OperationKey của bảng này độc lập với Payments.OperationKey. PK bả
 validation/CHECK bảo vệ định dạng không rỗng và hash 64 ký tự hex. Không hard-delete khóa sau
 khi hủy/hoàn hóa đơn; không cho InvoiceId hoặc RequestHash thay đổi sau commit.
 
-Chuẩn hóa yêu cầu trước khi tra khóa: kind=Orders hoặc Session theo điểm gọi, customerId lấy từ
+**Tiền tố dành riêng cho hệ thống.** `SessionAutoInvoice:` và `SessionAutoClose:` chỉ do server tạo cho ngữ cảnh System đã xác minh. Mọi điểm gọi Staff, kể cả gọi nội bộ từ thao tác nhân viên, từ chối OperationKey bắt đầu bằng một trong hai tiền tố này với 400 ValidationError trước khi tra hoặc ghi khóa. Kiểm tra tiền tố bằng OrdinalIgnoreCase, không trim/đổi hoa-thường rồi âm thầm nhận khóa. Không có Invoice/InvoiceDetail/InvoiceIssueRequest hoặc thay đổi tiền từ request bị từ chối. PK và so sánh các khóa hợp lệ vẫn dùng binary collation như bảng trên; hash khác không thay thế quy tắc dành riêng tiền tố.
+
+Yêu cầu nhân viên dùng định dạng version 1. Chuẩn hóa trước khi tra khóa gồm kind=Orders hoặc Session theo điểm gọi, customerId lấy từ
 nguồn đã xác minh, employeeId từ principal nhân viên, gamingSessionId (null nếu không yêu cầu phiên),
 orderIds là mảng ID int dương đã loại trùng và sắp tăng dần. JSON UTF-8 compact có thứ tự field
 như ví dụ dưới, không BOM, không khoảng trắng; SHA-256 của bytes đó là RequestHash. Kind=Session
@@ -725,14 +725,13 @@ nằm trong hash; chúng là kết quả server đọc, không phải nội dung
 {"version":1,"kind":"Orders","customerId":7,"employeeId":3,"gamingSessionId":null,"orderIds":[12,18]}
 ```
 
-Invoice.IssueForSession phải nhận tập orderIds cụ thể, có thể rỗng; không hiểu retry là chọn lại
-mọi đơn mới phát sinh. Các SessionCharge được chọn dưới khóa nguồn trong lần đầu và giữ bằng
+Invoice.IssueForSession phát hành mới nhận orderIds rỗng theo quyết định xuất riêng ngày 14/11/2026. Kind=Orders dùng tập đơn cụ thể, các dòng chỉ có OrderDetailId. Sau khi tra khóa đã commit theo version/hash gốc và quyền hiện tại, yêu cầu phát hành mới trộn hai loại nguồn trả 400 ValidationError. Các SessionCharge được chọn dưới khóa nguồn trong lần đầu và giữ bằng
 InvoiceDetails bất biến; retry tra khóa cũ trước khi chọn lại phí. Không tự thêm phí/đơn mới vào
 hóa đơn cũ. Một yêu cầu phát hành bổ sung cần khóa mới và chỉ được chọn các nguồn chưa có chứng từ.
 
 Luồng nguyên tử và xử lý tranh chấp:
 
-1. Xác thực, kiểm tra invoice.create và quyền với khách/nguồn trước khi trả kết quả theo khóa.
+1. Với Staff, xác thực, kiểm tra invoice.create và quyền với khách/nguồn trước khi trả kết quả theo khóa. Với System, kiểm tra ngữ cảnh nội bộ và nguồn tự đóng theo mục 6.3.2.
    Tra InvoiceIssueRequests; cùng hash trả cùng InvoiceId, khác hash trả 409, không ghi thay đổi.
    Không dùng cùng khóa để xem hóa đơn vượt quyền; đổi employeeId cũng là đổi nội dung yêu cầu.
 2. Nếu chưa có khóa, mở transaction, khóa nguồn theo mục 6.2.1; đọc lại khóa sau khi chờ nguồn,
@@ -750,7 +749,31 @@ Luồng nguyên tử và xử lý tranh chấp:
 Không tạo khóa giả cho hóa đơn lịch sử chưa có yêu cầu gốc; giữ các hóa đơn đó và xử lý trùng nguồn
 trước unique index. Khóa mới không được gắn vào hóa đơn cũ để tuyên bố đã xử lý một request chưa
 có bằng chứng. Bảng mới được triển khai trước khi bật đường phát hành mới; mọi caller phát hành mới
-bắt buộc ghi metadata này. Trường sở hữu entity/config/migration của bảng, Khang/Phúc nối điểm gọi.
+bắt buộc ghi metadata này. Trường thực hiện phần phát hành và entity/config/migration của InvoiceIssueRequests tại S2-T-2, Phúc nối worker phiên tại S2-P-1 theo mục 6.3.2.
+
+#### 6.3.2. Phát hành tự động với actor System — quyết định 14/11/2026
+
+Trưởng nhóm đã chốt hệ thống tự quyết toán, đóng phiên và phát hành hóa đơn khi hết tiền, trực tiếp hoàn thiện contract trong Sprint 1. Phúc thực hiện phiên/worker ở S2-P-1, Minh thực hiện ví ở S2-M-1 và Trường thực hiện hóa đơn ở S2-T-2. Chi tiết phiên và checklist tích hợp nằm tại [contract phiên mục 5.1](../../Backend/docs/002-computer-session-contract.md#51-quyết-định-tự-đóng-phiên-và-người-thực-hiện--14112026).
+
+**Quyền thực hiện.** Worker quyết toán nhận ngữ cảnh System từ Application/server và kiểm tra phiên, nguồn cùng điều kiện hết tiền dưới khóa. Ngữ cảnh này có ActorKey cố định `SessionBilling`, hỗ trợ tác vụ tự đóng và phục hồi sau restart. API công khai tiếp nhận actor Staff từ principal hiện tại, kiểm tra `session.end`/`invoice.create` khi đóng và phát hành, từ chối trường actor/quyền nội bộ do browser gửi. Trạng thái tài khoản của người mở được dùng để truy vết người mở, còn worker chịu quyền nội bộ của hệ thống.
+
+**Schema và hiển thị.** Invoice bổ sung ActorType Staff/System, EmployeeId nullable. CHECK yêu cầu Staff có EmployeeId, System có EmployeeId null và GamingSessionId khác null. Migration mới backfill hóa đơn có EmployeeId thành Staff. Lưu riêng người mở và actor đóng trên GamingSession theo contract phiên. Audit của System dùng EmployeeId null, có phiên/lý do/khóa thao tác. DTO, chi tiết và bản in hiển thị System thành “Hệ thống”.
+
+**Hash và khóa hệ thống.** Tự đóng dùng khóa phát hành `SessionAutoInvoice:{gamingSessionId}` và định dạng hash version 2 dưới đây. Server xác minh Customer/phiên, kind=Session và orderIds bắt buộc rỗng theo quyết định xuất riêng. Serialize JSON UTF-8 compact theo thứ tự field của mẫu rồi SHA-256 hex lowercase như version 1.
+
+Worker tự tạo đúng khóa từ GamingSessionId đã xác minh, không nhận khóa này từ browser hoặc caller Staff. Cả tiền tố phát hành và tự đóng được dành riêng theo mục 6.3.1, để thao tác nhân viên không chiếm khóa trước khi worker chạy.
+
+```json
+{"version":2,"kind":"Session","customerId":7,"actorType":"System","actorKey":"SessionBilling","employeeId":null,"reason":"InsufficientBalance","gamingSessionId":12,"orderIds":[]}
+```
+
+Version 1 tiếp tục phục vụ yêu cầu Staff và tra các khóa đã lưu bằng đúng định dạng đã tạo chúng. Replay khóa đã commit dùng hash/version gốc và quyền hiện tại, kể cả hóa đơn lịch sử có nguồn gộp. Version 2 ghi danh tính System ổn định qua restart và nhiều instance. Thời gian chạy, số lần retry và instance ID là metadata vận hành, nằm ngoài RequestHash. Cùng khóa/hash trả InvoiceId đã lưu, khác hash trả 409. Metadata actor trong kết quả đã commit được lấy lại từ SQL.
+
+**Tính nguyên tử.** Quyết toán khoản phí cuối, debit/ledger/Payment, trạng thái phiên/máy, hóa đơn/chi tiết/liên kết và InvoiceIssueRequests được lưu cùng transaction. Các khoản đã thu được liên kết theo nguồn. Mỗi khoản thu và mỗi nguồn chứng từ chịu unique tương ứng. Lưu kết quả đóng với `SessionAutoClose:{gamingSessionId}`. Worker cạnh tranh đóng thủ công hoặc worker khác phải khóa và đọc lại trạng thái để xử lý kết quả đã commit, phát SignalR sau commit. Xem, in và truy xuất kết quả bằng API áp dụng quyền staff/ownership khách như mục 2.1.
+
+**Phạm vi chứng từ.** Hóa đơn tự đóng chỉ chứa SessionCharge thuộc phiên chưa có InvoiceDetail, Discount=0, PromotionId null và InvoiceOrders rỗng. Chỉ tạo hóa đơn/InvoiceIssueRequests khi có nguồn phí chưa lên chứng từ. Phiên 0 đồng hoặc tất cả phí đã được phát hành thì kết quả đóng lưu invoiceId null, các hóa đơn trước đó truy qua nguồn phiên. Các đơn món được phát hành bằng IssueForOrders, các khoản thu/hoàn vẫn truy đúng nguồn của mình. Hóa đơn mới phát hành theo loại nguồn, dữ liệu lịch sử gộp tiếp tục được truy xuất theo snapshot.
+
+**Bàn giao.** Trưởng nhóm trực tiếp hoàn thiện contract còn dang dở của Sprint 1. Thiết kế đã chốt trong phiên làm việc ngày 14/11/2026 là đầu vào để Phúc/Minh/Trường triển khai các task Sprint 2 tương ứng. Nghiệm thu triển khai cần các ca người mở đăng xuất/khóa/mất quyền, giả System từ browser, thiếu ngân sách, rollback, retry/restart và cạnh tranh tại mục 5.1 của contract phiên.
 
 ### 6.4. Khoản hoàn là dòng riêng trong Payments
 
@@ -777,6 +800,7 @@ việc gửi khóa mới không cho phép hoàn lại cùng phần món/phiên �
   Cash đã thu cần Admin/Manager có payment.refund theo catalog hiện tại xác nhận tiền thực hoàn;
   Cashier không được xác nhận. Phải có dấu vết người thao tác
   theo nguồn nghiệp vụ/audit chung; không ghi hoàn chỉ vì đã duyệt hủy món.
+  Tiền mặt đã thực nhận nhưng cash-collections chưa commit phải giữ phiếu/key để tra cứu và đối soát theo [checkout mục 7.1.1](../../Backend/docs/004-order-checkout-contract.md#711-đã-nhận-tiền-mặt-nhưng-chưa-ghi-nhận-được-khoản-thu). Không suy SQL rollback là đã trả tiền; nếu chưa có Payment thì quản lý chốt hủy nguồn trước khi xác nhận trả tiền theo phiếu, lưu kết quả một lần, không tạo Refund với khoản thu gốc không tồn tại hoặc ghi doanh thu giả.
 - ZaloPay: lưu Refund Pending và RefundAttempt trước khi gọi API ngoài transaction; lấy mã thu gốc
   qua RefundOfPaymentId. Không dùng mã thu gốc làm mã hoàn. Query kết quả cuối mới ghi Succeeded;
   timeout giữ Pending, xử lý retry/cross-day theo mục 6.4.1. Không tự nhả giữ chỗ chỉ vì lỗi mạng.
@@ -893,6 +917,8 @@ riêng đáp ứng giới hạn đã xác minh. Không đưa giới hạn 100 th
 
 ### 6.5. Đầu vào và xác nhận liên module còn chờ
 
+**Cập nhật 14/11/2026.** Actor/quyền tự đóng đã chốt tại mục 6.3.2. Trưởng nhóm tự hoàn thiện và bàn giao phần contract còn dang dở của Sprint 1. Các owner triển khai Sprint 2 theo phân công module. Bảng dưới ghi các giao điểm lịch sử và phần nghiệp vụ còn lại.
+
 Ba phần nơi lưu, liên kết hóa đơn và chống thu/hoàn lặp đã được owner chọn ở nền thiết kế 1.6 tại mục 6.1–6.4.
 Phần bổ sung 1.7 về thời gian và khóa phát hành là đề xuất chờ review theo mục 9.4.
 Chưa coi đây là code đã chạy, migration đã áp hoặc phản hồi chấp thuận của các owner khác.
@@ -905,8 +931,7 @@ Chưa coi đây là code đã chạy, migration đã áp hoặc phản hồi ch�
 | Gateway             | Thời hạn giữ tồn/lượt, callback muộn, duyệt hoàn/thu dư; Minh xác nhận sandbox cho độ dài/format theo nguồn ngôn ngữ và bảng mã lỗi đúng API mục 6.4.1                                      |
 | Giao nhận và duyệt  | Commit/PR hoặc phản hồi cụ thể của từng owner; Trưởng nhóm xem xét contract chung trước triển khai                                                                                          |
 
-**Trạng thái P1:** đã có phương án thiết kế của owner cho cả ba phần; chưa khép tiêu chí hợp đồng
-chứng từ chung khi thiếu xác nhận/đầu vào bắt buộc tại bảng này. Không ghi các bên đã đồng ý khi chưa có bằng chứng.
+**Trạng thái thiết kế ngày 14/11/2026.** Trưởng nhóm đã chốt ba giao điểm phiên/ví/chứng từ gồm Payment tại mỗi lần thu, actor System và xuất riêng món/tiền giờ. Quyết định này là đầu vào bàn giao Sprint 1. Các điểm gọi, migration và kiểm chứng SQL/realtime của các owner được thực hiện trong S2, các ghi chú phản hồi tại mốc 05/11 trong mục 9 được giữ theo lịch sử đối chiếu.
 
 ## 7. Nguồn báo cáo và đối soát
 
@@ -1102,6 +1127,8 @@ dotnet run --project Backend/tests/CyberManagement.API.Checks/CyberManagement.AP
   Hai request cùng khóa khác tập nguồn chỉ một request commit; request thua không để lại hóa đơn,
   chi tiết hoặc liên kết tiền. Khóa khác cùng nguồn không tạo hóa đơn thứ hai. Thử hóa đơn 0 đồng,
   mất response, quyền bị thu hồi, lỗi insert khóa và hóa đơn lịch sử chưa có khóa.
+- Khóa System: Staff dùng SessionAutoInvoice:12 hoặc SessionAutoClose:12, kể cả biến thể hoa/thường, trả 400 ValidationError trước tra/ghi khóa và không có side effect. Sau đó worker vẫn tự đóng/phát hành bằng khóa chuẩn; retry/restart trả cùng kết quả, mỗi nguồn chỉ có một chứng từ.
+- Cash đã nhận nhưng request thu bị hủy/version conflict/rollback: phiếu và key cũ tra được, không thu lại. Nhánh chưa có Payment chỉ trả tiền sau chốt hủy nguồn; lặp xác nhận không trả hai lần, request thu đến muộn bị chặn, không tạo Refund/ledger/doanh thu giả. Nếu thu đã commit thì áp dụng quy trình khoản đã thu và truy đúng Payment gốc.
 - Thời gian hoàn: tạo trước nửa đêm, query xác nhận sau nửa đêm không có giờ provider thì Succeeded
   với Basis=Confirmation, ghi đúng ngày xác nhận và chỉ giảm PaidAmount/doanh thu một lần.
   Query trùng ngày sau không đổi mốc/Basis; rollback không lưu mốc thành công. Có giờ provider
