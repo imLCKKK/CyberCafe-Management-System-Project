@@ -249,14 +249,14 @@ không duyệt một phần. Hủy trực tiếp dòng đóng các yêu cầu Pe
 
 ### 5.1. Thanh toán đủ trước khi nhân viên nhận món — 14/11/2026
 
-Nhân viên có order.status.update chủ động confirm dòng Pending sau khi thanh toán đủ. Confirmed biểu thị món đã được nhận để chuẩn bị/phục vụ. Mỗi lần confirm, server khóa nguồn theo mục 8, kiểm tra version, trạng thái đơn/dòng và đối chiếu khoản thu thành công với giá trị các dòng còn hiệu lực. Khoản thu phải đủ cho toàn bộ phần còn phục vụ, số còn phải thu bằng 0. Đơn có tổng phải trả bằng 0 được xác minh NotRequired.
+Nhân viên có order.status.update chủ động confirm dòng Pending sau khi thanh toán đủ. Confirmed biểu thị món đã được nhận để chuẩn bị/phục vụ. Mỗi lần confirm, server khóa nguồn theo mục 8, kiểm tra version, trạng thái đơn/dòng và đối chiếu khoản thu thành công với giá trị các dòng còn hiệu lực. Khoản thu phải đủ cho toàn bộ phần còn phục vụ, số còn phải thu bằng 0. Đơn có PayableAmount=0 chỉ dùng NotRequired khi chưa có khoản thu/hoàn Succeeded và không còn nghĩa vụ tiền hoặc gateway chờ đối soát theo mục 7.2; các trạng thái tiền đã ghi nhận được giữ để truy vết.
 
 | Phương thức | Căn cứ đã thanh toán | Thao tác của nhân viên |
 | --- | --- | --- |
 | Wallet | Debit OrderPayment, ledger và Payment Succeeded đã commit khi tạo đơn | Đọc trạng thái đã thanh toán rồi confirm món |
 | Cash | Nhân viên có payment.create nhận đủ tiền, POST cash-collections với cashReceived=true, Payment Succeeded đã commit | Confirm món sau kết quả thu thành công |
 | ZaloPay | Callback/query hợp lệ, Payment Succeeded và đơn đã trở về Pending trong hạn giữ chỗ | Đọc trạng thái đã thanh toán rồi confirm món |
-| 0 đồng sau giảm | Server tính PayableAmount=0 và NotRequired | Confirm món theo quyền order.status.update |
+| 0 đồng sau giảm hoặc hủy dòng | PayableAmount=0, chưa có khoản thu/hoàn Succeeded và không còn nghĩa vụ tiền hoặc gateway chờ đối soát; NotRequired theo bảng mục 7.2 | Confirm dòng còn Pending theo quyền order.status.update; không phục hồi dòng đã Cancelled |
 
 Đơn Cash PendingCollection và ZaloPay AwaitingPayment hiển thị “Chờ thanh toán”. Nút nhận/làm món chỉ hoạt động khi server xác minh đủ tiền. Gọi trực tiếp endpoint confirm khi chưa đủ điều kiện trả 409 PaymentRequired, giữ trạng thái dòng, tồn và sổ tiền. Waiter có thể nhận món đã thanh toán theo order.status.update, thao tác xác nhận thu tiền mặt cần payment.create.
 
@@ -316,6 +316,17 @@ OrderDetailId null cho phần còn lại: amount do server tính từ tập dòn
 Pending/Succeeded. Lưu tập nguồn hủy trong thao tác, khóa khoản thu gốc và trừ cả phần đang chờ;
 không thêm khoản hoàn tổng trùng khoản dòng. Khóa ổn định `OrderRefund:{orderId}:All` cho phần hoàn này.
 V1 thu cash từng đơn; thu cash gộp/hóa đơn gộp dùng contract chứng từ Trường, không tự mở rộng DTO này.
+
+#### 7.1.1. Đã nhận tiền mặt nhưng chưa ghi nhận được khoản thu
+
+Rollback SQL hoặc lỗi version không hoàn tác tiền đã nhận tại quầy. Trước khi gửi cash-collections, nhân viên giữ phiếu tiếp nhận có mã phiếu duy nhất, OrderId, số tiền thực nhận theo số phải thu server vừa hiển thị, người nhận, thời điểm, Idempotency-Key và expectedVersion. Phiếu/bằng chứng phải còn tra được khi browser hoặc API khởi động lại; có thể dùng phiếu quầy trong giai đoạn bàn giao, không chỉ giữ trong RAM. Phiếu không thay thế Payment hoặc làm đơn Paid.
+
+1. Mất phản hồi hoặc chưa rõ transaction đã commit: tra/retry cùng key và nguyên body để lấy kết quả theo mục 8.1. UI giữ trạng thái đang đối soát, không hướng dẫn thu khách lần hai, đổi version/key hoặc tạo đơn thay thế. GET đơn thấy Paid chưa đủ chứng minh chính phiếu này đã được ghi; phải khớp kết quả thao tác/khoản thu và phiếu.
+2. Retry xác nhận thao tác đã thành công thì dùng cùng Payment/kết quả đã lưu, kết thúc phiếu tiếp nhận. Không thu lại hoặc ghi thêm Payment. Nếu vẫn lỗi hạ tầng thì tiếp tục giữ bằng chứng và chuyển quản lý, không suy từ timeout rằng tiền chưa được ghi.
+3. Khi server xác nhận request thất bại, quản lý có order.cancel và payment.refund đối chiếu phiếu, thao tác và khoản thu dưới cùng khóa nguồn. Nếu khoản thu Succeeded đã xuất hiện, áp dụng khóa hủy và quy trình ngoại lệ khoản đã thu tại mục 7.1; không trả tiền theo nhánh chưa có Payment. Nếu chưa có khoản thu, có thể tiếp tục đúng ý định cũ bằng replay; khi chọn trả lại tiền, trước hết phải chốt hủy toàn bộ dòng còn Pending và đổi version của đơn, hoặc xác nhận đơn đã Cancelled. Thao tác hủy dùng đường hủy/khóa/version hiện có, có key riêng và audit liên kết phiếu. Nếu thu thắng tranh chấp, hủy trả CashCancellationLocked và phải quay lại nhánh có Payment. Chỉ trả tiền sau khi kết quả hủy đã commit và không có khoản thu Succeeded; request thu cũ đến muộn bị chặn bởi version/trạng thái, không hồi sinh đơn.
+4. Quản lý xác nhận tiền mặt đã thực trả đủ theo phiếu và lưu kết quả đối soát bền vững cùng mã phiếu, OrderId, key thu cũ, số tiền, người nhận/trả/xác nhận, thời điểm và bằng chứng. Phiếu đã trả được đóng một lần; lặp thao tác chỉ tra kết quả cũ. Đây là tiền nhận rồi trả ngoài Payment: không tạo Payment/Refund giả, không cộng ví và không tính thành doanh thu. Nếu chưa trả được hoặc chưa lưu được xác nhận, giữ phiếu mở để đối soát, không báo đã hoàn tất.
+
+UI/quy trình quầy S2 phải bàn giao được phiếu và kết quả tra cứu; nghiệp vụ điều chỉnh có audit thuộc phần ngoại lệ tiền S3 đã nêu ở mục 7.1. Trường hợp ghi nhận thu thành công vẫn khóa hủy theo lựa chọn Trưởng nhóm; bước trả tiền ngoài Payment ở đây chỉ dành cho khoản thực nhận chưa được ghi thành công.
 
 ### 7.2. ZaloPay sandbox
 
@@ -402,12 +413,14 @@ Refund đang chờ duyệt chưa được worker gửi. Phân biệt khoản thu
 | RefundPending | refundUnresolvedAmount > 0; gồm chờ duyệt, đang hoàn hoặc hoàn thất bại cần xử lý tiếp. Đây là trạng thái tổng hợp của đơn; không đổi Refund Failed thành Pending hay giữ hạn mức giả |
 | Refunded / PartiallyRefunded | Không còn hoàn chờ, RefundedAmount > 0; bằng CollectedAmount thì Refunded, thấp hơn thì PartiallyRefunded |
 | Paid | Có khoản thu Succeeded, không có hoàn thành công/đang chờ |
-| NotRequired | OriginalPayable=0; hoặc cash hủy hết khi chưa thu, không còn nghĩa vụ thu |
+| NotRequired | PayableAmount=0, chưa có khoản thu/hoàn Succeeded và không còn nghĩa vụ thu/hoàn hoặc giao dịch gateway chờ đối soát. Gồm đơn gốc 0 đồng, Cash hủy hết chưa thu và Cash hủy dòng có tiền chỉ còn dòng Pending netAmount=0; giữ nguyên OriginalPayable/snapshot |
 | PendingCollection | Cash còn tiền phải thu và chưa thu |
 | Failed / Expired | Gateway chưa có khoản thu Succeeded và yêu cầu thu ở trạng thái tương ứng; requiresReconciliation vẫn true nếu chưa chắc provider chưa thu |
 | Pending | Các trường hợp gateway chưa rõ còn lại |
 
 Thu muộn không được che bằng Expired. Dòng Payment gốc vẫn Succeeded sau hoàn; Refund là dòng riêng.
+
+Ví dụ hai dòng giá 5000, giảm cố định 9999: phân bổ giảm 5000/4999, netAmount=0/1 và OriginalPayable=1. Cash chưa thu hủy dòng netAmount=1 thì PayableAmount=0, paymentStatus=NotRequired; dòng netAmount=0 còn Pending nhận được, không tạo Payment/ledger 0 đồng. Nếu đã có khoản thu/hoàn hoặc gateway chưa rõ kết quả thì giữ các trạng thái Paid/RefundPending/Refunded/đối soát tương ứng, không dùng NotRequired để che lịch sử tiền.
 
 Ví dụ đối soát sau hủy một dòng trị giá 40000 của đơn đã thu 100000, PayableAmount còn 60000:
 
@@ -727,6 +740,8 @@ Các ca dưới là yêu cầu bàn giao cho S2/S3, **chưa được chạy tron
 | Cash chưa thu, Waiter gọi trực tiếp confirm | 409 PaymentRequired, món tiếp tục Pending, SQL giữ tồn/sổ tiền |
 | Cash nhân viên xác nhận cashReceived=true khi món Pending → nhận món | Thu đủ đúng một Payment Succeeded, response tăng version, confirm dùng version mới và order.status.update |
 | Cash đã thu nhưng món còn Pending, khách/admin yêu cầu hủy | 409 CashCancellationLocked, khoản thu và trạng thái/tồn giữ nguyên, UI hướng dẫn liên hệ quản lý tại quầy |
+| Cash thực nhận rồi mất response; SQL rollback hoặc hủy thắng trước lúc ghi thu | Tra/retry nguyên key/body, không thu lần hai. Thành công chỉ một Payment; nếu trả tiền ngoài Payment thì quản lý chốt hủy/version trước, xác nhận thực trả một lần và lưu phiếu/audit; request thu cũ đến muộn không ghi được tiền hoặc hồi sinh đơn |
+| Cash hai dòng netAmount=0/1, chưa thu, hủy dòng netAmount=1 | PayableAmount=0, OriginalPayable=1 giữ nguyên, NotRequired; dòng 0 còn Pending nhận được, không tạo khoản tiền 0. Có thu/hoàn hoặc gateway chưa rõ thì không che bằng NotRequired |
 | ZaloPay chưa xác minh hoặc redirect giả thành công → confirm | PaymentRequired, tiếp tục chờ xác minh; callback hợp lệ cập nhật Paid nhưng nhân viên vẫn phải nhận món |
 | Hóa đơn món và hóa đơn tự đóng tiền giờ | Chứng từ mới mỗi loại nguồn riêng, orderIds rỗng cho phí giờ, các khoản đã thu chỉ được liên kết một lần |
 | Hủy dòng đã giảm / hủy toàn bộ / hủy lặp | Hoàn netAmount một lần, Return một lần; partial không hoàn lượt, full hoàn đúng một lượt |

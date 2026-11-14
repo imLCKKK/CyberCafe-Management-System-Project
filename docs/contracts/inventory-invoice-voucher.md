@@ -712,6 +712,8 @@ OperationKey của bảng này độc lập với Payments.OperationKey. PK bả
 validation/CHECK bảo vệ định dạng không rỗng và hash 64 ký tự hex. Không hard-delete khóa sau
 khi hủy/hoàn hóa đơn; không cho InvoiceId hoặc RequestHash thay đổi sau commit.
 
+**Tiền tố dành riêng cho hệ thống.** `SessionAutoInvoice:` và `SessionAutoClose:` chỉ do server tạo cho ngữ cảnh System đã xác minh. Mọi điểm gọi Staff, kể cả gọi nội bộ từ thao tác nhân viên, từ chối OperationKey bắt đầu bằng một trong hai tiền tố này với 400 ValidationError trước khi tra hoặc ghi khóa. Kiểm tra tiền tố bằng OrdinalIgnoreCase, không trim/đổi hoa-thường rồi âm thầm nhận khóa. Không có Invoice/InvoiceDetail/InvoiceIssueRequest hoặc thay đổi tiền từ request bị từ chối. PK và so sánh các khóa hợp lệ vẫn dùng binary collation như bảng trên; hash khác không thay thế quy tắc dành riêng tiền tố.
+
 Yêu cầu nhân viên dùng định dạng version 1. Chuẩn hóa trước khi tra khóa gồm kind=Orders hoặc Session theo điểm gọi, customerId lấy từ
 nguồn đã xác minh, employeeId từ principal nhân viên, gamingSessionId (null nếu không yêu cầu phiên),
 orderIds là mảng ID int dương đã loại trùng và sắp tăng dần. JSON UTF-8 compact có thứ tự field
@@ -759,6 +761,8 @@ Trưởng nhóm đã chốt hệ thống tự quyết toán, đóng phiên và p
 
 **Hash và khóa hệ thống.** Tự đóng dùng khóa phát hành `SessionAutoInvoice:{gamingSessionId}` và định dạng hash version 2 dưới đây. Server xác minh Customer/phiên, kind=Session và orderIds bắt buộc rỗng theo quyết định xuất riêng. Serialize JSON UTF-8 compact theo thứ tự field của mẫu rồi SHA-256 hex lowercase như version 1.
 
+Worker tự tạo đúng khóa từ GamingSessionId đã xác minh, không nhận khóa này từ browser hoặc caller Staff. Cả tiền tố phát hành và tự đóng được dành riêng theo mục 6.3.1, để thao tác nhân viên không chiếm khóa trước khi worker chạy.
+
 ```json
 {"version":2,"kind":"Session","customerId":7,"actorType":"System","actorKey":"SessionBilling","employeeId":null,"reason":"InsufficientBalance","gamingSessionId":12,"orderIds":[]}
 ```
@@ -796,6 +800,7 @@ việc gửi khóa mới không cho phép hoàn lại cùng phần món/phiên �
   Cash đã thu cần Admin/Manager có payment.refund theo catalog hiện tại xác nhận tiền thực hoàn;
   Cashier không được xác nhận. Phải có dấu vết người thao tác
   theo nguồn nghiệp vụ/audit chung; không ghi hoàn chỉ vì đã duyệt hủy món.
+  Tiền mặt đã thực nhận nhưng cash-collections chưa commit phải giữ phiếu/key để tra cứu và đối soát theo [checkout mục 7.1.1](../../Backend/docs/004-order-checkout-contract.md#711-đã-nhận-tiền-mặt-nhưng-chưa-ghi-nhận-được-khoản-thu). Không suy SQL rollback là đã trả tiền; nếu chưa có Payment thì quản lý chốt hủy nguồn trước khi xác nhận trả tiền theo phiếu, lưu kết quả một lần, không tạo Refund với khoản thu gốc không tồn tại hoặc ghi doanh thu giả.
 - ZaloPay: lưu Refund Pending và RefundAttempt trước khi gọi API ngoài transaction; lấy mã thu gốc
   qua RefundOfPaymentId. Không dùng mã thu gốc làm mã hoàn. Query kết quả cuối mới ghi Succeeded;
   timeout giữ Pending, xử lý retry/cross-day theo mục 6.4.1. Không tự nhả giữ chỗ chỉ vì lỗi mạng.
@@ -1122,6 +1127,8 @@ dotnet run --project Backend/tests/CyberManagement.API.Checks/CyberManagement.AP
   Hai request cùng khóa khác tập nguồn chỉ một request commit; request thua không để lại hóa đơn,
   chi tiết hoặc liên kết tiền. Khóa khác cùng nguồn không tạo hóa đơn thứ hai. Thử hóa đơn 0 đồng,
   mất response, quyền bị thu hồi, lỗi insert khóa và hóa đơn lịch sử chưa có khóa.
+- Khóa System: Staff dùng SessionAutoInvoice:12 hoặc SessionAutoClose:12, kể cả biến thể hoa/thường, trả 400 ValidationError trước tra/ghi khóa và không có side effect. Sau đó worker vẫn tự đóng/phát hành bằng khóa chuẩn; retry/restart trả cùng kết quả, mỗi nguồn chỉ có một chứng từ.
+- Cash đã nhận nhưng request thu bị hủy/version conflict/rollback: phiếu và key cũ tra được, không thu lại. Nhánh chưa có Payment chỉ trả tiền sau chốt hủy nguồn; lặp xác nhận không trả hai lần, request thu đến muộn bị chặn, không tạo Refund/ledger/doanh thu giả. Nếu thu đã commit thì áp dụng quy trình khoản đã thu và truy đúng Payment gốc.
 - Thời gian hoàn: tạo trước nửa đêm, query xác nhận sau nửa đêm không có giờ provider thì Succeeded
   với Basis=Confirmation, ghi đúng ngày xác nhận và chỉ giảm PaidAmount/doanh thu một lần.
   Query trùng ngày sau không đổi mốc/Basis; rollback không lưu mốc thành công. Có giờ provider
