@@ -13,11 +13,20 @@ public class InventoryTransactionConfiguration : IEntityTypeConfiguration<Invent
             t.HasCheckConstraint("CK_InventoryTransactions_Values", "[Before] >= 0 AND [After] >= 0 AND CAST([Before] AS bigint) + [Quantity] = [After]");
             t.HasCheckConstraint("CK_InventoryTransactions_Reason", "LEN(LTRIM(RTRIM([Reason]))) BETWEEN 1 AND 200");
             t.HasCheckConstraint("CK_InventoryTransactions_Type", "(([Type] IN ('Receive','Return') AND [Quantity] > 0) OR ([Type] = 'Sale' AND [Quantity] < 0) OR ([Type] = 'Adjust' AND [Quantity] <> 0)) AND (([Type] IN ('Receive','Adjust') AND [OrderDetailId] IS NULL) OR ([Type] IN ('Sale','Return') AND [OrderDetailId] IS NOT NULL AND [OrderId] IS NOT NULL))");
+            t.HasCheckConstraint("CK_InventoryTransactions_OperationKey", "[OperationKey] IS NULL OR LEN(LTRIM(RTRIM([OperationKey]))) > 0");
         });
         builder.Property(x => x.Reason).HasMaxLength(200).IsRequired();
         builder.HasIndex(x => new { x.OrderDetailId, x.Type }).IsUnique().HasFilter("[OrderDetailId] IS NOT NULL");
         builder.HasOne(x => x.OrderDetail).WithMany().HasForeignKey(x => x.OrderDetailId).OnDelete(DeleteBehavior.NoAction);
         builder.HasKey(x => x.InvTransId);
+
+        builder.Property(x => x.OperationKey)
+            .HasMaxLength(200)
+            .UseCollation("Latin1_General_100_BIN2");
+
+        builder.HasIndex(x => x.OperationKey)
+            .IsUnique()
+            .HasFilter("[OperationKey] IS NOT NULL");
 
         builder.Property(x => x.Type).HasMaxLength(50).IsRequired();
         builder.Property(x => x.ReferenceType).HasMaxLength(50).IsRequired();

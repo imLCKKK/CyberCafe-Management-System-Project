@@ -128,7 +128,11 @@ try
             await Send(failedClient, await Login(failedClient, "admin")));
         await failed.StopAsync();
         if (fixture.IsSql)
+        {
             await SchemaContractChecks.RunUpgradeGuardsAsync(Environment.GetEnvironmentVariable("INVENTORY_CHECKS_SQL_CONNECTION")!, Check);
+            await using var movementHost = CreateApp(false);
+            await InventoryMovementChecks.RunAsync(movementHost.Services, Check);
+        }
         Console.WriteLine($"{checks} inventory checks passed ({(fixture.IsSql ? "SQL Server" : "InMemory; not migration evidence")}).");
     }
 }
