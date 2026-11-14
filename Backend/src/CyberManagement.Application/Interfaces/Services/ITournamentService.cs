@@ -4,6 +4,7 @@ namespace CyberManagement.Application.Interfaces.Services;
 
 public interface ITournamentService
 {
+    Task RequireActiveEmployeeAsync(int employeeId, CancellationToken cancellationToken);
     Task<IReadOnlyList<GameDto>> GetGamesAsync(bool includeInactive, CancellationToken cancellationToken);
     Task<IReadOnlyList<GameRankDto>> GetRanksAsync(int gameId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TournamentDto>> GetTournamentsAsync(bool includeDrafts, CancellationToken cancellationToken);
@@ -12,8 +13,8 @@ public interface ITournamentService
     Task<IReadOnlyList<ClientTournamentRegistrationDto>> GetClientRegistrationsAsync(
         int tournamentId, int customerId, CancellationToken cancellationToken);
     Task<TournamentDto> CreateAsync(int employeeId, CreateTournamentRequest request, CancellationToken cancellationToken);
-    Task<TournamentDto> UpdateAsync(int tournamentId, UpdateTournamentRequest request, CancellationToken cancellationToken);
-    Task<TournamentDto> TransitionAsync(int tournamentId, string status, CancellationToken cancellationToken);
+    Task<TournamentDto> UpdateAsync(int employeeId, int tournamentId, UpdateTournamentRequest request, CancellationToken cancellationToken);
+    Task<TournamentDto> TransitionAsync(int employeeId, int tournamentId, string status, CancellationToken cancellationToken);
     Task<TournamentRegistrationDto> RegisterAsync(
         int tournamentId, int customerId, TournamentRegistrationRequest request, CancellationToken cancellationToken);
 }

@@ -12,6 +12,8 @@
 
 **Phạm vi triển khai S2-D-2 (14/11/2026):** CRUD giải, đọc danh sách SQL, đăng ký miễn phí và danh sách người tham gia đã được nối qua API. Đăng ký giải có phí hiện trả 409 cho tới khi ví và quyết toán phiên được tích hợp; lựa chọn này không đổi policy đích D-T02 (chỉ thu bằng Wallet). `RiotId` được thêm nullable để giữ nguyên đăng ký lịch sử; request đăng ký mới bắt buộc cung cấp Riot ID hợp lệ. Team, hủy đăng ký/hoàn phí, export và lưu snapshot OP.GG vẫn ngoài phạm vi triển khai này.
 
+Các endpoint giải đấu phía nhân viên kiểm tra `IsActive` từ DB; các thao tác ghi kiểm tra trong transaction. Idempotency và `expectedVersion` cho giải đấu vẫn chưa triển khai theo hợp đồng bên dưới; không coi S2-D-2 đã hoàn thành.
+
 **Trạng thái:** bản hợp đồng cập nhật theo review Trưởng nhóm, chưa phải API đang chạy. Các phương án ở Phụ lục A là lựa chọn thiết kế để triển khai; xác nhận liên module của Minh/Phúc và duyệt cuối của Trưởng nhóm được ghi riêng, không suy diễn từ việc cập nhật tài liệu.
 
 **Quyết định bổ sung ngày 10/11/2026:** Trưởng nhóm chọn baseline/fallback `rank-snake-v1` theo [SCRUM-9, mục 5](https://github.com/imLCKKK/CyberCafe-Management-System-Project/blob/1b2ceb9b34cf91b81c61d5dc5c30b5918487527b/docs/contracts/ml-team-balancing-pipeline.md#L146-L153), thay cách xếp theo SkillScore tổng hợp trong v0.5 đã merge ở PR #18. Giữ yêu cầu ML; không chờ xác nhận riêng của Minh/Phúc để chốt phương án này. Bản bổ sung vẫn do Trưởng nhóm duyệt cuối.

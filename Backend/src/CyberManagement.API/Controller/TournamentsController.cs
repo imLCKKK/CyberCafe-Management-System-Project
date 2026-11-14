@@ -49,23 +49,35 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
 
     [HttpGet("admin/games")]
     [Authorize(Policy = ApiPolicies.TournamentView)]
-    public async Task<IActionResult> GetAdminGames(CancellationToken cancellationToken) =>
-        Ok(await tournaments.GetGamesAsync(true, cancellationToken));
+    public async Task<IActionResult> GetAdminGames(CancellationToken cancellationToken)
+    {
+        await tournaments.RequireActiveEmployeeAsync(GetEmployeeId(), cancellationToken);
+        return Ok(await tournaments.GetGamesAsync(true, cancellationToken));
+    }
 
     [HttpGet("admin/games/{gameId:int}/ranks")]
     [Authorize(Policy = ApiPolicies.TournamentView)]
-    public async Task<IActionResult> GetAdminRanks(int gameId, CancellationToken cancellationToken) =>
-        Ok(await tournaments.GetRanksAsync(gameId, cancellationToken));
+    public async Task<IActionResult> GetAdminRanks(int gameId, CancellationToken cancellationToken)
+    {
+        await tournaments.RequireActiveEmployeeAsync(GetEmployeeId(), cancellationToken);
+        return Ok(await tournaments.GetRanksAsync(gameId, cancellationToken));
+    }
 
     [HttpGet("admin/tournaments")]
     [Authorize(Policy = ApiPolicies.TournamentView)]
-    public async Task<IActionResult> GetAdminTournaments(CancellationToken cancellationToken) =>
-        Ok(await tournaments.GetTournamentsAsync(true, cancellationToken));
+    public async Task<IActionResult> GetAdminTournaments(CancellationToken cancellationToken)
+    {
+        await tournaments.RequireActiveEmployeeAsync(GetEmployeeId(), cancellationToken);
+        return Ok(await tournaments.GetTournamentsAsync(true, cancellationToken));
+    }
 
     [HttpGet("admin/tournaments/{tournamentId:int}")]
     [Authorize(Policy = ApiPolicies.TournamentView)]
-    public async Task<IActionResult> GetAdminTournament(int tournamentId, CancellationToken cancellationToken) =>
-        Ok(await tournaments.GetTournamentAsync(tournamentId, true, cancellationToken));
+    public async Task<IActionResult> GetAdminTournament(int tournamentId, CancellationToken cancellationToken)
+    {
+        await tournaments.RequireActiveEmployeeAsync(GetEmployeeId(), cancellationToken);
+        return Ok(await tournaments.GetTournamentAsync(tournamentId, true, cancellationToken));
+    }
 
     [HttpPost("admin/tournaments")]
     [Authorize(Policy = ApiPolicies.TournamentManage)]
@@ -80,18 +92,21 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
     [Authorize(Policy = ApiPolicies.TournamentManage)]
     public async Task<IActionResult> Update(
         int tournamentId, [FromBody] UpdateTournamentRequest request, CancellationToken cancellationToken) =>
-        Ok(await tournaments.UpdateAsync(tournamentId, request, cancellationToken));
+        Ok(await tournaments.UpdateAsync(GetEmployeeId(), tournamentId, request, cancellationToken));
 
     [HttpPost("admin/tournaments/{tournamentId:int}/transitions")]
     [Authorize(Policy = ApiPolicies.TournamentManage)]
     public async Task<IActionResult> Transition(
         int tournamentId, [FromBody] TournamentTransitionRequest request, CancellationToken cancellationToken) =>
-        Ok(await tournaments.TransitionAsync(tournamentId, request.ToStatus, cancellationToken));
+        Ok(await tournaments.TransitionAsync(GetEmployeeId(), tournamentId, request.ToStatus, cancellationToken));
 
     [HttpGet("admin/tournaments/{tournamentId:int}/registrations")]
     [Authorize(Policy = ApiPolicies.TournamentView)]
-    public async Task<IActionResult> GetAdminRegistrations(int tournamentId, CancellationToken cancellationToken) =>
-        Ok(await tournaments.GetAdminRegistrationsAsync(tournamentId, cancellationToken));
+    public async Task<IActionResult> GetAdminRegistrations(int tournamentId, CancellationToken cancellationToken)
+    {
+        await tournaments.RequireActiveEmployeeAsync(GetEmployeeId(), cancellationToken);
+        return Ok(await tournaments.GetAdminRegistrationsAsync(tournamentId, cancellationToken));
+    }
 
     private int GetOwnCustomerId()
     {

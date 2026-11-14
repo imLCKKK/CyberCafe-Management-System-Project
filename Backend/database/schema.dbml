@@ -457,6 +457,7 @@ Table dbo.TournamentRegistrations {
   PreferredRole nvarchar(50) [null]
   RankId int [not null]
   RegisteredAt datetime2 [not null]
+  RiotId nvarchar(128) [null]
   SkillScore decimal(6,2) [null]
   Status nvarchar(50) [not null]
   TournamentId int [not null]

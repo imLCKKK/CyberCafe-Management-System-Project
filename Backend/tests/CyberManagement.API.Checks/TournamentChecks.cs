@@ -51,6 +51,35 @@ internal static class TournamentChecks
             clientListBeforeOpen.All(row => row.GetProperty("id").GetInt32() != tournamentId));
         await ExpectStatus("Manager can read admin tournament list", HttpStatusCode.OK,
             await SendAsync(HttpMethod.Get, "/api/admin/tournaments", staffTokens["Manager"]));
+        await ExpectStatus("Admin can read a tournament by ID", HttpStatusCode.OK,
+            await SendAsync(HttpMethod.Get, $"/api/admin/tournaments/{tournamentId}", adminToken));
+        await ExpectStatus("Client cannot read a draft tournament by ID", HttpStatusCode.NotFound,
+            await SendAsync(HttpMethod.Get, $"/api/client/tournaments/{tournamentId}", customerToken));
+
+        var adminId = int.Parse(new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler()
+            .ReadJwtToken(adminToken).Claims.Single(claim => claim.Type == "sub").Value);
+        await SetAdminActiveAsync(false);
+        try
+        {
+            foreach (var path in new[]
+            {
+                "/api/admin/games", $"/api/admin/games/{gameId}/ranks", "/api/admin/tournaments",
+                $"/api/admin/tournaments/{tournamentId}", $"/api/admin/tournaments/{tournamentId}/registrations"
+            })
+                await ExpectStatus("Inactive staff cannot read tournament data with an old token", HttpStatusCode.Forbidden,
+                    await SendAsync(HttpMethod.Get, path, adminToken));
+            await ExpectStatus("Inactive staff cannot create a tournament with an old token", HttpStatusCode.Forbidden,
+                await SendAsync(HttpMethod.Post, "/api/admin/tournaments", adminToken, CreateBody(gameId, 0)));
+            await ExpectStatus("Inactive staff cannot edit a tournament with an old token", HttpStatusCode.Forbidden,
+                await SendAsync(HttpMethod.Put, $"/api/admin/tournaments/{tournamentId}", adminToken, CreateBody(gameId, 0)));
+            await ExpectStatus("Inactive staff cannot open a tournament with an old token", HttpStatusCode.Forbidden,
+                await SendAsync(HttpMethod.Post, $"/api/admin/tournaments/{tournamentId}/transitions", adminToken,
+                    new { toStatus = "RegistrationOpen" }));
+        }
+        finally
+        {
+            await SetAdminActiveAsync(true);
+        }
 
         var edit = await SendAsync(HttpMethod.Put, $"/api/admin/tournaments/{tournamentId}", adminToken,
             new
@@ -63,6 +92,8 @@ internal static class TournamentChecks
             HttpMethod.Post, $"/api/admin/tournaments/{tournamentId}/transitions", adminToken,
             new { toStatus = "RegistrationOpen" }));
         Check("Admin opens registration and status is persisted", opened.GetProperty("status").GetString() == "RegistrationOpen");
+        await ExpectStatus("Client can read an open tournament by ID", HttpStatusCode.OK,
+            await SendAsync(HttpMethod.Get, $"/api/client/tournaments/{tournamentId}", customerToken));
 
         var ranks = await ReadSuccessAsync<JsonElement[]>(await SendAsync(
             HttpMethod.Get, $"/api/client/games/{gameId}/ranks", customerToken));
@@ -140,6 +171,15 @@ internal static class TournamentChecks
                 new { riotId = "Player#VN3", rankId, preferredRole = "Flex" }));
 
         return checks;
+
+        async Task SetAdminActiveAsync(bool isActive)
+        {
+            await using var scope = services.CreateAsyncScope();
+            var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var employee = await database.Employees.SingleAsync(row => row.EmployeeId == adminId);
+            employee.IsActive = isActive;
+            await database.SaveChangesAsync();
+        }
 
         object CreateBody(int requestedGameId, decimal entryFee) => new
         {

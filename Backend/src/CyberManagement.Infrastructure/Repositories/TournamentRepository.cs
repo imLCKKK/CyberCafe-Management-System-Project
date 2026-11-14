@@ -36,8 +36,9 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
 
     public async Task<TournamentDto> GetTournamentAsync(
         int tournamentId, bool includeDraft, CancellationToken cancellationToken) =>
-        await TournamentQuery(includeDraft)
-            .SingleOrDefaultAsync(tournament => tournament.Id == tournamentId, cancellationToken)
+        await ProjectTournaments(TournamentEntities(includeDraft)
+            .Where(tournament => tournament.TournamentId == tournamentId))
+            .SingleOrDefaultAsync(cancellationToken)
             ?? throw new EntityNotFoundException("Không tìm thấy giải đấu.");
 
     public async Task<IReadOnlyList<TournamentRegistrationDto>> GetAdminRegistrationsAsync(
@@ -69,6 +70,7 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
         int employeeId, CreateTournamentRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await BeginTransactionAsync(cancellationToken);
+        await RequireActiveEmployeeAsync(employeeId, cancellationToken);
         var game = await database.Games.SingleOrDefaultAsync(
             item => item.GameId == request.GameId && item.IsActive, cancellationToken)
             ?? throw new BusinessRuleException("Chỉ có thể tạo giải cho trò chơi đang hoạt động.");
@@ -92,9 +94,10 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
     }
 
     public async Task<TournamentDto> UpdateAsync(
-        int tournamentId, UpdateTournamentRequest request, CancellationToken cancellationToken)
+        int employeeId, int tournamentId, UpdateTournamentRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await BeginTransactionAsync(cancellationToken);
+        await RequireActiveEmployeeAsync(employeeId, cancellationToken);
         var tournament = await FindTournamentAsync(tournamentId, cancellationToken);
         if (tournament.Status is not ("Draft" or "RegistrationOpen" or "RegistrationClosed"))
             throw new BusinessRuleException("Giải đấu không còn cho phép chỉnh sửa.");
@@ -122,9 +125,10 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
     }
 
     public async Task<TournamentDto> TransitionAsync(
-        int tournamentId, string status, CancellationToken cancellationToken)
+        int employeeId, int tournamentId, string status, CancellationToken cancellationToken)
     {
         await using var transaction = await BeginTransactionAsync(cancellationToken);
+        await RequireActiveEmployeeAsync(employeeId, cancellationToken);
         var tournament = await FindTournamentAsync(tournamentId, cancellationToken);
         if (status == "RegistrationOpen")
         {
@@ -222,15 +226,28 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
     }
 
     private IQueryable<TournamentDto> TournamentQuery(bool includeDrafts) =>
+        ProjectTournaments(TournamentEntities(includeDrafts));
+
+    private IQueryable<Tournament> TournamentEntities(bool includeDrafts) =>
         database.Tournaments.AsNoTracking()
             .Where(tournament => includeDrafts || tournament.Status != "Draft")
-            .OrderBy(tournament => tournament.StartTime).ThenBy(tournament => tournament.TournamentId)
+            .OrderBy(tournament => tournament.StartTime).ThenBy(tournament => tournament.TournamentId);
+
+    private static IQueryable<TournamentDto> ProjectTournaments(IQueryable<Tournament> tournaments) =>
+        tournaments
             .Select(tournament => new TournamentDto(
                 tournament.TournamentId, tournament.GameId, tournament.Game.GameName, tournament.Game.TeamSize,
                 tournament.TournamentName, AsUtc(tournament.RegistrationStart), AsUtc(tournament.RegistrationEnd),
                 AsUtc(tournament.StartTime), tournament.EntryFee,
                 tournament.Registrations.Count(registration => registration.Status != "Cancelled"),
                 tournament.Status, tournament.CreatedBy));
+
+    public async Task RequireActiveEmployeeAsync(int employeeId, CancellationToken cancellationToken)
+    {
+        if (!await database.Employees.AnyAsync(
+            employee => employee.EmployeeId == employeeId && employee.IsActive, cancellationToken))
+            throw new UnauthorizedAccessException("Tài khoản nhân viên hiện không hoạt động.");
+    }
 
     private async Task<Tournament> FindTournamentAsync(int tournamentId, CancellationToken cancellationToken) =>
         await database.Tournaments.Include(item => item.Game)

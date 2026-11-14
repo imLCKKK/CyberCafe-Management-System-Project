@@ -2579,3 +2579,24 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114115920_AddTournamentRegistrationRiotId'
+)
+BEGIN
+    ALTER TABLE [TournamentRegistrations] ADD [RiotId] nvarchar(128) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114115920_AddTournamentRegistrationRiotId'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261114115920_AddTournamentRegistrationRiotId', N'10.0.14');
+END;
+
+COMMIT;
+GO

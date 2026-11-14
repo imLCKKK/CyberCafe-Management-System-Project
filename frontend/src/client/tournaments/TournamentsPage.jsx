@@ -8,7 +8,7 @@ import { getTournamentRanks, getTournamentRegistrations, getTournaments, registe
 import { dateTime, money, statusLabels } from '../home/homeModel';
 import HomeDialog from '../shared/Dialog';
 import { RiotIdFields, OpggPrivacyNote } from '../../shared/RiotIdFields';
-import { fetchParticipantStats, filterParticipants, roles, statColumns, opggUrl } from './tournamentModel';
+import { fetchParticipantStats, filterParticipants, roles, statColumns, opggUrl, validRankSelection } from './tournamentModel';
 import '../home/home.css';
 import './tournaments.css';
 
@@ -92,9 +92,7 @@ export function TournamentsPage() {
     return () => { controller.abort(); request.current?.abort(); request.current = null; };
   }, [accessToken, refreshVersion, tournament?.id, tournament?.gameId]);
 
-  useEffect(() => {
-    if (!form.rankId && ranks.length) setForm((current) => ({ ...current, rankId: String(ranks[0].rankId) }));
-  }, [form.rankId, ranks]);
+  const rankId = validRankSelection(form.rankId, ranks);
 
   const participants = registrations.map((row) => ({
     RegistrationId: row.id,
@@ -123,7 +121,7 @@ export function TournamentsPage() {
     try {
       await registerTournament(tournament.id, {
         riotId: form.riotId,
-        rankId: Number(form.rankId),
+        rankId: Number(rankId),
         preferredRole: form.role,
       });
       setModal(false); setError(''); setNotice('Đăng ký đã được lưu. Danh sách được cập nhật từ máy chủ.');
@@ -194,6 +192,6 @@ export function TournamentsPage() {
       </section>
       <OpggNote/>
     </>}
-    {modal && tournament && <HomeDialog title="Đăng ký giải đấu" onClose={() => { setModal(false); setError(''); }}><form className="tour-form" onSubmit={submit}><p className="tour-muted">{tournament.name} · Đăng ký miễn phí.</p>{error && <div className="tour-note tour-error" role="alert">{error}</div>}<RiotIdFields value={form.riotId} onChange={(riotId) => setForm({ ...form, riotId })}/><OpggPrivacyNote/><label>Hạng hiện tại<select required value={form.rankId} onChange={(event) => setForm({ ...form, rankId: event.target.value })}>{ranks.map((item) => <option key={item.rankId} value={item.rankId}>{item.rankName}</option>)}</select></label><label>Vai trò sở trường<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>{roles.map((item) => <option key={item}>{item}</option>)}</select></label><div className="tour-actions"><button type="button" className="tour-button" onClick={() => { setModal(false); setError(''); }}>Để sau</button><button className="tour-button primary" type="submit" disabled={!ranks.length}>Xác nhận đăng ký</button></div></form></HomeDialog>}
+    {modal && tournament && <HomeDialog title="Đăng ký giải đấu" onClose={() => { setModal(false); setError(''); }}><form className="tour-form" onSubmit={submit}><p className="tour-muted">{tournament.name} · Đăng ký miễn phí.</p>{error && <div className="tour-note tour-error" role="alert">{error}</div>}<RiotIdFields value={form.riotId} onChange={(riotId) => setForm({ ...form, riotId })}/><OpggPrivacyNote/><label>Hạng hiện tại<select required value={rankId} onChange={(event) => setForm({ ...form, rankId: event.target.value })}>{ranks.map((item) => <option key={item.rankId} value={item.rankId}>{item.rankName}</option>)}</select></label><label>Vai trò sở trường<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>{roles.map((item) => <option key={item}>{item}</option>)}</select></label><div className="tour-actions"><button type="button" className="tour-button" onClick={() => { setModal(false); setError(''); }}>Để sau</button><button className="tour-button primary" type="submit" disabled={!ranks.length}>Xác nhận đăng ký</button></div></form></HomeDialog>}
   </div>;
 }

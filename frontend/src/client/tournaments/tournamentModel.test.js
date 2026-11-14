@@ -2,11 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDemoData } from '../home/mockData.js';
 import { registerTournament, isValidHomeData } from '../home/homeModel.js';
-import { fetchParticipantStats, filterParticipants, getParticipants, opggUrl, validateStats, saveParticipantStats } from './tournamentModel.js';
+import { fetchParticipantStats, filterParticipants, getParticipants, opggUrl, validateStats, saveParticipantStats, validRankSelection } from './tournamentModel.js';
 
 const now = new Date('2026-10-09T12:00:00Z');
 const form = { riotId: 'Player #VN1', role: 'Duelist' };
 const payload = { riotId: 'Player#VN1', source: 'opgg', queue: 'competitive', scope: '20 trận gần nhất', fetchedAt: now.toISOString(), sourceUpdatedAt: now.toISOString(), rank: { tier: 14, name: 'Gold', division: 3, label: 'Gold 3' }, matches: 20, winRate: 55, headshotRate: 25.5, damagePerRound: 145.2, kda: 1.6 };
+
+test('rank selection follows the new game and preserves an available selection', () => {
+  assert.equal(validRankSelection('9', [{ rankId: 2 }, { rankId: 3 }]), '2');
+  assert.equal(validRankSelection('3', [{ rankId: 2 }, { rankId: 3 }]), '3');
+  assert.equal(validRankSelection('9', []), '');
+});
 
 test('registration shares Home storage, survives reload and never fabricates stats', () => {
   const db = registerTournament(createDemoData(now), 1, form, now);

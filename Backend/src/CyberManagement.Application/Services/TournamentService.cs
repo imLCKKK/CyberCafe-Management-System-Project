@@ -12,6 +12,12 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
     private static readonly HashSet<string> PreferredRoles =
         ["Duelist", "Initiator", "Controller", "Sentinel", "Flex"];
 
+    public Task RequireActiveEmployeeAsync(int employeeId, CancellationToken cancellationToken)
+    {
+        ValidateId(employeeId, "EmployeeId");
+        return repository.RequireActiveEmployeeAsync(employeeId, cancellationToken);
+    }
+
     public Task<IReadOnlyList<GameDto>> GetGamesAsync(bool includeInactive, CancellationToken cancellationToken) =>
         repository.GetGamesAsync(includeInactive, cancellationToken);
 
@@ -59,23 +65,25 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
     }
 
     public async Task<TournamentDto> UpdateAsync(
-        int tournamentId, UpdateTournamentRequest request, CancellationToken cancellationToken)
+        int employeeId, int tournamentId, UpdateTournamentRequest request, CancellationToken cancellationToken)
     {
+        ValidateId(employeeId, "EmployeeId");
         ValidateId(tournamentId, "TournamentId");
         ValidateTournament(request.GameId, request.Name, request.RegistrationStartUtc,
             request.RegistrationEndUtc, request.StartTimeUtc, request.EntryFee);
-        var tournament = await repository.UpdateAsync(tournamentId, request, cancellationToken);
+        var tournament = await repository.UpdateAsync(employeeId, tournamentId, request, cancellationToken);
         await PublishAsync(RealtimeEvent.TournamentChanged, tournament.Id);
         return tournament;
     }
 
     public async Task<TournamentDto> TransitionAsync(
-        int tournamentId, string status, CancellationToken cancellationToken)
+        int employeeId, int tournamentId, string status, CancellationToken cancellationToken)
     {
+        ValidateId(employeeId, "EmployeeId");
         ValidateId(tournamentId, "TournamentId");
         if (status is not ("RegistrationOpen" or "RegistrationClosed"))
             throw new ValidationException("Trạng thái đích chỉ được là RegistrationOpen hoặc RegistrationClosed.");
-        var tournament = await repository.TransitionAsync(tournamentId, status, cancellationToken);
+        var tournament = await repository.TransitionAsync(employeeId, tournamentId, status, cancellationToken);
         await PublishAsync(RealtimeEvent.TournamentChanged, tournament.Id);
         return tournament;
     }
