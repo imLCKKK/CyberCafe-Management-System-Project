@@ -443,10 +443,14 @@ Assignee: **Minh**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Đ�
 
 #### S2-M-1 — Implement-Wallet-Ledger-Counter-Topups
 
+Jira: **SCRUM-21**. Contract/API/migration và cách kiểm tra: [hợp đồng ví](../Backend/docs/003-customer-wallet-contract.md).
+
 **Description:**
 
 - Triển khai credit/debit/refund dùng chung với ledger trong cùng transaction và khóa chống xử lý lặp.
 - Nối nạp tại quầy, lịch sử và realtime số dư; kiểm tra số dư không âm, xử lý lặp và điểm tích hợp phiên/đơn.
+- Bổ sung theo yêu cầu Trưởng nhóm 09/11/2026: khách chọn 10k/20k/30k/50k/100k/200k/300k/500k rồi gửi yêu cầu; admin nhận tại `/admin/topups` và xác nhận đã thu đủ tiền mặt mới cộng ví. Chỉ một Pending/khách; cùng khóa hoặc duyệt lặp/đồng thời không cộng thêm. Đây là phần nạp tại quầy của task; ZaloPay giữ riêng ở S2-M-2/S2-M-3.
+- Tiền tặng đã chốt: 50k +5k, 100k +15k, 200k +35k, 300k +50k, 500k +100k; 10k/20k/30k không tặng. API tính/lưu tiền tặng cùng yêu cầu; admin thu đúng tiền mặt, duyệt cộng tổng trong một ledger/transaction. UI hai phía hiển thị cả ba số. Migration bổ sung cập nhật Pending; Approved cũ và retry giữ snapshot đã ghi nhận. Không coi hoàn thành nạp quầy là đã hoàn tất mọi giao điểm credit/debit/refund.
 
 **Dependencies:** `S1-M-1`, `S1-P-2`, `S1-T-2`
 

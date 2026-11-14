@@ -51,6 +51,10 @@ test(`Vite ${mode} forwards auth/admin/menu/customers and realtime WebSockets wh
       ['/api/menu', 'GET'],
       ['/api/customers/me', 'GET'],
       ['/api/customers/me/wallet', 'GET'],
+      ['/api/customers/me/wallet/counter-topups/options', 'GET'],
+      ['/api/customers/me/wallet/counter-topups', 'POST'],
+      ['/api/admin/topups', 'GET'],
+      ['/api/admin/topups/1/approve', 'POST'],
     ];
     for (const [path, method] of routes) {
       const response = await fetch(`${origin}${path}`, { method, headers: { Authorization: 'Bearer proxy-test-token' } });

@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy,
       watch: {
-        ignored: ['**/.tools/**', '**/Phuc/**'],
+        ignored: [fileURLToPath(new URL('.tools/', import.meta.url)).replaceAll('\\', '/') + '**', '**/Phuc/**'],
       },
     },
     preview: { proxy },

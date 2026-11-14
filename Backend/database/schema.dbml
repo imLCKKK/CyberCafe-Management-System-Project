@@ -60,6 +60,26 @@ Table dbo.ComputerTypes {
   indexes {
   }
 }
+Table dbo.CounterTopUpRequests {
+  RequestId int [not null, pk, increment]
+  Amount decimal(18,0) [not null]
+  ApprovedAt datetime2 [null]
+  ApprovedByEmployeeId int [null]
+  BonusAmount decimal(18,0) [not null]
+  CashAmountReceived decimal(18,0) [null]
+  CreatedAt datetime2 [not null]
+  CustomerId int [not null]
+  RequestKey uniqueidentifier [not null]
+  Status nvarchar(20) [not null]
+  TotalAmount decimal(18,0) [not null]
+  WalletTransactionId int [null]
+  indexes {
+    (ApprovedByEmployeeId) [name: 'IX_CounterTopUpRequests_ApprovedByEmployeeId']
+    (CustomerId, RequestKey) [name: 'IX_CounterTopUpRequests_CustomerId_RequestKey', unique]
+    (WalletTransactionId) [name: 'IX_CounterTopUpRequests_WalletTransactionId', unique]
+    (CustomerId) [name: 'UX_CounterTopUpRequests_PendingCustomer', unique]
+  }
+}
 Table dbo.Customers {
   CustomerId int [not null, pk, increment]
   CreatedAt datetime2 [not null]
@@ -464,14 +484,25 @@ Table dbo.Tournaments {
 }
 Table dbo.WalletTransactions {
   TransactionId int [not null, pk, increment]
+  ActorEmployeeId int [null]
+  ActorType nvarchar(10) [null]
   Amount decimal(18,0) [not null]
   BalanceAfter decimal(18,0) [not null]
   CreatedAt datetime2 [not null]
   CustomerId int [not null]
   Description nvarchar(255) [null]
+  Kind nvarchar(10) [null]
+  OperationKey nvarchar(100) [null]
+  OriginalDebitId int [null]
+  SourceId nvarchar(100) [null]
+  SourceType nvarchar(50) [null]
   Type nvarchar(50) [not null]
   indexes {
+    (ActorEmployeeId) [name: 'IX_WalletTransactions_ActorEmployeeId']
     (CustomerId) [name: 'IX_WalletTransactions_CustomerId']
+    (OperationKey) [name: 'IX_WalletTransactions_OperationKey', unique]
+    (OriginalDebitId) [name: 'IX_WalletTransactions_OriginalDebitId']
+    (SourceType, SourceId, Type) [name: 'IX_WalletTransactions_SourceType_SourceId_Type', unique]
   }
 }
 Ref: dbo.AuditLogs.(EmployeeId) > dbo.Employees.(EmployeeId)
@@ -479,6 +510,9 @@ Ref: dbo.ComputerMaintenance.(ComputerId) > dbo.Computers.(ComputerId)
 Ref: dbo.ComputerMaintenance.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.Computers.(RoomId) > dbo.ComputerRooms.(RoomId)
 Ref: dbo.Computers.(ComputerTypeId) > dbo.ComputerTypes.(ComputerTypeId)
+Ref: dbo.CounterTopUpRequests.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.CounterTopUpRequests.(ApprovedByEmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.CounterTopUpRequests.(WalletTransactionId) > dbo.WalletTransactions.(TransactionId)
 Ref: dbo.CustomerStatusHistory.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.CustomerStatusHistory.(ChangedBy) > dbo.Employees.(EmployeeId)
 Ref: dbo.Employees.(RoleId) > dbo.Roles.(RoleId)
@@ -535,3 +569,5 @@ Ref: dbo.TournamentRegistrations.(TournamentId) > dbo.Tournaments.(TournamentId)
 Ref: dbo.Tournaments.(CreatedBy) > dbo.Employees.(EmployeeId)
 Ref: dbo.Tournaments.(GameId) > dbo.Games.(GameId)
 Ref: dbo.WalletTransactions.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.WalletTransactions.(ActorEmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.WalletTransactions.(OriginalDebitId) > dbo.WalletTransactions.(TransactionId)
