@@ -23,6 +23,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerStatusHistory> CustomerStatusHistories => Set<CustomerStatusHistory>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
+    public DbSet<CounterTopUpRequest> CounterTopUpRequests => Set<CounterTopUpRequest>();
 
     // Computers
     public DbSet<ComputerRoom> ComputerRooms => Set<ComputerRoom>();

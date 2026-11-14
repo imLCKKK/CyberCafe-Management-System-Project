@@ -11,6 +11,8 @@ using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Security;
 using CyberManagement.Domain.Entities;
 using CyberManagement.Infrastructure.Repositories;
+using CyberManagement.Application.Wallets;
+using CyberManagement.Infrastructure.Wallets;
 using CyberManagement.Infrastructure.Security;
 using CyberManagement.Infrastructure.Persistance;
 using Microsoft.AspNetCore.Builder;
@@ -20,6 +22,20 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+
+if (args.Contains("--counter-demo-seed"))
+{
+    await CounterDemoSeed.RunAsync();
+    return;
+}
+
+if (args.Contains("--wallet-migration-checks"))
+{
+    var connection = Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION");
+    if (string.IsNullOrWhiteSpace(connection)) throw new ArgumentException("AUTH_CHECKS_SQL_CONNECTION is required.");
+    Console.WriteLine($"{await CounterTopUpMigrationChecks.RunAsync(connection)} counter top-up migration SQL checks passed.");
+    return;
+}
 
 if (args.Contains("--zalopay-checks"))
 {
@@ -59,8 +75,11 @@ if (args.Contains("--catalog-browser-host"))
 
 var catalogOnly = args.Contains("--catalog-only");
 var customerOnly = args.Contains("--customer-only");
-if (catalogOnly && customerOnly)
-    throw new ArgumentException("Select either --catalog-only or --customer-only, not both.");
+var walletOnly = args.Contains("--wallet-only");
+if (new[] { catalogOnly, customerOnly, walletOnly }.Count(value => value) > 1)
+    throw new ArgumentException("Select one of --catalog-only, --customer-only or --wallet-only.");
+if (walletOnly && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION")))
+    throw new ArgumentException("--wallet-only requires AUTH_CHECKS_SQL_CONNECTION; wallet writers are verified on SQL Server.");
 
 var databaseFixture = new AuthCheckDatabase(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"));
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -90,6 +109,8 @@ builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
+builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
@@ -239,15 +260,20 @@ try
             await SendWithToken(HttpMethod.Get, "/api/admin/roles", login.AccessToken));
     }
 
-    if (!catalogOnly && !customerOnly)
+    if (!catalogOnly && !customerOnly && !walletOnly)
     {
         checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
         checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
     }
-    if (!customerOnly)
+    if (!customerOnly && !walletOnly)
         checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
-    if (!catalogOnly)
+    if (!catalogOnly && !walletOnly)
         checks += await CustomerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
+    if (!catalogOnly && !customerOnly && databaseFixture.Provider == "SQL Server")
+    {
+        checks += await CounterTopUpChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+        checks += await WalletLedgerChecks.RunAsync(app.Services);
+    }
 
     await CheckStatus("Expired token is rejected", HttpStatusCode.Unauthorized,
         await SendWithToken(HttpMethod.Get, "/api/auth/me",
