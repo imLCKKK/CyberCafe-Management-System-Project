@@ -30,7 +30,11 @@ namespace CyberManagement.Application.Services
         }
 
         // Nhập hoặc điều chỉnh tồn thủ công.
-        public async Task<InventoryMovementDto> CreateMovementAsync(CreateInventoryMovementRequest request, int employeeId, CancellationToken cancellationToken = default)
+        public async Task<InventoryMovementDto> CreateMovementAsync(
+            CreateInventoryMovementRequest request,
+            int employeeId,
+            Guid idempotencyKey,
+            CancellationToken cancellationToken = default)
         {
             var normalizedRequest = ValidateRequest(request);
 
@@ -40,12 +44,29 @@ namespace CyberManagement.Application.Services
                     "Phải xác định nhân viên thực hiện thao tác kho.");
             }
 
+            if (idempotencyKey == Guid.Empty)
+            {
+                throw new ValidationException(
+                    "Idempotency-Key phải là UUID khác rỗng.");
+            }
+
+            // Một khóa cho một thao tác của một nhân viên; retry giữ nguyên khóa.
+            var operationKey = FormattableString.Invariant(
+                $"Manual:{employeeId}:{idempotencyKey:N}");
+
             return await _unitOfWork.ExecuteAsync(async () =>
             {
-                var product =
-                    await _inventoryRepository.GetProductForUpdateAsync(
-                        normalizedRequest.ProductId,
-                        cancellationToken);
+                var existing = await _movementRepository.GetByOperationKeyAsync(
+                    operationKey, cancellationToken);
+
+                if (existing is not null)
+                {
+                    EnsureSameManualMovement(existing, normalizedRequest, employeeId);
+                    return ToMovementDto(existing);
+                }
+
+                var product = await _inventoryRepository.GetProductForUpdateAsync(
+                    normalizedRequest.ProductId, cancellationToken);
 
                 if (product is null)
                 {
@@ -53,8 +74,15 @@ namespace CyberManagement.Application.Services
                         $"Không tìm thấy sản phẩm có ID {normalizedRequest.ProductId}.");
                 }
 
-                // Mỗi thao tác thủ công mới có một khóa riêng.
-                var operationKey = $"Manual:{Guid.NewGuid():N}";
+                // Request khác có thể đã hoàn tất khi ta đang chờ khóa sản phẩm.
+                existing = await _movementRepository.GetByOperationKeyAsync(
+                    operationKey, cancellationToken);
+
+                if (existing is not null)
+                {
+                    EnsureSameManualMovement(existing, normalizedRequest, employeeId);
+                    return ToMovementDto(existing);
+                }
 
                 return await ChangeStockAsync(
                     product,
@@ -66,6 +94,26 @@ namespace CyberManagement.Application.Services
                     null,
                     cancellationToken);
             }, cancellationToken);
+        }
+
+        private static void EnsureSameManualMovement(
+            InventoryTransaction movement,
+            CreateInventoryMovementRequest request,
+            int employeeId)
+        {
+            if (movement.ReferenceType != "Manual"
+                || movement.OrderId is not null
+                || movement.OrderDetailId is not null
+                || movement.ReceiptId is not null
+                || movement.EmployeeId != employeeId
+                || movement.ProductId != request.ProductId
+                || movement.Type != request.Type
+                || movement.Quantity != request.QuantityDelta
+                || !string.Equals(movement.Reason, request.Reason, StringComparison.Ordinal))
+            {
+                throw new BusinessRuleException(
+                    "Idempotency-Key đã được dùng cho nội dung thao tác kho khác.");
+            }
         }
 
         // Chỉ đổi trạng thái bán, không đổi tồn hoặc giá.

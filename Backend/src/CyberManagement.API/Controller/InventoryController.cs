@@ -56,6 +56,7 @@ public sealed class InventoryController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<InventoryMovementDto>> CreateMovement(
         [FromBody] CreateInventoryMovementRequest request,
+        [FromHeader(Name = "Idempotency-Key"), Required] string idempotencyKey,
         CancellationToken cancellationToken)
     {
         // Chọn quyền theo đúng loại thao tác.
@@ -82,7 +83,15 @@ public sealed class InventoryController : ControllerBase
             return Forbid();
         }
 
-        var result = await _inventoryService.CreateMovementAsync(request, employeeId, cancellationToken);
+        var rawKey = Request.Headers["Idempotency-Key"];
+        if (rawKey.Count != 1 || !Guid.TryParseExact(idempotencyKey, "D", out var key)
+            || key == Guid.Empty)
+        {
+            throw new ValidationException("Idempotency-Key phải là một UUID dạng chuẩn, khác rỗng.");
+        }
+
+        var result = await _inventoryService.CreateMovementAsync(
+            request, employeeId, key, cancellationToken);
 
         return Created("/api/admin/inventory/movements", result);
     }

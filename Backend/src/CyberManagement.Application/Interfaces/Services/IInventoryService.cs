@@ -11,7 +11,11 @@ namespace CyberManagement.Application.Interfaces.Services
         Task<IReadOnlyList<InventoryMovementDto>> GetMovementsAsync(CancellationToken cancellationToken = default);
 
         // Nhập hoặc điều chỉnh tồn thủ công.
-        Task<InventoryMovementDto> CreateMovementAsync(CreateInventoryMovementRequest request,int employeeId,CancellationToken cancellationToken = default);
+        Task<InventoryMovementDto> CreateMovementAsync(
+            CreateInventoryMovementRequest request,
+            int employeeId,
+            Guid idempotencyKey,
+            CancellationToken cancellationToken = default);
 
         // Bật/tắt trạng thái bán, giữ nguyên tồn và giá.
         Task<InventoryItemDto> UpdateProductStatusAsync(

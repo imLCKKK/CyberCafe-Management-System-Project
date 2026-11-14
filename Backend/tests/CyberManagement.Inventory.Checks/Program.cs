@@ -132,6 +132,15 @@ try
             await SchemaContractChecks.RunUpgradeGuardsAsync(Environment.GetEnvironmentVariable("INVENTORY_CHECKS_SQL_CONNECTION")!, Check);
             await using var movementHost = CreateApp(false);
             await InventoryMovementChecks.RunAsync(movementHost.Services, Check);
+            await movementHost.StartAsync();
+            using var movementClient = movementHost.GetTestClient();
+            await InventoryRegressionChecks.RunAsync(movementHost.Services, movementClient, Check);
+            await movementHost.StopAsync();
+            await using var replayHost = CreateApp(false);
+            await replayHost.StartAsync();
+            using var replayClient = replayHost.GetTestClient();
+            await InventoryRegressionChecks.CheckReplayAfterRestartAsync(replayHost.Services, replayClient, Check);
+            await replayHost.StopAsync();
         }
         Console.WriteLine($"{checks} inventory checks passed ({(fixture.IsSql ? "SQL Server" : "InMemory; not migration evidence")}).");
     }

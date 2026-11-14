@@ -1,4 +1,4 @@
-﻿using CyberManagement.Application.Exceptions;
+using CyberManagement.Application.Exceptions;
 using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Domain.Entities;
 using CyberManagement.Infrastructure.Persistance;
@@ -12,6 +12,8 @@ namespace CyberManagement.Infrastructure.Repositories
     public class InventoryRepository : IInventoryRepository
     {
         private readonly ApplicationDbContext _context;
+        private readonly Dictionary<int, Product> _lockedProducts = new();
+        private Guid? _lockedTransactionId;
 
         public InventoryRepository(ApplicationDbContext context)
         {
@@ -52,34 +54,81 @@ namespace CyberManagement.Infrastructure.Repositories
             }
 
             RequireTransaction();
+            cancellationToken.ThrowIfCancellationRequested();
+            _context.ChangeTracker.DetectChanges();
 
-            // Khóa sản phẩm để các thao tác cập nhật tồn không chạy chồng nhau.
-            var product = await _context.Products
+            var transactionId = _context.Database.CurrentTransaction!.TransactionId;
+            if (_lockedTransactionId != transactionId)
+            {
+                _lockedProducts.Clear();
+                _lockedTransactionId = transactionId;
+            }
+
+            var entry = _context.ChangeTracker.Entries<Product>()
+                .SingleOrDefault(x => x.Entity.ProductId == productId);
+
+            if (entry is not null && entry.State is EntityState.Added or EntityState.Deleted)
+            {
+                throw new BusinessRuleException(
+                    "Không thể thao tác kho với sản phẩm đang được thêm hoặc xóa.");
+            }
+
+            // Đã giữ khóa trong chính transaction này: giữ thay đổi của caller.
+            if (entry is not null
+                && _lockedProducts.TryGetValue(productId, out var locked)
+                && ReferenceEquals(entry.Entity, locked))
+            {
+                return locked;
+            }
+
+            // Tồn/trạng thái chỉ được sửa sau khi đã lấy khóa.
+            if (entry is not null
+                && (entry.Property(x => x.Stock).IsModified
+                    || entry.Property(x => x.IsActive).IsModified))
+            {
+                throw new BusinessRuleException(
+                    "Phải khóa sản phẩm trước khi sửa tồn hoặc trạng thái bán.");
+            }
+
+            // AsNoTracking lấy dữ liệu SQL thật, không tái dùng entity cũ của EF.
+            var snapshot = await _context.Products
                 .FromSqlInterpolated(
                     $"SELECT * FROM [dbo].[Products] WITH (UPDLOCK, HOLDLOCK) WHERE [ProductId] = {productId}")
-                .AsTracking()
+                .AsNoTracking()
                 .SingleOrDefaultAsync(cancellationToken);
 
-            if (product is null)
+            if (snapshot is null)
             {
                 return null;
             }
 
-            var entry = _context.Entry(product);
-
-            if (entry.State == EntityState.Deleted)
+            Product product;
+            if (entry is null)
             {
-                throw new InvalidOperationException(
-                    "Sản phẩm đang được đánh dấu xóa trong transaction.");
+                product = snapshot;
+                _context.Products.Attach(product);
+            }
+            else
+            {
+                // Giữ các sửa đổi tên/giá..., cập nhật lại dữ liệu gốc theo SQL.
+                var pending = entry.Properties.Where(x => x.IsModified)
+                    .ToDictionary(x => x.Metadata.Name, x => x.CurrentValue);
+
+                entry.CurrentValues.SetValues(snapshot);
+                entry.OriginalValues.SetValues(snapshot);
+                entry.State = EntityState.Unchanged;
+
+                foreach (var (name, value) in pending)
+                {
+                    var property = entry.Property(name);
+                    property.CurrentValue = value;
+                    property.IsModified = !Equals(property.OriginalValue, value);
+                }
+
+                product = entry.Entity;
             }
 
-            // Làm mới dữ liệu nếu sản phẩm đã được đọc trước khi lấy khóa.
-            // Giữ lại thay đổi chưa lưu của thao tác hiện tại.
-            if (entry.State == EntityState.Unchanged)
-            {
-                await entry.ReloadAsync(cancellationToken);
-            }
-
+            _lockedProducts[productId] = product;
             return product;
         }
 
