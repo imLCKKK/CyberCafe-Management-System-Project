@@ -1,7 +1,7 @@
 ﻿import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { cdp, evaluate, until, screenshot, errors, socket, sleep, origin, outputDir } from './cdp.mjs';
+import { cdp, evaluate, until, screenshot, errors, socket, sleep, origin, outputDir, setupWorkflowLogin } from './cdp.mjs';
 import { mkdir, readFile } from 'node:fs/promises';
 const key = 'tram.client.dbml.demo.v2';
 const input = async (selector, value) => evaluate(`(() => { const field = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, ${JSON.stringify(value)}); field.dispatchEvent(new Event('input', { bubbles: true })); })()`);
@@ -12,6 +12,7 @@ try {
   await cdp('Runtime.enable');
   await cdp('Page.enable');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+  await setupWorkflowLogin('customer', { resetDemo: true });
   await cdp('Page.navigate', { url: origin + '/client/invoices' });
   await until("Boolean(document.querySelector('.invoices-page'))");
   await evaluate(`(async () => {
@@ -67,7 +68,7 @@ try {
   await cdp('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloadDir });
   await evaluate("document.querySelector('.invoice-detail-actions .primary').click()");
   let downloaded;
-  for (let step = 0; step < 40; step++) { try { downloaded = await readFile(downloadDir + '/TRAM-PC1027.txt', 'utf8'); break; } catch { await sleep(100); } }
+  for (let step = 0; step < 40; step++) { try { downloaded = await readFile(downloadDir + '/NEXORA-PC1027.txt', 'utf8'); break; } catch { await sleep(100); } }
   assert.ok(downloaded?.includes('Đã thu tiền mặt: 35.000'));
   assert.ok(downloaded?.includes('Tiền mặt chờ thu: 28.000'));
   assert.ok(downloaded?.includes('Món tiền mặt hủy không thu: -15.000'));

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 globalThis.localStorage = { getItem: () => null };
 const server = await createServer({
   root: fileURLToPath(new URL('../../../', import.meta.url)),
+  optimizeDeps: { noDiscovery: true },
   server: { middlewareMode: true },
   appType: 'custom',
   ssr: {
@@ -21,7 +22,7 @@ try {
   const { default: HomePage } = await server.ssrLoadModule('/src/client/home/HomePage.jsx');
   const { ClientDemoProvider } = await server.ssrLoadModule('/src/client/shared/ClientDemoContext.jsx');
   const html = renderToString(React.createElement(MemoryRouter, { initialEntries: ['/client/home'] }, React.createElement(ClientDemoProvider, null, React.createElement(HomePage)))).replace(/<!-- -->/g, '');
-  for (const text of ['Chào Minh Anh', '2 giờ 15 phút', 'Nạp tiền vào ví', 'Mì xào bò', 'Đấu trường cuối tuần', 'Hoạt động gần đây']) {
+  for (const text of ['Chào Minh Anh', '2 giờ 15 phút', 'Nạp tiền vào ví', 'Đang tải thực đơn…', 'Đấu trường cuối tuần', 'Hoạt động gần đây']) {
     assert.ok(html.includes(text), `Missing rendered content: ${text}`);
   }
   assert.ok(!html.includes('NaN'));

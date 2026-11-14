@@ -1,22 +1,25 @@
 # Script tiện ích Windows
 
-Các file `.cmd` là tập lệnh Windows, không chứa nghiệp vụ ứng dụng. Có thể dùng trực tiếp `npm` và `dotnet`; các wrapper chỉ hỗ trợ máy đã cài công cụ portable trong `.tools/` hoặc muốn chạy nhanh.
+Wrapper dùng công cụ portable trong `.tools/` nếu có rồi tìm bản đã cài; trả lại đúng exit code. `.tools/` là cục bộ, không đi theo clone.
 
-`.tools/` là thư mục **cục bộ**, được `.gitignore` bỏ qua nên người khác clone repo không cần nó. Máy hiện tại dùng nó để giữ ảnh/log/kết quả kiểm thử, bản sao và script tạm lúc dọn backlog; nếu cài Node, .NET hoặc `dotnet-ef` portable thì wrapper tìm công cụ tại đó. Các file này không phải source hay dữ liệu nghiệp vụ. Có thể dọn artifact cũ khi không còn cần đối chiếu, nhưng kiểm tra trước xem máy đang dùng SDK/CLI portable trong `.tools/` hay không.
-
-| File | Tác dụng |
+| Script | Công dụng |
 | --- | --- |
-| `start.cmd` | Chuyển tới `frontend/`, cài dependency nếu thiếu rồi chạy Vite ở `127.0.0.1:5173` |
-| `npm-local.cmd` | Chọn Node/npm portable nếu có, nếu không dùng Node/npm đã cài trên máy |
-| `dotnet-local.cmd` | Tương tự cho .NET SDK; `global.json` tại root chọn SDK .NET 10 ổn định |
-| `ef-local.cmd` | Gọi EF Core CLI để quản lý migration; cần cài `dotnet-ef` trước theo hướng dẫn backend |
+| `npm-local.cmd` | Node/npm cho frontend |
+| `dotnet-local.cmd` | .NET SDK theo `global.json` |
+| `ef-local.cmd` | EF CLI, cần cài `dotnet-ef` 10.0.14 theo Backend README |
+| `start.cmd` | Cài dependency frontend nếu thiếu và chạy Vite/OP.GG ở 127.0.0.1:5173 |
 
-Từ thư mục gốc:
+Từ repository root:
 
 ```powershell
 .\scripts\start.cmd
 .\scripts\npm-local.cmd --prefix frontend run build
-.\scripts\dotnet-local.cmd build backend\CyberCafe.Api\CyberCafe.Api.csproj
+.\scripts\dotnet-local.cmd build Backend\CyberManagement.slnx
+.\scripts\ef-local.cmd migrations list --no-connect --project Backend\src\CyberManagement.Infrastructure --startup-project Backend\src\CyberManagement.API
 ```
 
-`start.cmd` hiện chỉ khởi động frontend demo và middleware OP.GG, chưa chạy API .NET/SQL Server hay cấu hình LAN. Xem [hướng dẫn backend](../backend/README.md) và [quy trình nhóm](../planning/team-workflow.md).
+`start.cmd` không chạy API .NET/SQL hoặc thiết lập LAN. Cấu hình DB mới 35 bảng/JWT/seed theo [Backend README](../Backend/README.md); quy trình nhận task/review theo [hướng dẫn nhóm](../planning/team-workflow.md).
+
+S1-M-2 bổ sung `configure-zalopay-sandbox.ps1`, `start-zalopay-demo.ps1`, `stop-zalopay-demo.ps1`:
+cấu hình User Secrets và chạy/dừng listener kiểm tra chữ ký qua HTTPS riêng. Cách dùng và giới hạn
+tại [Backend README](../Backend/README.md) và [contract ZaloPay](../Backend/docs/005-zalopay-sandbox-contract.md).

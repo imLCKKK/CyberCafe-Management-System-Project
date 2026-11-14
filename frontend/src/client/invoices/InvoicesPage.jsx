@@ -36,7 +36,7 @@ export function InvoicesPage() {
     try {
       url = URL.createObjectURL(new Blob(['\uFEFF' + receiptText(row, db, account, now)], { type: 'text/plain;charset=utf-8' }));
       const anchor = document.createElement('a');
-      anchor.href = url; anchor.download = `TRAM-PC${row.id}.txt`;
+      anchor.href = url; anchor.download = `NEXORA-PC${row.id}.txt`;
       document.body.appendChild(anchor); anchor.click(); anchor.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000); setError('');
     } catch { if (url) URL.revokeObjectURL(url); setError('Không thể tải bảng kê. Hãy thử lại hoặc dùng In / lưu PDF.'); }
@@ -63,7 +63,7 @@ export function InvoicesPage() {
       </div>
       {invalidRange && <p className="invoice-filter-error" role="alert">Ngày bắt đầu phải bằng hoặc trước ngày kết thúc.</p>}
       <div className="invoice-list-meta"><span aria-live="polite">{rows.length} / {receipts.length} bảng kê{filtered ? ' phù hợp bộ lọc' : ''} · Ngày tính theo lúc bắt đầu phiên</span>{filtered && <button type="button" className="home-text-button" onClick={resetFilters}><RotateCcw size={13}/> Xóa bộ lọc</button>}</div>
-      <div className="home-table-wrap invoice-table-wrap"><table className="home-table invoice-table"><caption className="home-sr-only">Bảng kê phiên chơi và trạng thái thanh toán</caption><thead><tr><th scope="col">Bảng kê / Phiên chơi</th><th scope="col">Tiền máy / Món</th><th scope="col">Tổng ghi nhận</th><th scope="col">Thanh toán</th><th scope="col"><span className="home-sr-only">Thao tác</span></th></tr></thead><tbody>{visible.map((row) => <tr key={row.id}>
+      <div className="home-table-wrap invoice-table-wrap" tabIndex={0} role="region" aria-label="Bảng kê phiên chơi"><table className="home-table invoice-table"><caption className="home-sr-only">Bảng kê phiên chơi và trạng thái thanh toán</caption><thead><tr><th scope="col">Bảng kê / Phiên chơi</th><th scope="col">Tiền máy / Món</th><th scope="col">Tổng ghi nhận</th><th scope="col">Thanh toán</th><th scope="col"><span className="home-sr-only">Thao tác</span></th></tr></thead><tbody>{visible.map((row) => <tr key={row.id}>
         <td><div className="invoice-row-title"><span className="client-icon-tile neutral"><ReceiptText size={18}/></span><div><button className="invoice-open-link" onClick={() => setSelected(row.id)}>Bảng kê #PC{row.id}</button><small>{row.computer?.code || '—'} · {row.orders.length} đơn món</small></div></div><span className="invoice-row-date">{dateTime(row.session.started_at)}</span><span className="invoice-row-session"><Badge status={row.session.status}/><small>{minutesLabel(row.session.started_at, row.session.ended_at || now)}</small></span></td>
         <td><div className="invoice-cost-lines"><span>Tiền máy <b>{money(row.session.charged_amount)}</b></span><span>Tiền món <b>{money(row.food)}</b></span>{row.refunds > 0 && <small>Đã hoàn ví: {money(row.refunds)}</small>}{row.cashCancelled > 0 && <small>Không thu món hủy: {money(row.cashCancelled)}</small>}</div></td>
         <td><strong className="invoice-row-total">{money(row.total)}</strong><small className="invoice-total-caption">{row.session.status === 'Active' ? 'Tạm tính · Phiên đang chơi' : 'Phiên đã kết thúc'}</small></td>

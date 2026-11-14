@@ -1,4 +1,4 @@
-﻿# Client Home
+# Client Home
 
 Trang chủ tại `/client/home`, thiết kế theo giao diện tối TRAM và DBML được cung cấp. Luồng gọi món chuyển sang `/client/ordering` và được nối tới `OrderingPage` trong router.
 

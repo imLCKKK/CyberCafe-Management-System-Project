@@ -10,14 +10,14 @@ const WINNER_INDEX = 27;
 
 export function TodaySuggestionTeaser({ db, onOpen }) {
   const available = db.products.filter((product) => product.is_active !== false && remainingStock(db, product) > 0);
-  const showcase = [1, 3, 5].map((id) => available.find((product) => product.id === id)).filter(Boolean);
+  const showcase = available.slice(0, 3);
   return <button type="button" className="today-teaser" onClick={onOpen} aria-label="Hôm nay ăn gì? Khám phá vòng quay gợi ý món">
-    <span className="today-teaser-copy"><span className="today-eyebrow"><Sparkles size={13}/> CHƯA BIẾT CHỌN MÓN NÀO?</span><span className="today-teaser-title">Hôm nay <em>ăn gì?</em></span><span className="today-teaser-description">Một vòng quay, một món ngon.<br/>Để TRAM chọn giúp bạn nhé!</span><span className="today-teaser-cta">Khám phá ngay <ArrowUpRight size={18}/></span></span>
+    <span className="today-teaser-copy"><span className="today-eyebrow"><Sparkles size={13}/> CHƯA BIẾT CHỌN MÓN NÀO?</span><span className="today-teaser-title">Hôm nay <em>ăn gì?</em></span><span className="today-teaser-description">Một vòng quay, một món ngon.<br/>Để NEXORA chọn giúp bạn nhé!</span><span className="today-teaser-cta">Khám phá ngay <ArrowUpRight size={18}/></span></span>
     <span className="today-teaser-art" aria-hidden="true"><span className="today-teaser-orbit"/>{showcase.map((product, index) => <span className={`today-teaser-food today-teaser-food-${index}`} key={product.id}><span>{productArt[product.id] || '🍽️'}</span><small>{product.name}</small></span>)}<span className="today-teaser-dice"><Dices size={23}/></span><span className="today-teaser-hint"><Sparkles size={11}/> Khám phá món mới</span></span>
   </button>;
 }
 
-export default function TodaySuggestion({ db, category, onCategoryChange, cart, onAdd, onBack, onViewOrders }) {
+export default function TodaySuggestion({ db, category, onCategoryChange, cart, onAdd, onBack }) {
   const [sequence, setSequence] = useState([]);
   const [winnerId, setWinnerId] = useState(null);
   const [phase, setPhase] = useState('ready');
@@ -103,12 +103,12 @@ export default function TodaySuggestion({ db, category, onCategoryChange, cart, 
       <div className="today-wheel-focus"/>
     </div>
     <div className={`today-outcome ${winner ? 'has-winner' : ''}`} role="status" aria-live="polite">
-      {winner ? <><span className="today-outcome-label"><Check size={14}/> MÓN NGON DÀNH CHO BẠN</span><strong>{winner.name}</strong><span>{money(winner.current_price)} · Còn {remainingStock(db, winner)} phần</span></> : <><strong>{phase === 'spinning' ? 'Món nào sẽ được chọn đây?' : available.length ? 'Món ngon tiếp theo của bạn là…' : 'Nhóm món này đã hết hàng'}</strong><span>{phase === 'spinning' ? 'Chờ một chút, vòng quay đang chậm dần.' : available.length ? 'Bấm quay và để TRAM tạo một bất ngờ nho nhỏ.' : 'Hãy chọn nhóm khác để khám phá món còn hàng.'}</span></>}
+      {winner ? <><span className="today-outcome-label"><Check size={14}/> MÓN NGON DÀNH CHO BẠN</span><strong>{winner.name}</strong><span>{money(winner.current_price)} · Còn {remainingStock(db, winner)} phần</span></> : <><strong>{phase === 'spinning' ? 'Món nào sẽ được chọn đây?' : available.length ? 'Món ngon tiếp theo của bạn là…' : 'Nhóm món này đã hết hàng'}</strong><span>{phase === 'spinning' ? 'Chờ một chút, vòng quay đang chậm dần.' : available.length ? 'Bấm quay và để NEXORA tạo một bất ngờ nho nhỏ.' : 'Hãy chọn nhóm khác để khám phá món còn hàng.'}</span></>}
     </div>
-    <div className="today-experience-actions"><button className="home-button primary" type="button" disabled={!available.length || phase === 'spinning'} onClick={spin}>{phase === 'done' ? <RotateCw size={18}/> : <Dices size={18}/>} {phase === 'spinning' ? 'Đang quay…' : phase === 'done' ? 'Thử món khác' : 'Quay chọn món ngay'}</button>{winner && <button className="home-button" type="button" onClick={() => setResultOpen(true)}>Xem món & thanh toán <ArrowUpRight size={17}/></button>}</div>
+    <div className="today-experience-actions"><button className="home-button primary" type="button" disabled={!available.length || phase === 'spinning'} onClick={spin}>{phase === 'done' ? <RotateCw size={18}/> : <Dices size={18}/>} {phase === 'spinning' ? 'Đang quay…' : phase === 'done' ? 'Thử món khác' : 'Quay chọn món ngay'}</button>{winner && <button className="home-button" type="button" onClick={() => setResultOpen(true)}>Xem món & thêm vào giỏ <ArrowUpRight size={17}/></button>}</div>
     <p className="today-stock-note">Món còn nhiều có cơ hội được chọn cao hơn. Bạn luôn có thể quay lại để thử món khác.</p>
     <button type="button" className="home-text-button today-back" onClick={onBack}><ArrowLeft size={14}/> Về thực đơn</button>
     </div>
-    {resultOpen && winner && <SuggestionResultDialog productId={winner.id} cart={cart} onAdd={onAdd} onClose={() => setResultOpen(false)} onViewOrders={onViewOrders}/>}
+    {resultOpen && winner && <SuggestionResultDialog db={db} productId={winner.id} cart={cart} onAdd={onAdd} onClose={() => setResultOpen(false)}/>}
   </section>;
 }

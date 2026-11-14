@@ -1,6 +1,12 @@
 # Hướng dẫn AI làm việc với dự án CyberCafe
 
-Cập nhật 31/10/2026. Đọc file này trước khi sửa code, sau đó đọc đúng task trong [SPRINT_TASKS.md](SPRINT_TASKS.md). File này đủ để nắm hướng đi; các liên kết giúp kiểm tra chi tiết. Luôn đối chiếu trạng thái code/nhánh hiện tại, không coi ngày ghi trong tài liệu là bằng chứng chức năng đã hoàn thành.
+Cập nhật 02/11/2026 theo quyết định dùng backend 35 bảng; giữ lịch/phân công baseline 31/10/2026. Đọc file này trước khi sửa code, sau đó đọc đúng task trong [SPRINT_TASKS.md](SPRINT_TASKS.md). File này đủ để nắm hướng đi; các liên kết giúp kiểm tra chi tiết. Luôn đối chiếu trạng thái code/nhánh hiện tại, không coi ngày ghi trong tài liệu là bằng chứng chức năng đã hoàn thành.
+
+Cập nhật UI ngày 09/11/2026: Trưởng nhóm trực tiếp thực hiện `S1-U-1 — Apply-Nexora-Branding-Theme` và cung cấp logo NEXORA CYBER; `S2-U-1` (ảnh món/component thẻ món) vẫn thuộc Phúc.
+
+Quyết định ngày 14/11/2026 giao **Trưởng nhóm trực tiếp hoàn thiện các phần dang dở của Sprint 1**, gồm chốt và đồng bộ contract phiên/ví/chứng từ tại S1-P-1, S1-M-1 và S1-T-1. Actor tự đóng/phát hành khi hết tiền là System, người mở phiên được lưu riêng. Trưởng nhóm tự hoàn tất phần thiết kế/bàn giao Sprint 1. Phúc thực hiện phiên/worker ở S2-P-1, Minh thực hiện ví ở S2-M-1 và Trường thực hiện hóa đơn ở S2-T-2. Contract hiện hành nằm ở [phiên mục 5.1](../Backend/docs/002-computer-session-contract.md#51-quyết-định-tự-đóng-phiên-và-người-thực-hiện--14112026) và [chứng từ mục 6.3.2](../docs/contracts/inventory-invoice-voucher.md#632-phát-hành-tự-động-với-actor-system--quyết-định-14112026).
+
+Lựa chọn xác nhận lại ngày 14/11/2026 bổ sung contract S1-K-2 yêu cầu đơn món thanh toán đủ trước khi nhân viên nhận để làm. Cash đã thu khóa hủy, quản lý xử lý ngoại lệ tại quầy. Hóa đơn món ăn và hóa đơn tiền giờ xuất riêng. Mỗi lần thu phí giờ có SessionCharge/ledger/Payment cùng transaction, tự đóng phát hành phí giờ chưa có chứng từ với actor System. Trưởng nhóm tự hoàn thiện thiết kế Sprint 1, các owner triển khai S2 theo phân công module.
 
 ## 1. Dự án làm gì và đã chốt điều gì?
 
@@ -9,64 +15,63 @@ Hệ thống quản lý phòng máy: admin/nhân viên quản lý máy, phiên, 
 | Nội dung | Quyết định của nhóm |
 | --- | --- |
 | Stack | React/Vite + ASP.NET Core API .NET 10 + EF Core + SQL Server |
+| Backend/DB | `Backend/CyberManagement.slnx`, Clean Architecture, SQL Server mới 35 bảng; EmployeeId/CustomerId kiểu int |
 | Demo | Hai máy mở web trên cùng LAN, dùng chung API/SQL; SignalR báo thay đổi, mục tiêu cập nhật trong 2 giây được đo khi nghiệm thu |
 | Máy trạm | Không xây phần mềm khóa/điều khiển Windows |
 | Thanh toán | ZaloPay sandbox chính thức cho nạp ví và thanh toán đơn món; giữ ví/tiền mặt/nạp tại quầy; không dùng tiền thật |
+| Thu tiền món | Quyết định 14/11/2026 yêu cầu thanh toán đủ rồi nhân viên mới nhận món để làm. Cash do nhân viên xác nhận thực thu, Wallet/ZaloPay do server xác minh |
 | Khuyến mãi | Voucher món ăn giảm % hoặc số tiền cố định, ngày hiệu lực, đơn tối thiểu, hạn mức; server tính và lưu snapshot trên chứng từ |
 | Giải đấu | Quản lý giải/đăng ký/đội, thống kê OP.GG; bắt buộc có ML hỗ trợ chia đội, Phúc phụ trách |
-| Nhận diện | NEXORA CYBER; nền đen `#0B0F14`, tím `#A855F7`, cyan `#22D3EE`, chữ `#E5F0FF`. Concept logo nhóm sẽ chốt chiều 31/10/2026; chưa tự chọn một trong ba mẫu. Phúc triển khai token/layout trước, đối chiếu asset đã duyệt trước khi hoàn tất logo |
+| Nhận diện | NEXORA CYBER; nền đen `#0B0F14`, tím `#A855F7`, cyan `#22D3EE`, chữ `#E5F0FF`. Logo do Trưởng nhóm cung cấp ngày 09/11/2026: [nexora-cyber.png](../frontend/public/branding/nexora-cyber.png), biểu tượng N neon cyan–tím trên nền đen kèm chữ NEXORA CYBER. Trưởng nhóm thực hiện logo/theme chung trong S1-U-1 |
 | Hạn nộp | 21/11/2026; S1 31/10–05/11, S2 06–10/11, S3 10–15/11, S4 15–19/11; ngày 10/11 và 15/11 là mốc bàn giao giữa hai sprint; dự phòng 20–21/11 |
-| Cách giao việc | 55 Task Jira độc lập: 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI giao Phúc theo yêu cầu mới; các bước nhỏ là checklist, không tạo Task cha/Sub-task |
+| Cách giao việc | 55 Task Jira độc lập: 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI: S1-U-1 do Trưởng nhóm thực hiện, S2-U-1 do Phúc thực hiện; các bước nhỏ là checklist, không tạo Task cha/Sub-task |
 | Reviewer | **Trưởng nhóm**, chính là người yêu cầu lập bộ tài liệu này và trực tiếp duyệt thay đổi |
 
 Chưa có tên/account Jira hoặc GitHub của reviewer trong tài liệu. Không tự suy ra đó là Đại, Minh hay tài khoản đang chạy AI trên máy khác. Các thành viên hỗ trợ đối chiếu nghiệp vụ; quyền duyệt cuối thuộc Trưởng nhóm. AI hỗ trợ thực hiện hoặc review theo yêu cầu, không tự nhận là người đã duyệt.
 
 ## 2. Hiện trạng cần hiểu trước khi code
 
-Baseline kiểm tra ngày 31/10/2026, trước các task triển khai:
+Ngày 02/11/2026, Trưởng nhóm chọn backend **CyberManagement và database mới 35 bảng** của phần auth làm nền chung. Solution là `Backend/CyberManagement.slnx`; giữ bốn tầng Domain/Application/Infrastructure/API và project kiểm tra auth. Bản CyberCafe 19 bảng thuộc lịch sử Git, không còn là backend/schema đích.
 
-- React đang chạy bản demo với dữ liệu nghiệp vụ chủ yếu trong localStorage. Có giao diện/hành vi hữu ích để giữ lại; auth admin/client và khuyến mãi còn placeholder.
-- `backend/CyberCafe.Api/Program.cs` mới có `/health` và OpenAPI development; EF có schema/migration ban đầu 19 bảng. Chưa có API nghiệp vụ cấp dữ liệu cho các trang.
-- OP.GG là adapter Node riêng, được Vite gắn middleware; đây không phải backend quản lý phòng máy.
-- Chưa triển khai SignalR hai máy, ZaloPay sandbox và ML chia đội trong nhánh nền đã khảo sát. Kiểm kê lại code Phúc có khi nhận task ML; không tự kết luận các nhánh khác không có gì.
-- Việc dọn cấu trúc nằm trên nhánh `refactor/project-foundation` tại lần lập tài liệu. Không mặc định đã commit/merge/push hoặc có trên máy của thành viên khác. Kiểm tra Git thật trước khi bắt đầu.
-- `cybernet-html/` đã được chủ dự án chủ động xóa. Không dựng lại prototype này. Backend trên các nhánh cũ có khác schema/provider; chọn lọc code phù hợp, không merge nguyên migration MySQL vào SQL Server.
+- API có login/logout nhân viên và khách, JWT, phân quyền, danh sách role và `/health`. Tài liệu định danh/quyền: [001-monorepo.md](../Backend/docs/001-monorepo.md). Đây chưa phải quyết định nghiệm thu Task của Trưởng nhóm.
+- Database mới được tạo từ bốn migration hiện có trong `Backend/src/CyberManagement.Infrastructure/Migrations/`. Không áp chuỗi InitialCreate này lên DB 19 bảng cũ. Yêu cầu hiện tại không chuyển/xóa dữ liệu cũ; giữ DB cũ riêng nếu đang có.
+- Staff dùng `Employees.EmployeeId`, customer dùng `Customers.CustomerId` (int). Không có bảng Account riêng. Chủ module đối chiếu mapping UI demo/account ID và hợp đồng auth trước khi nối API.
+- React vẫn chủ yếu dùng localStorage. Nối form login và các luồng UI thuộc Task hiện hữu; không coi có backend auth là UI đã tích hợp.
+- OP.GG vẫn là adapter Node ở `Backend/integrations/opgg/`, được Vite gắn middleware. Giữ adapter khi thay backend .NET.
+- SignalR hai máy, ZaloPay, ML và các API nghiệp vụ còn thực hiện theo backlog; kiểm tra branch/code thực tế trước khi kết luận đã có hoặc chưa có.
+- Đợt sửa theo yêu cầu đang dừng trước commit trên checkout riêng; không mặc định đã push/merge vào `dev`. Giữ nguyên bản foundation local khác và lấy đúng commit được Trưởng nhóm tích hợp làm base cho nhóm.
 
-Nếu code hiện tại đã tiến xa hơn baseline, báo chênh lệch và cập nhật tài liệu dựa trên bằng chứng; không kéo code về trạng thái cũ để khớp mô tả.
+Không phục hồi prototype `cybernet-html/` đã xóa. Không nhập nguyên migration/provider MySQL từ nhánh cũ. Tài liệu có ngày baseline phải được đối chiếu với source mới.
 
 ## 3. Bản đồ thư mục
 
 ```text
 frontend/
-  package.json, package-lock.json, vite.config.js, index.html
-  public/
-  src/
-    main.jsx
-    app/                  router, layout, theme
-    admin/<feature>/      màn hình quản trị theo nghiệp vụ
-    client/<feature>/     màn hình khách theo nghiệp vụ
-    admin/shared/         UI/CSS và logic demo phía admin
-    client/shared/        UI, provider và model demo dùng nhiều nơi
-    shared/               UI dùng chung cả hai phía
-  tests/                  kiểm tra luồng trình duyệt
-backend/
-  CyberCafe.Api/
-    Program.cs
-    Data/                 entity, DbContext, migrations
-  integrations/opgg/      adapter Node và helper dùng cả browser/Node
-  database/               SQL xuất và DBML mô tả
-docs/                     kiến trúc/đặc tả và báo cáo
-planning/                 kế hoạch sprint và quy trình nhóm
-codex/
-  PROJECT_GUIDE.md        đọc trước khi làm việc
-  REVIEW_GUIDE.md         cách review và báo cáo cho Trưởng nhóm
-  SPRINT_TASKS.md         nguồn chính của 55 Task và checklist bên trong
-scripts/                  tiện ích Windows để gọi npm/.NET/EF/chạy frontend
+  src/app/                       router, layout, theme
+  src/admin/<feature>/           màn hình admin
+  src/client/<feature>/          màn hình khách
+  src/shared/                    UI dùng cả hai phía
+  tests/                         browser tests
+Backend/
+  CyberManagement.slnx
+  src/CyberManagement.Domain/             entity, không EF/HTTP
+  src/CyberManagement.Application/        DTO, use case, interface, validation
+  src/CyberManagement.Infrastructure/
+    Persistance/                         ApplicationDbContext, cấu hình EF, factory
+    Migrations/                          lịch sử schema 35 bảng
+    Repositories/, Security/             implementation lưu trữ/hash
+  src/CyberManagement.API/                Controller, JWT/HTTP, cấu hình DI
+  tests/CyberManagement.API.Checks/       auth + seed regression; InMemory/SQL
+  integrations/opgg/                     adapter Node và helper browser/Node
+docs/                            kiến trúc và báo cáo lịch sử
+planning/                        lịch sprint, phân công, quy trình
+codex/                           hướng dẫn và 55 Task
+scripts/                         wrapper Windows dùng chung
 ```
 
-Thêm file vào module đang sở hữu nghiệp vụ. UI chỉ dùng một màn hình đặt gần màn hình đó; dùng chung một phía vào `admin/shared` hoặc `client/shared`; dùng cả hai vào `src/shared`. Khi nối API, thêm client/service theo nghiệp vụ trong `frontend/src/services/`; endpoint/DTO/nghiệp vụ vào `backend/CyberCafe.Api/Features/<feature>/` khi cần. Hai đường dẫn này là hướng tổ chức, chưa khẳng định đã có code.
+Tên thư mục chuẩn là **`Backend`** (chữ B hoa), kể cả import JavaScript và lệnh chạy trên Linux. Application chỉ tham chiếu project Domain; Infrastructure tham chiếu Application/Domain; API ghép DI và gọi Application. Application/Domain không dùng DbContext/HttpContext. Hub SignalR và adapter HTTP thuộc tầng ngoài.
 
-Không tạo backend riêng theo người, tách backend admin/client, tạo thư mục rỗng hay `mockData.js` rỗng để đánh dấu nhiệm vụ. Chỗ đặt model/runtime ML chốt sau khi kiểm kê phần Phúc đã làm, không tự thêm một service/ngôn ngữ vào stack.
+Owner triển khai module xuyên tầng và UI. Endpoint theo cấu trúc `Controller/` hiện có; use case/DTO/interface đặt gần nghiệp vụ; interface dùng chung có thể ở `Interfaces/`. Không thêm thư mục rỗng, generic repository, framework hoặc backend riêng theo người. UI một màn hình đặt cạnh màn hình; dùng chung admin/client vào shared phù hợp. API client frontend được thêm theo Task khi có code thật.
 
 ## 4. Luồng dữ liệu cần theo
 
@@ -77,7 +82,7 @@ frontend/index.html → src/main.jsx → app/routes.jsx
   → AdminLayout / ClientLayout → trang theo nghiệp vụ
   → provider/model demo → localStorage
 
-Vite /api/valorant/opgg/stats → backend/integrations/opgg → OP.GG
+Vite /api/valorant/opgg/stats → Backend/integrations/opgg → OP.GG
 ```
 
 Ba kho demo cần đọc trước khi thay nghiệp vụ:
@@ -109,6 +114,7 @@ Người dùng thao tác React
 - ZaloPay: server tạo giao dịch TopUp/Order; callback xác minh chữ ký/giao dịch/số tiền hoặc truy vấn provider mới ghi nhận. Redirect của browser không chứng minh thanh toán; callback/query lặp không ghi tiền hai lần. Không giữ SQL transaction trong thời gian chờ provider.
 - Đơn chờ ZaloPay cần policy giữ tồn/lượt voucher, hết hạn, callback muộn và hoàn tiền. Quy tắc cụ thể chốt ở S1, không tự đổi phương thức hoàn tiền.
 - ML: đăng ký hợp lệ → Phúc cung cấp dữ liệu/model/suy luận và đề xuất đội → Đại tích hợp UI/xác nhận → API lưu đội cùng version/snapshot → SignalR. Có dữ liệu đánh giá và baseline; phân biệt mô hình học từ dữ liệu với thuật toán ghép đội viết tay.
+- Quyết định ngày 10/11/2026: baseline/fallback SCRUM-4 và SCRUM-9 dùng chung `rank-snake-v1`: sắp `OpggSnapshot.rank.tier` giảm dần, hòa theo `RegistrationId` tăng dần rồi phân snake; không xếp theo SkillScore tổng hợp. Thiếu rank OP.GG hợp lệ báo lỗi; dự phòng có nhãn/phương pháp riêng. Yêu cầu ML và đánh giá so baseline giữ nguyên. Confirm phải giữ phân đội/vai trò của đề xuất server; swap sau xác nhận mang nguồn Manual, giữ lịch sử và không được tính là kết quả baseline/ML.
 - OP.GG lỗi/không có dữ liệu phải hiện đúng; fixture chỉ dùng kiểm thử, không ghi thành dữ liệu provider thật.
 
 ## 5. Người sở hữu từng phần
@@ -117,13 +123,14 @@ Người dùng thao tác React
 | --- | --- |
 | Đại | Auth/quyền/nhân viên, luồng giải đấu/đăng ký/UI xác nhận/lưu đội; UI CRUD voucher; điều phối tích hợp |
 | Minh | Khách/hồ sơ, ví/ledger, nạp tại quầy, ZaloPay; thao tác tiền dùng chung |
-| Phúc | Máy/phiên/tiền giờ/Home, SignalR, OP.GG, **ML chia đội**, nhận diện NEXORA/theme chung và ảnh món |
+| Phúc | Máy/phiên/tiền giờ/Home, SignalR, OP.GG, **ML chia đội**, ảnh món/component thẻ món |
 | Khang | Danh mục/sản phẩm/menu/gợi ý/đơn/checkout/hủy; tích hợp voucher và gateway vào đơn |
 | Trường | Kho/chứng từ/hóa đơn/báo cáo; API/rule voucher; điều phối thứ tự migration |
+| Trưởng nhóm | Trực tiếp thực hiện S1-U-1 và hoàn thiện các phần dang dở/contract liên module của Sprint 1 theo quyết định 14/11/2026, giữ quyền review và duyệt cuối |
 
 Owner không đồng nghĩa reviewer. Tất cả Task gửi **Trưởng nhóm** duyệt. Trường điều phối migration nhưng từng owner viết entity/config của mình; Phúc cung cấp realtime chung nhưng từng owner tự nối event/UI module mình.
 
-Phúc nhận thêm **S1-U-1** (NEXORA CYBER/logo/theme cyan–tím–đen) và **S2-U-1** (ảnh món/component thẻ món) theo phân công mới. Giữ mã U để tra cứu; Assignee là Phúc. Phúc có 4 Task ở S1/S2, ưu tiên bàn giao contract/hook và component ảnh sớm cho người tích hợp; không gộp UI vào ML để che tải công việc. Khang giữ logic vòng quay/checkout trong **S2-K-3**, hồi quy ở **S3-K-2**; Phúc cung cấp token/component/asset, không tạo Task trùng. Trưởng nhóm review cuối, các owner kiểm tra chéo module của mình.
+Theo quyết định ngày 09/11/2026, **S1-U-1** (NEXORA CYBER/logo/theme cyan–tím–đen) do **Trưởng nhóm** trực tiếp thực hiện; **S2-U-1** (ảnh món/component thẻ món) vẫn do **Phúc** thực hiện. Giữ mã U để tra cứu. Phúc có 3 Task ở S1 và 4 Task ở S2, ưu tiên bàn giao contract/hook và component ảnh sớm cho người tích hợp; không gộp UI vào ML để che tải công việc. Khang giữ logic vòng quay/checkout trong **S2-K-3**, hồi quy ở **S3-K-2**; Trưởng nhóm cung cấp token/theme, Phúc cung cấp component/asset ảnh món, không tạo Task trùng. Trưởng nhóm review cuối, các owner kiểm tra chéo module của mình.
 
 ## 6. Quy trình khi AI nhận một Task
 
@@ -132,7 +139,7 @@ Phúc nhận thêm **S1-U-1** (NEXORA CYBER/logo/theme cyan–tím–đen) và *
 3. Đọc **Description**, **Dependencies** và từng mục **Done khi** của Task; đây lần lượt là phạm vi, phụ thuộc và kết quả phải chứng minh. Đọc code thực tế của module, các caller/provider và test liên quan. Phân biệt phụ thuộc chỉ cần contract với phụ thuộc phải chạy tích hợp thật.
 4. Xác định branch/base đang chứa cấu trúc mới. Summary dùng nguyên tên Task dạng `Build-Admin-Client-Login`; người thực hiện tạo branch từ Jira theo flow của nhóm, không cần viết sẵn trường Branch trong backlog. Dùng key thật của issue khi liên kết, không coi mã minh họa là issue đang tồn tại. Tránh làm mất diff chưa commit khi đổi nhánh.
 5. Với giao điểm module, thống nhất DTO/endpoint/trạng thái/lỗi/event/schema trước khi triển khai khác nhau. Các quyết định còn mở ở [kế hoạch bàn giao](../planning/team-delivery-plan.md), mục 11, cần được ghi lại khi chốt.
-6. Sửa trong phạm vi task, giữ hành vi hiện có ngoài phạm vi. EF migrations là lịch sử schema chính; DBML/SQL xuất là tài liệu đối chiếu. Không sửa migration đã chạy ở DB chung; xác nhận đúng DB thử trước khi áp migration.
+6. Sửa trong phạm vi task, giữ hành vi hiện có ngoài phạm vi. EF migrations trong CyberManagement.Infrastructure là lịch sử schema chính của DB 35 bảng; DBML/SQL xuất là tài liệu đối chiếu. Không sửa migration đã chạy ở DB chung; xác nhận đúng DB thử trước khi áp migration.
 7. Chạy kiểm tra phù hợp ở mục 7; ghi lệnh, kết quả và giới hạn. Không ghi test đã pass nếu chưa chạy hoặc chỉ dùng fixture thay hệ thống thật.
 8. Tự rà bằng `REVIEW_GUIDE.md`, sửa lỗi tìm thấy trong phạm vi task, rồi bàn giao một báo cáo tổng hợp theo Task để Trưởng nhóm review. Giữ các bước nhỏ trong checklist; có thể chia commit/PR để bàn giao sớm nhưng cùng tham chiếu một Task. Chỉ tách thêm thẻ nếu có kết quả/blocker độc lập cần theo dõi. AI báo “sẵn sàng review”, không tự xác nhận Trưởng nhóm đã duyệt hoặc Task đã Done.
 
@@ -148,10 +155,10 @@ Từ thư mục gốc repo trên Windows, cần Node.js 22+ và .NET 10 SDK. Wra
 Hoặc dùng `npm.cmd --prefix frontend ...` trực tiếp. `scripts/start.cmd` cài dependency nếu thiếu và chạy Vite tại `127.0.0.1:5173`; chưa chạy API/SQL hay thiết lập LAN.
 
 ```powershell
-.\scripts\dotnet-local.cmd run --project backend\CyberCafe.Api --no-launch-profile --urls http://127.0.0.1:5088
+.\scripts\dotnet-local.cmd run --project Backend\src\CyberManagement.API --no-launch-profile --urls http://127.0.0.1:5088
 ```
 
-Ở baseline, `/health` chạy được không chứng minh kết nối SQL. Cấu hình DB, EF CLI và migration theo [backend/README.md](../backend/README.md); dùng secret/biến môi trường server, không commit credential. LAN/SignalR/ZaloPay cần các task triển khai và cấu hình riêng, không suy ra đã có từ lệnh dev.
+`/health` là liveness, không chứng minh kết nối SQL. API cần cấu hình connection string và signing key theo hướng dẫn backend trước khi chạy. Cấu hình DB, EF CLI và migration theo [Backend/README.md](../Backend/README.md); dùng secret/biến môi trường server, không commit credential. LAN/SignalR/ZaloPay cần các task triển khai và cấu hình riêng, không suy ra đã có từ lệnh dev.
 
 | Phạm vi sửa | Kiểm tra phù hợp đang có |
 | --- | --- |
@@ -170,12 +177,14 @@ Các lệnh hiện có để chọn dùng:
 .\scripts\npm-local.cmd --prefix frontend run test:frontend:render
 .\scripts\npm-local.cmd --prefix frontend run test:frontend -- routes
 .\scripts\npm-local.cmd --prefix frontend run test:frontend -- client-workflows cross-tab
-.\scripts\dotnet-local.cmd build backend\CyberCafe.Api\CyberCafe.Api.csproj
+.\scripts\dotnet-local.cmd build Backend\CyberManagement.slnx
 ```
 
 `test:frontend` không truyền tên suite sẽ chạy bộ browser đầy đủ. Cần Chrome/Edge, có thể đặt `CHROME_PATH`. Log/ảnh trong `.tools/frontend-retest/` là cục bộ, không đi theo clone. Bộ mặc định dùng fixture OP.GG; suite `opgg-live` mới gọi nguồn thật. Chọn kiểm tra theo thay đổi; không cần chạy cả bộ app khi chỉ sửa tài liệu.
 
 ## 8. Bàn giao cuối phiên
+
+Gửi lỗi, cách sửa và kết quả kiểm tra trực tiếp trong chat. Chỉ tạo file báo cáo khi người dùng yêu cầu. Không tự đăng nhận xét GitHub/Jira, commit, merge hoặc push.
 
 ```text
 Task / Jira key / người thực hiện:

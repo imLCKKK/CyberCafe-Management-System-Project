@@ -8,7 +8,7 @@ import { registerTournament } from '../home/homeModel.js';
 
 let db = createDemoData();
 globalThis.localStorage = { getItem: (key) => key === 'tram.client.home.demo.v1' ? JSON.stringify(db) : null };
-const server = await createServer({ root: fileURLToPath(new URL('../../../', import.meta.url)), server: { middlewareMode: true }, appType: 'custom', ssr: { noExternal: ['react-router-dom', 'react-router'], resolve: { conditions: ['module', 'module-sync', 'node', 'development'] } } });
+const server = await createServer({ root: fileURLToPath(new URL('../../../', import.meta.url)), optimizeDeps: { noDiscovery: true }, server: { middlewareMode: true }, appType: 'custom', ssr: { noExternal: ['react-router-dom', 'react-router'], resolve: { conditions: ['module', 'module-sync', 'node', 'development'] } } });
 try {
   const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
   const { TournamentsPage } = await server.ssrLoadModule('/src/client/tournaments/TournamentsPage.jsx');

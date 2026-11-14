@@ -1,79 +1,38 @@
-# CyberCafe-Management-System-Project
-Đồ án môn Công Nghệ .NET
-### Hệ thống quản lý phòng máy thương mại
+# CyberCafe Management System
 
-## Giới thiệu
+Gói bàn giao **SCRUM-6**: xem [README-SCRUM-6.md](README-SCRUM-6.md) để biết phạm vi, kiểm tra và cách commit/push.
 
-Đồ án xây dựng hệ thống quản lý phòng máy thương mại, hỗ trợ quản lý máy tính, khách hàng, nhân viên, dịch vụ và hóa đơn.
+Đồ án .NET quản lý phòng máy: máy/phiên, khách hàng, nhân viên, ví, món/đơn, kho, hóa đơn/báo cáo, giải đấu và khuyến mãi. Nhận diện NEXORA CYBER; React/Vite + ASP.NET Core .NET 10 + EF Core + SQL Server.
 
-## Chức năng
+## Nền được chọn
 
-* Quản lý máy tính
-* Quản lý khách hàng
-* Quản lý nhân viên
-* Quản lý dịch vụ
-* Quản lý phiên sử dụng máy
-* Tính tiền sử dụng máy
-* Quản lý hóa đơn
-* Thống kê doanh thu
-* Đăng nhập và phân quyền
+Ngày 02/11/2026, Trưởng nhóm chọn **backend CyberManagement, database SQL Server mới 35 bảng**. Solution [Backend/CyberManagement.slnx](Backend/CyberManagement.slnx) gồm Domain, Application, Infrastructure, API và project kiểm tra auth. Chủ module làm xuyên tầng; API là host chung.
 
-## Công nghệ sử dụng
+Backend đã có auth nhân viên/khách, JWT/permission, seed và health. Frontend hiện vẫn chủ yếu demo/localStorage; nối UI và các nghiệp vụ còn triển khai theo [55 task hiện hữu](codex/SPRINT_TASKS.md). Giữ tên/owner/sprint; chưa tự nghiệm thu Task hoặc đưa thay đổi lên `dev`.
 
-* C#
-* ASP.NET Core Web API
-* Entity Framework Core
-* SQL Server
-* React / Vite / JavaScript / CSS
-* SignalR cho realtime và ZaloPay sandbox theo kế hoạch triển khai
+DB mới tạo từ migrations CyberManagement; không áp InitialCreate mới lên DB 19 bảng cũ. OP.GG vẫn dùng adapter Node tại `Backend/integrations/opgg/`. SignalR hai máy, ZaloPay sandbox và ML theo kế hoạch; chưa được coi hoàn thành từ việc có schema.
 
-## Database
+## Chạy
 
-Sử dụng SQL Server.
-
-## Bắt đầu đọc hệ thống
-
-- [Hướng dẫn cho AI trên máy thành viên](codex/PROJECT_GUIDE.md): flow dự án, ranh giới code, cách nhận Task và bàn giao.
-- [Hướng dẫn review cho Trưởng nhóm](codex/REVIEW_GUIDE.md): checklist và mẫu báo cáo; Trưởng nhóm là người duyệt cuối.
-- [Bản đồ kiến trúc và luồng dữ liệu](docs/architecture.md): app nào đang chạy, dữ liệu nằm ở đâu, phần nào chưa tích hợp.
-- [Kế hoạch 4 sprint và phân việc 5 người](planning/team-delivery-plan.md): 31/10–19/11/2026, dự phòng 20–21/11.
-- [55 Task để đưa lên Jira](codex/SPRINT_TASKS.md): 53 Task đã gom và 2 Task UI giao Phúc theo yêu cầu mới; mỗi thẻ có tên tiếng Anh nối bằng dấu gạch ngang, Description, Dependencies và Done khi.
-- [Quy trình làm nhóm](planning/team-workflow.md): chạy dự án, nhánh, PR, review và migration.
-- [Mục lục tài liệu](docs/README.md).
-
-| Thư mục | Vai trò |
-| --- | --- |
-| [`frontend/`](frontend/README.md) | React/Vite: source, package/config, assets và browser test |
-| [`backend/`](backend/README.md) | API .NET, migrations, schema/SQL và adapter OP.GG |
-| [`docs/`](docs/README.md) | Kiến trúc, đặc tả và báo cáo |
-| [`planning/`](planning/team-delivery-plan.md) | Kế hoạch sprint và quy trình phối hợp |
-| [`scripts/`](scripts/README.md) | Script chạy nhanh trên Windows, không phải code nghiệp vụ |
-| [`codex/`](codex/PROJECT_GUIDE.md) | Ba tài liệu cho AI: hiểu dự án, review và danh sách Task theo sprint |
-
-Mỗi phần có cấu hình và lệnh chạy tại chỗ. Root chỉ giữ hướng dẫn và cấu hình chung như `.gitignore`, `global.json`; `global.json` chọn .NET SDK cho backend.
-
-## Cách chạy
-
-Giao diện hiện tại dùng React/Vite và dữ liệu mẫu lưu trong trình duyệt. Repository
-có dự án ASP.NET Core API, Entity Framework Core và migration trong `backend/`, nhưng
-các trang admin chưa kết nối API hay SQL Server. Xem [hướng dẫn admin demo](frontend/ADMIN_DEMO.md)
-để biết các luồng mẫu, cách tính báo cáo và giới hạn hiện tại.
-
-Với Node.js 22+ đã cài trên máy, chạy từ thư mục gốc:
+Từ repository root với Node.js 22+ và .NET 10 SDK:
 
 ```powershell
-npm.cmd --prefix frontend ci
-npm.cmd --prefix frontend run dev
+.\scripts\npm-local.cmd --prefix frontend ci
+.\scripts\npm-local.cmd --prefix frontend run dev
+.\scripts\dotnet-local.cmd build Backend\CyberManagement.slnx
 ```
 
-Mở http://127.0.0.1:5173. Dừng server bằng `Ctrl+C`.
-Xem [quy trình nhóm](planning/team-workflow.md) để chạy backend, kiểm thử và làm việc với migration.
+Frontend ở http://127.0.0.1:5173. Cấu hình DB mới/signing key/seed và chạy API theo [Backend README](Backend/README.md). Giữ đúng chữ B hoa trong `Backend` để đường dẫn/import hoạt động cả Linux.
 
-Nếu muốn dùng script tiện ích Windows (tự cài dependency nếu thiếu):
+## Tài liệu cho nhóm
 
-```powershell
-.\scripts\start.cmd
-```
+- [Kiến trúc và luồng dữ liệu](docs/architecture.md).
+- [Định danh và ma trận quyền](Backend/docs/001-monorepo.md).
+- [Hướng dẫn AI](codex/PROJECT_GUIDE.md), [hướng dẫn review](codex/REVIEW_GUIDE.md).
+- [Kế hoạch 4 sprint](planning/team-delivery-plan.md), [55 Task](codex/SPRINT_TASKS.md), [quy trình nhóm](planning/team-workflow.md).
+- [Frontend demo](frontend/ADMIN_DEMO.md), [adapter OP.GG](Backend/integrations/opgg/README.md), [scripts](scripts/README.md), [mục lục tài liệu](docs/README.md).
+
+Kết quả sửa/review gửi trực tiếp trong chat; chỉ tạo file báo cáo khi được yêu cầu. Trưởng nhóm duyệt trước khi merge `dev`.
 
 ## Thành viên
 

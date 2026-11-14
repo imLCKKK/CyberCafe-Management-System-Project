@@ -2,14 +2,16 @@
 
 Cập nhật: 31/10/2026. Đây là baseline phân công của nhóm sau khi xác nhận phạm vi với người dùng. Các task dưới đây là công việc cần triển khai; việc dọn thư mục không đồng nghĩa ứng dụng đã có API nghiệp vụ, realtime hoặc thanh toán.
 
-Để đưa lên Jira, dùng [backlog 55 Task độc lập](../codex/SPRINT_TASKS.md): 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI giao Phúc theo yêu cầu mới. Mỗi Task có Summary tiếng Anh nối bằng dấu gạch ngang, Description, Dependencies và Done khi. Sprint, người phụ trách và reviewer ghi ở đầu phần/nhóm, không lặp lại trong từng thẻ; không cần trường Branch riêng. Đã giữ đủ 100 việc nhỏ cũ trong các checklist. Đại và Trường ở S2 có 4 Task vì các API/UI cần bàn giao riêng trước bước tích hợp/đối chiếu. Phúc có 4 Task ở S1/S2 sau khi nhận thêm hai Task UI; ưu tiên bàn giao contract/hook và component ảnh sớm, không bỏ phần ML/realtime. Các gói S1-D…S4-T trong tài liệu này chỉ tổng hợp phạm vi theo người, không tạo thành Task cha/Sub-task trên Jira.
+Cập nhật UI ngày 09/11/2026: Trưởng nhóm trực tiếp thực hiện S1-U-1 và cung cấp logo NEXORA CYBER; S2-U-1 vẫn thuộc Phúc. Giữ lịch baseline và tổng 55 Task.
+
+Để đưa lên Jira, dùng [backlog 55 Task độc lập](../codex/SPRINT_TASKS.md): 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI: S1-U-1 do Trưởng nhóm thực hiện, S2-U-1 do Phúc thực hiện. Mỗi Task có Summary tiếng Anh nối bằng dấu gạch ngang, Description, Dependencies và Done khi. Sprint, người phụ trách và reviewer ghi ở đầu phần/nhóm, không lặp lại trong từng thẻ; không cần trường Branch riêng. Đã giữ đủ 100 việc nhỏ cũ trong các checklist. Đại và Trường ở S2 có 4 Task vì các API/UI cần bàn giao riêng trước bước tích hợp/đối chiếu. Phúc có 3 Task ở S1 và 4 Task ở S2, ưu tiên bàn giao contract/hook và component ảnh sớm, không bỏ phần ML/realtime. Các gói S1-D…S4-T trong tài liệu này chỉ tổng hợp phạm vi theo người, không tạo thành Task cha/Sub-task trên Jira.
 
 **Reviewer duy nhất là Trưởng nhóm**, người dùng đã yêu cầu lập kế hoạch này và trực tiếp duyệt thay đổi. Các thành viên được ghi ở phần phối hợp chỉ hỗ trợ đối chiếu nghiệp vụ/tích hợp. AI hỗ trợ kiểm tra theo [hướng dẫn review](../codex/REVIEW_GUIDE.md); quyết định duyệt và Done cần phản ánh quyết định thực tế của Trưởng nhóm, không suy ra từ test pass.
 
 ## 1. Ràng buộc đã chốt
 
 - **Stack:** React/Vite + ASP.NET Core API + Entity Framework Core + SQL Server.
-- **Nhóm:** Đại, Minh, Phúc, Khang, Trường; năng lực tương đương. Mỗi người sở hữu cả UI, API, dữ liệu và kiểm tra của phần được giao.
+- **Nhóm:** Đại, Minh, Phúc, Khang, Trường; năng lực tương đương. Mỗi người sở hữu cả UI, API, dữ liệu và kiểm tra của phần được giao. Trưởng nhóm trực tiếp thực hiện S1-U-1 theo cập nhật ngày 09/11/2026.
 - **Lịch:** bắt đầu 31/10/2026, hạn 21/11/2026. Bốn sprint trải từ 31/10 đến 19/11 (20 ngày lịch); ngày 10/11 và 15/11 là mốc bàn giao chung giữa hai sprint liền kề. Dự phòng 20–21/11; không coi số ngày lịch là ngày làm việc toàn thời gian.
 - **Phạm vi:** toàn bộ chức năng hiện có, gồm các trang đang là placeholder: đăng nhập/quyền, nhân viên, khách/tài khoản, máy/phiên/tiền giờ, Home/dashboard, sản phẩm/menu/đơn/gợi ý món, ví, kho, hóa đơn/báo cáo, giải đấu/OP.GG và khuyến mãi. Bổ sung bắt buộc **ML hỗ trợ chia đội giải đấu, do Phúc phụ trách**.
 - **Khuyến mãi đã duyệt:** voucher cho đơn món ăn, giảm theo phần trăm hoặc số tiền cố định, ngày hiệu lực, giá trị đơn tối thiểu và giới hạn sử dụng. Không áp voucher này vào tiền giờ.
@@ -21,44 +23,22 @@ Mục tiêu là **đủ chức năng cuối S3 ngày 15/11** để bàn giao san
 
 ## 2. Tận dụng code và làm rõ cấu trúc
 
-Khảo sát ban đầu dựa trên main và các remote-tracking ref có sẵn tại máy, chưa fetch/build lại các nhánh cũ. Những nguồn dưới đây là vật liệu để chọn lọc, chưa phải bằng chứng backend đã hoàn chỉnh.
+Quyết định mới ngày 02/11/2026 của Trưởng nhóm: dùng **CyberManagement và DB SQL Server mới 35 bảng**, thay nền CyberCafe 19 bảng trong bản mô tả 31/10. Giữ stack, 55 task, owner và lịch đã chốt; rà ước lượng nếu code/contract bị ảnh hưởng.
 
-| Nguồn | Giữ/tận dụng | Điều kiện |
+| Nguồn | Phần dùng tiếp | Cách phối hợp |
 | --- | --- | --- |
-| React `frontend/src` | Layout, màn hình, CSS, component và các hành vi demo | Chuyển từng luồng sang API; auth/promo còn placeholder phải triển khai |
-| Model/test JavaScript | Mẫu hành vi và hồi quy UI | Quy tắc tiền, tồn, quyền phải được thực thi và kiểm thử ở server |
-| `backend/CyberCafe.Api` | Khung .NET/EF/SQL Server, schema ban đầu 19 bảng và ràng buộc | Hiện mới có health check; bổ sung schema kho/hóa đơn/promo/gateway theo hợp đồng đã chốt |
-| Cached `origin/Truong` | DTO, controller/service sản phẩm, danh mục, đơn, hóa đơn; validation/snapshot giá | Kiểm tra repository, DI và transaction trước khi port từng phần |
-| Cached `origin/Minh` | Ý tưởng dữ liệu kho, nhà cung cấp, hóa đơn, quyền | Backend dùng MySQL và model khác; không nhập nguyên migration vào SQL Server |
-| OP.GG | Giữ adapter và helper đã có, nối vào luồng giải đấu thật | Đã gom vào `backend/integrations/opgg/`, gồm helper `shared.js` |
-| HTML prototype cũ | Chỉ tra cứu lịch sử Git khi cần | Người dùng đã chủ động xóa `cybernet-html/`; giữ quyết định xóa, không tạo lại thư mục prototype |
+| `frontend/` | React/Vite, UI, model demo và tests | Chuyển từng luồng sang API; auth backend không tự nối UI |
+| `Backend/src/CyberManagement.Domain` | 35 entity | Owner đối chiếu ID Employee/Customer kiểu int và rule module |
+| `Backend/src/CyberManagement.Application` | Auth/use case/interface/validation | Thêm nghiệp vụ theo Task, không dùng EF/HTTP |
+| `Backend/src/CyberManagement.Infrastructure` | ApplicationDbContext, config, migrations, repositories/hash | Trường điều phối migration, từng owner viết phần của mình |
+| `Backend/src/CyberManagement.API` | Controller/JWT, DI, HTTP host chung | Thêm endpoint theo Task; không tạo backend riêng |
+| `Backend/integrations/opgg` | Adapter Node và helper frontend | Giữ endpoint/import/test khi đổi backend .NET |
 
-Chọn `backend/CyberCafe.Api` làm backend tích hợp chính. Không nhập nguyên ba backend: account/customer, trạng thái đơn, kiểu ID, thời điểm thu tiền và provider database chưa thống nhất. Chọn lọc theo hành vi cần giữ.
+Solution: `Backend/CyberManagement.slnx`; xem [lệnh chạy/EF](../Backend/README.md) và [kiến trúc](../docs/architecture.md). App hiện có auth/role/health; kho, ví, phiên, voucher, ML và các tích hợp vẫn đối chiếu Task và code thực tế, không nghiệm thu từ số entity.
 
-Cấu trúc đích cho phần triển khai tiếp theo:
+DB mới dùng bốn migration hiện có. Không áp InitialCreate mới vào DB 19 bảng cũ; chưa yêu cầu chuyển/xóa DB cũ. SQL/DBML mô tả khi bổ sung phải theo schema CyberManagement. Giữ dữ liệu cũ riêng nếu có, việc chuyển dữ liệu cần được chốt thành phạm vi cụ thể.
 
-```text
-frontend/
-  package.json, vite.config.js, index.html
-  public/
-  src/
-    app/                  # Router, layout, provider và kết nối realtime chung
-    admin/<feature>/      # Màn hình quản trị
-    client/<feature>/     # Màn hình khách
-    services/             # API client, bổ sung trong S1
-    shared/               # UI và hàm hiển thị dùng chung
-  tests/                  # Browser test
-backend/
-  CyberCafe.Api/
-    Features/<feature>/   # Endpoint, DTO, nghiệp vụ; bổ sung theo sprint
-    Data/                 # Entity, DbContext, configuration, migrations
-  integrations/opgg/      # Adapter Node + helper dùng ở browser/Node
-  database/               # SQL xuất và DBML mô tả schema
-docs/                     # Kiến trúc, hợp đồng, kế hoạch, hướng dẫn
-scripts/                  # Tiện ích chạy trên Windows
-```
-
-Đợt dọn nền ở nhánh `refactor/project-foundation` đã gom source/config/assets/tests frontend vào `frontend/`, API/SQL/OP.GG vào `backend/` và các file `.cmd` vào `scripts/`. `services/`, `Features/` và kết nối realtime là phần cần bổ sung theo sprint, không phải chức năng đã có. Cấu trúc này tham khảo cách tách frontend/backend của BrewLite và giữ stack đã chốt.
+Nền sửa hiện dừng trước commit trên nhánh riêng; chưa tự đưa lên `dev`. Các thành viên lấy đúng `dev` đã được Trưởng nhóm review/tích hợp trước khi phát triển tiếp. Không phục hồi `cybernet-html/` hoặc nhập migration MySQL từ nhánh cũ.
 
 ## 3. Hợp đồng kỹ thuật chung
 
@@ -90,7 +70,7 @@ Phúc sở hữu SignalR Hub, hook kết nối dùng chung và hợp đồng s�
 - Dùng một adapter thanh toán cho hai mục đích `TopUp` và `Order`. Tạo đơn sandbox ở server, lưu ID, tài khoản/đơn liên quan, số tiền và trạng thái dự kiến; xác minh callback theo tài liệu chính thức trước khi cập nhật ví hoặc xác nhận đơn đã trả tiền.
 - Trang redirect hay thông báo thành công ở browser không đủ để ghi nhận thanh toán. Đối chiếu callback đã xác minh hoặc kết quả truy vấn trạng thái chính thức với giao dịch đang chờ.
 - Callback lặp/đến muộn hoặc truy vấn đồng thời không được cộng ví, xác nhận đơn, trừ tồn hay dùng voucher lần hai. Sai chữ ký, sai giao dịch hoặc sai số tiền không được ghi nhận thành công.
-- Với đơn món ăn: giữ snapshot giá/giảm giá và quy định thời hạn giữ tồn/lượt voucher khi chờ thanh toán. Chốt cách giải phóng khi hết hạn và xử lý callback thành công đến sau khi hết hạn; không tự giao món nếu không còn tồn. Chính sách hủy/hoàn theo phương thức gốc phải được chốt cùng Minh/Khang/Trường, không tự cộng ví thay cho hoàn gateway hoặc hoàn hai lần.
+- Với đơn món ăn: quyết định ngày 08/11/2026 tại hợp đồng checkout D05/D06 giữ tồn/lượt 15 phút, hết hạn giải phóng một lần; thu muộn ghi tiền và tạo nghĩa vụ hoàn có duyệt, không hồi sinh đơn. Hoàn theo phương thức gốc, không tự cộng ví thay cho hoàn gateway hoặc hoàn hai lần. Owner triển khai/kiểm chứng theo mục 11.3 của hợp đồng.
 - Kiểm thử chữ ký/trạng thái bằng fixture phải ghi là kiểm thử nội bộ. Nghiệm thu sandbox cần bằng chứng request/response/callback từ môi trường sandbox thật đã che khóa bí mật.
 - Nếu chưa có credentials hoặc callback chưa truy cập được, đánh dấu đúng phụ thuộc bị chặn; tiếp tục phần adapter/test độc lập. Không giả lập thành công rồi tính là đã tích hợp.
 - Không đưa khóa vào frontend, Git, ảnh demo hoặc log công khai. Không dùng môi trường live/tiền thật.
@@ -103,6 +83,7 @@ Nguồn triển khai: [ZaloPay — hướng dẫn bắt đầu](https://develope
 
 - Phúc phụ trách dữ liệu, huấn luyện/đánh giá, phiên bản model, suy luận và logic đề xuất chia đội. Đại phụ trách danh sách đăng ký hợp lệ, màn hình đề xuất/xác nhận và lưu đội qua API giải đấu. API kiểm tra quyền và danh sách người chơi trước khi lưu.
 - Phân biệt kết quả học từ dữ liệu với quy tắc ghép đội hoặc công thức điểm viết tay. Có baseline để so sánh; không ghi thuật toán chia đội theo quy tắc là ML. Chốt chỉ số và ngưỡng nghiệm thu ở S1 trước khi đánh giá; không tự hứa model tốt hơn khi chưa có kết quả.
+- Quyết định ngày 10/11/2026: baseline/fallback SCRUM-4 và SCRUM-9 dùng chung `rank-snake-v1`: sắp `OpggSnapshot.rank.tier` giảm dần, hòa theo `RegistrationId` tăng dần rồi phân snake; không xếp theo SkillScore tổng hợp. Thiếu rank OP.GG hợp lệ báo lỗi; dự phòng có nhãn/phương pháp riêng. Yêu cầu ML và đánh giá so baseline giữ nguyên. Confirm phải giữ phân đội/vai trò của đề xuất server; swap sau xác nhận mang nguồn Manual, giữ lịch sử và không được tính là kết quả baseline/ML. Đại đồng bộ contract v0.7 bằng PR bổ sung SCRUM-4 sau PR #18; Phúc giữ đặc tả baseline.
 - Tách dữ liệu huấn luyện và đánh giá, ghi nguồn/đặc trưng và giới hạn dữ liệu. OP.GG là nguồn đầu vào nếu phù hợp; không mặc định vài số liệu người đăng ký đã đủ để huấn luyện model.
 - Đề xuất phải đúng số người/đội, không trùng hoặc bỏ sót người đủ điều kiện và đáp ứng ràng buộc vai trò đã chốt. Lưu phiên bản model và snapshot đầu vào cùng kết quả để tái hiện. Có xử lý dữ liệu thiếu/model lỗi; chia thủ công hoặc baseline dự phòng phải có nhãn rõ, không tính là nghiệm thu ML.
 - Đại lưu kết quả xác nhận trong SQL và phát sự kiện sau commit để hai máy thấy cùng đội. Việc gọi lại đề xuất không tự ghi đè đội đã xác nhận.
@@ -116,12 +97,13 @@ Nguồn triển khai: [ZaloPay — hướng dẫn bắt đầu](https://develope
 | Phúc | Máy/phiên/tính tiền giờ, Home/dashboard máy; SignalR, adapter OP.GG; **ML chia đội giải đấu** | Đại tích hợp UI/API lưu đội; module owner tự nối event/UI; ưu tiên ML, không giao thêm UI báo cáo |
 | Khang | Danh mục/sản phẩm, menu/gợi ý, đặt/xử lý/hủy đơn; áp voucher vào đơn | Gọi rule voucher của Trường; ghi lượt dùng, trừ/hoàn ví và tồn trong transaction đơn |
 | Trường | Kho, hóa đơn/bảng kê/in/xuất, báo cáo; schema/API/quy tắc voucher | Đại làm UI CRUD voucher; tái sử dụng biểu đồ hiện có; điều phối thứ tự migration |
+| Trưởng nhóm | S1-U-1: nhận diện NEXORA CYBER/logo/theme dùng chung | Bàn giao token/theme cho các owner; Đại phối hợp màn hình login, Phúc dùng theme cho component ảnh món; giữ quyền duyệt cuối |
 
 **Voucher chỉ có một owner nghiệp vụ: Trường.** Đại chịu màn hình CRUD, Khang chịu nơi áp dụng vào đơn món ăn. Loại giảm phần trăm/cố định, ngày hiệu lực, ngưỡng đơn và hạn mức đều do rule server dùng chung kiểm tra. Chính sách tính tiền và dùng lại lượt sau hủy phải được thống nhất ngày đầu.
 
 Đại điều phối tích hợp; từng owner sửa lỗi module mình. Trường điều phối migration nhưng không viết thay entity của cả nhóm. Trưởng nhóm review và duyệt; luồng tiền/tồn cần bằng chứng và giải thích từ owner liên quan, không chỉ kiểm tra giao diện.
 
-**Phần frontend chuyển cho Phúc theo yêu cầu mới:** S1-U-1 áp nhận diện NEXORA CYBER và theme cyan–tím–đen; S2-U-1 bổ sung ảnh món và component thẻ món theo theme mới. Giữ mã U để tra liên kết. Bảng màu theo ảnh: nền `#0B0F14`, tím `#A855F7`, cyan `#22D3EE`, chữ `#E5F0FF`; concept logo chờ nhóm chốt chiều 31/10/2026, không tự chọn. Phúc làm token/layout trước và tích hợp đúng asset được duyệt; không đổi màu trạng thái nghiệp vụ hàng loạt. Khang giữ logic vòng quay/checkout trong S2-K-3, hồi quy S3-K-2, phối hợp dữ liệu ảnh và nối component Phúc bàn giao. Hai Task UI được tính vào tải Phúc; Trưởng nhóm giữ review cuối, không thêm thành viên hay thẻ trùng.
+**Phân công frontend cập nhật ngày 09/11/2026:** **Trưởng nhóm** trực tiếp thực hiện S1-U-1: nhận diện NEXORA CYBER, logo và theme cyan–tím–đen; **Phúc** tiếp tục thực hiện S2-U-1: ảnh món và component thẻ món theo theme mới. Giữ mã U để tra liên kết. Bảng màu giữ nguyên: nền `#0B0F14`, tím `#A855F7`, cyan `#22D3EE`, chữ `#E5F0FF`. Logo do Trưởng nhóm cung cấp cùng ngày được lưu tại [frontend/public/branding/nexora-cyber.png](../frontend/public/branding/nexora-cyber.png), biểu tượng N neon cyan–tím trên nền đen kèm chữ NEXORA CYBER. Trưởng nhóm triển khai token/layout và tích hợp logo; không đổi màu trạng thái nghiệp vụ hàng loạt. Khang giữ logic vòng quay/checkout trong S2-K-3, hồi quy S3-K-2, phối hợp dữ liệu ảnh và nối component Phúc bàn giao. S1-U-1 được tính vào tải Trưởng nhóm, S2-U-1 vào tải Phúc; tổng 55 Task và quyền duyệt cuối của Trưởng nhóm giữ nguyên.
 
 ## 5. Lịch và mốc giao hàng
 
@@ -361,7 +343,7 @@ Mốc là mục tiêu kế hoạch, không bảo đảm tiến độ khi giờ t
 1. Mỗi gói S1-D…S4-T là một cụm phạm vi để đọc. Mỗi mục Task có mã như S1-D-1 trong [backlog chi tiết](../codex/SPRINT_TASKS.md) là một thẻ Jira độc lập, gán sprint/người phụ trách và nhận issue key thực tế khi tạo. Các bước nhỏ là checklist trong thẻ; không tạo Task cha/Sub-task hay issue cho từng bước.
 2. Nhánh theo thẻ Jira từ nhánh tích hợp mới nhất, ví dụ `feat/SCRUM-123-zalopay-callback` (key minh họa). PR nhỏ, tách di chuyển thư mục khỏi thay đổi nghiệp vụ; không giữ một nhánh cá nhân suốt lịch rồi merge một lần.
 3. Trước khi sửa giao điểm, ghi endpoint/payload/trạng thái/lỗi và event. Contract đủ rõ mới để hai người triển khai song song.
-4. PR chạy build/check liên quan. Tiền/quyền/tồn/promo/gateway cần kiểm tra nghiệp vụ và API/DB có ý nghĩa; browser smoke bảo vệ luồng đã tích hợp. Không đợi S4 mới kiểm thử. Một Task có thể chia commit/PR nhỏ để bàn giao sớm; gửi báo cáo review tổng hợp theo Task, không tách một thẻ chỉ vì có thêm bước test hoặc tài liệu.
+4. PR chạy build/check liên quan. Tiền/quyền/tồn/promo/gateway cần kiểm tra nghiệp vụ và API/DB có ý nghĩa; browser smoke bảo vệ luồng đã tích hợp. Không đợi S4 mới kiểm thử. Một Task có thể chia commit/PR nhỏ để bàn giao sớm; gửi kết quả review tổng hợp theo Task trực tiếp trong chat theo mẫu tin nhắn ở mục 6 của [hướng dẫn review](../codex/REVIEW_GUIDE.md), chỉ tạo file báo cáo khi người dùng yêu cầu rõ. Không tách một thẻ chỉ vì có thêm bước test hoặc tài liệu.
 5. Trường điều phối thứ tự migration; owner module viết entity/config của mình, Trưởng nhóm review và duyệt. Không sửa/xóa migration đã áp dụng ở DB chung; tạo migration tiếp theo.
 6. Đầu ngày cập nhật đã xong/vướng/phụ thuộc. Cuối ngày có thay đổi thì kiểm tra bản tích hợp; ưu tiên lỗi chặn người khác. Chuyển hỗ trợ theo tải quan sát được, không dựa vào số lượng tên task.
 7. Routes/layout/provider là phần chung có reviewer. Mỗi người chịu tích hợp module mình, không đẩy tất cả cho Đại hoặc Phúc.
@@ -384,15 +366,43 @@ PR / trạng thái / blocker:
 
 Đây là quyết định triển khai trong phạm vi đã duyệt, không hỏi lại stack, số người, ngày, giờ làm, LAN hay lựa chọn sandbox.
 
+**Cập nhật 08/11/2026 cho SCRUM-11:** theo yêu cầu trực tiếp của người dùng, AI được ủy quyền chọn
+phương án hợp lý cho các giao điểm checkout đang chờ. Các lựa chọn đã ghi tại
+[hợp đồng checkout, mục 11.2](../Backend/docs/004-order-checkout-contract.md#112-quyết-định-thiết-kế-đã-chốt).
+Đây là nguồn chốt thiết kế cho checkout và phí phiên trước chi ví, không ghi nhận các owner đã phản hồi đồng ý
+hoặc Trưởng nhóm đã duyệt; việc tích hợp code/migration/kiểm chứng theo mục 11.3 của hợp đồng.
+
 | Quyết định | Chịu trách nhiệm |
 | --- | --- |
 | Mapping tài khoản khách/nhân viên và quyền từng endpoint; quy tắc khóa tài khoản | Đại + Minh |
-| Phiên: làm tròn tiền giờ, thời điểm trừ ví, ví hết tiền/restart, điều kiện mở/đóng | Phúc + Minh + Trường |
-| Nạp tại quầy: thời điểm thu/cộng ví; xử lý trạng thái demo `CreditedUnpaid` khi chuyển dữ liệu | Minh + Trường |
-| Đơn: hủy từng món/cả đơn, thời điểm trừ/hoàn tồn, ví và khoản thu tiền mặt; checkout ZaloPay giữ chỗ/hết hạn, callback trễ và chính sách hoàn gateway | Khang + Minh + Trường |
-| Voucher: phần trăm hợp lệ, làm tròn, thời gian theo Việt Nam, ngưỡng tính trước giảm, giới hạn tổng/theo khách, một hay nhiều mã, hoàn lượt khi hủy; tiền giảm không vượt giá trị đơn | Trường + Khang + Đại |
+| Phiên/giao điểm chi ví theo D09 và [contract SCRUM-7](../Backend/docs/002-computer-session-contract.md). Quyết định 14/11/2026 chọn System tự quyết toán, đóng phiên và phát hành hóa đơn khi hết tiền, lưu riêng người mở | Trưởng nhóm hoàn thiện contract Sprint 1; Phúc triển khai phiên/worker S2-P-1, Minh triển khai ví S2-M-1, Trường triển khai chứng từ S2-T-2; Khang gọi điểm tích hợp chi ví |
+| Nạp tại quầy: người dùng chốt 08/11 thu tiền xong mới cộng ví/ledger cùng transaction, không nạp nợ; không nhập `CreditedUnpaid` như nạp thành công. Contract và điểm gọi credit/debit/refund ở [SCRUM-5](../Backend/docs/003-customer-wallet-contract.md); writer/migration ở S2 | Minh + Trường |
+| Đơn theo quyết định 14/11/2026 thanh toán đủ trước khi nhân viên confirm để làm. Wallet trừ khi tạo, Cash xác nhận thực thu lúc món còn Pending, ZaloPay xác minh thu trong hạn giữ chỗ. D03/D05–D08 quy định tồn, hết hạn và nguồn hoàn | Khang + Minh + Trường |
+| Lựa chọn xác nhận lại 14/11/2026 khóa hủy Cash đã thu, quản lý xử lý ngoại lệ tại quầy. Hóa đơn món ăn và tiền giờ xuất riêng, tự đóng chỉ phát hành phí giờ chưa có chứng từ | Trưởng nhóm hoàn thiện thiết kế S1-K-2/S1-M-1/S1-P-1/S1-T-1; Khang/Minh/Phúc/Trường triển khai S2 theo module |
+| Voucher trong checkout: D04 chốt một mã, ngưỡng trước giảm, hiệu lực server, AwayFromZero/phân bổ snapshot; usage chiếm lượt khi tạo, partial không nhả, full cancel/expired nhả một lần; không giảm vượt tiền món | Trường + Khang + Đại |
 | Giải đấu: UI đang miễn phí nhưng DBML có phí; chọn policy nhất quán, thời hạn đăng ký/hủy và điều kiện đủ đội | Đại + Minh + Phúc |
-| ML chia đội: kiểm kê phần Phúc đã làm; chốt bài toán, dataset/đặc trưng, ràng buộc đội, baseline, chỉ số/ngưỡng đánh giá và cách chạy model | Phúc + Đại |
-| Chứng từ/doanh thu: thời điểm ghi nhận, hoàn tiền, giảm giá, phân biệt nạp ví và doanh thu | Trường + Khang + Phúc |
+| ML chia đội: [thiết kế SCRUM-9 v1.1](../docs/contracts/ml-team-balancing-pipeline.md) đã đối chiếu S1-D-3 / SCRUM-4 v0.7, bổ sung mapping preview → confirm ML/Balanced và binding token/proposal/roster/model; B1 không còn là thiếu contract. Dataset có nhãn/model, snapshot SQL và kiểm chứng tích hợp còn phải thực hiện; chờ owner đối chiếu mapping mới và Trưởng nhóm duyệt cuối | Phúc + Đại |
+| Chứng từ/doanh thu dùng chung: thời điểm ghi nhận, hoàn tiền, giảm giá, phân biệt nạp ví và doanh thu | Trường + Khang + Phúc |
+| Chứng từ/checkout: D11 chọn thiết kế 1.7 ghim trong hợp đồng, Payments neo nguồn trước hóa đơn, khóa phát hành bền vững và mốc nguồn/xác nhận; thu/hoàn theo nguồn, không cộng đôi ví/Payment và không tính nạp ví thành doanh thu | Trường + Minh + Khang + Phúc |
+| Giờ hoàn ZaloPay khi Query Refund không trả thời điểm: phân biệt thời điểm provider và thời điểm hệ thống xác nhận, ngày báo cáo theo mục 6.1.1 của [contract SCRUM-12](../docs/contracts/inventory-invoice-voucher.md); là đề xuất tại nguồn 05/11, được D11 chọn cho checkout ngày 08/11 | Minh + Trường; Trưởng nhóm review tích hợp |
+| Khóa phát hành hóa đơn qua retry/restart và hóa đơn 0 đồng: InvoiceIssueRequests lưu cùng transaction theo mục 6.3.1 của [contract SCRUM-12](../docs/contracts/inventory-invoice-voucher.md); là đề xuất tại nguồn 05/11, được D11 chọn cho checkout ngày 08/11 | Trường; Khang/Phúc đối chiếu caller; Trưởng nhóm review tích hợp |
 
 Credentials ZaloPay và callback HTTPS là **task phụ thuộc S1-M**, không phải lựa chọn cần người dùng xác nhận lại. Kết quả kickoff phải được ghi vào hợp đồng/schema trước khi các module triển khai khác nhau.
+
+Gói SCRUM-6 / S1-M-2 ghép lên base `d2141da`, giữ realtime và các module tích hợp; bằng chứng lịch sử ở `4816802`; xem
+[contract ZaloPay](../Backend/docs/005-zalopay-sandbox-contract.md). Cấu hình, HMAC/fixture và probe HTTPS
+thuộc S1; adapter ghi tiền/migration gateway thuộc S2. Kết quả kiểm tra provider thực tế được ghi riêng,
+không suy từ probe hoặc cấu hình hợp lệ thành thanh toán thành công.
+
+Ngày 03/11/2026, người dùng cho phép soạn contract bước 1 của SCRUM-7 (`S1-P-1`). [Contract máy/phiên](../Backend/docs/002-computer-session-contract.md) ghi phương án trạng thái, tiền giờ tính theo giây/làm tròn tổng lên một đồng, thu chênh lệch mỗi 60 giây/khi đóng/trước debit khác, giới hạn hết tiền và phục hồi SQL sau restart; đồng thời mô tả API đọc máy/loại/phòng và sửa trạng thái theo permission. Snapshot giá, liên kết khoản thu–ledger, khóa chống lặp và các ràng buộc phiên/hóa đơn cần migration riêng ở S2; SCRUM-7 không triển khai thu tiền hoặc đổi schema. Login `S1-D-2` đã được tích hợp vào nhánh SCRUM-7 tại `903e055`.
+
+Ngày 05/11/2026, Trưởng nhóm yêu cầu giữ merge SCRUM-12 (`229d7af`, PR #8) và bổ sung phần thiếu để
+review tiếp. [Contract SCRUM-12](../docs/contracts/inventory-invoice-voucher.md) mục 6.1.1/6.3.1/9.4
+ghi phương án thời gian hoàn và lưu khóa phát hành, cùng trách nhiệm giao nhận. Đây là đề xuất bổ sung,
+chưa phải phản hồi đồng thuận của Đại/Minh/Phúc/Khang hoặc quyết định nghiệm thu; P1 liên module còn mở.
+
+Ngày 06/11/2026, Trưởng nhóm yêu cầu hoàn tất kiểm chứng UI–API–SQL và giải quyết conflict với `dev`, giữ cả ghi chú SCRUM-7/SCRUM-12. Trưởng nhóm điều phối và chốt phương án chung; bàn giao code SCRUM-7 không phải chờ từng owner xác nhận. Các điểm giao nhau cần xử lý trước S2 (thời điểm tạo Payment theo từng khoản thu, actor tự đóng và phạm vi hóa đơn tiền giờ/gộp món) được ghi cụ thể ở mục 5 của contract SCRUM-7, không coi chúng là lỗi của API đổi trạng thái máy.
+
+Ngày 14/11/2026, Trưởng nhóm chọn tự quyết toán, đóng phiên và phát hành hóa đơn khi hết tiền bằng actor System, giữ riêng người mở phiên. Trưởng nhóm trực tiếp hoàn thiện các phần dang dở của Sprint 1, gồm chốt và đồng bộ contract S1-P-1/S1-M-1/S1-T-1, tự hoàn tất phần thiết kế/bàn giao. Phúc triển khai phiên/worker ở S2-P-1, Minh triển khai ví ở S2-M-1 và Trường triển khai hóa đơn ở S2-T-2 theo phân công module. Quyền nội bộ, actor nullable và hash/khóa bền vững được ghi tại contract phiên mục 5.1 và chứng từ mục 6.3.2. Các tiêu chí triển khai SQL/realtime được bàn giao cho các task Sprint 2 tương ứng.
+
+Cùng ngày, Trưởng nhóm xác nhận lại đơn món phải thanh toán đủ trước nhân viên nhận để làm, đơn Cash đã thu khóa hủy và quản lý xử lý ngoại lệ tại quầy. Tiền món và tiền giờ xuất hóa đơn riêng. Contract checkout 0.5 và chứng từ 1.9 ghi lựa chọn này, contract phiên/ví đồng bộ Payment từng khoản thu và các trường hợp phí đã có chứng từ/phiên 0 đồng. Bộ testcase bàn giao cho S2 bao gồm chưa thu bị chặn nhận món, Cash đã thu bị chặn hủy, phí chỉ thu một lần và xuất chứng từ theo loại nguồn.
