@@ -1,4 +1,7 @@
 using System.Data;
+using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
+using System.Text.Json;
 using CyberManagement.Application.DTOs.Tournaments;
 using CyberManagement.Application.Exceptions;
 using CyberManagement.Application.Interfaces.Repositories;
@@ -66,11 +69,34 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
                 registration.CustomerId == customerId))
             .ToListAsync(cancellationToken);
 
-    public async Task<TournamentDto> CreateAsync(
-        int employeeId, CreateTournamentRequest request, CancellationToken cancellationToken)
+    public async Task<CreateTournamentResult> CreateAsync(
+        int employeeId, string key, CreateTournamentRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await BeginTransactionAsync(cancellationToken);
         await RequireActiveEmployeeAsync(employeeId, cancellationToken);
+        var fingerprint = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            request.GameId, Name = request.Name.Trim(),
+            RegistrationStart = AsUtc(request.RegistrationStartUtc),
+            RegistrationEnd = AsUtc(request.RegistrationEndUtc),
+            StartTime = AsUtc(request.StartTimeUtc), EntryFee = decimal.ToInt64(request.EntryFee)
+        })));
+        var priorQuery = database.Database.IsSqlServer()
+            ? database.Tournaments.FromSqlInterpolated(
+                $"SELECT * FROM [Tournaments] WITH (UPDLOCK, HOLDLOCK) WHERE [CreatedBy] = {employeeId} AND [CreateRequestKey] = {key}")
+            : database.Tournaments.Where(row => row.CreatedBy == employeeId && row.CreateRequestKey == key);
+        var prior = await priorQuery.Include(row => row.Game).SingleOrDefaultAsync(cancellationToken);
+        if (prior is not null)
+        {
+            if (prior.CreateRequestFingerprint != fingerprint)
+                throw new BusinessRuleException("IdempotencyConflict: khóa đã được dùng với nội dung khác.");
+            var count = await database.TournamentRegistrations.CountAsync(
+                row => row.TournamentId == prior.TournamentId && row.Status != "Cancelled", cancellationToken);
+            if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+            return new CreateTournamentResult(ToDto(prior, prior.Game, count), true);
+        }
+        if (request.StartTimeUtc <= DateTime.UtcNow)
+            throw new ValidationException("Thời gian thi đấu phải ở tương lai.");
         var game = await database.Games.SingleOrDefaultAsync(
             item => item.GameId == request.GameId && item.IsActive, cancellationToken)
             ?? throw new BusinessRuleException("Chỉ có thể tạo giải cho trò chơi đang hoạt động.");
@@ -83,14 +109,16 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
             RegistrationEnd = AsUtc(request.RegistrationEndUtc),
             StartTime = AsUtc(request.StartTimeUtc),
             EntryFee = request.EntryFee,
-            Status = "Draft"
+            Status = "Draft",
+            CreateRequestKey = key,
+            CreateRequestFingerprint = fingerprint
         };
         database.Tournaments.Add(tournament);
         await database.SaveChangesAsync(cancellationToken);
         var result = ToDto(tournament, game, 0);
         if (transaction is not null)
             await transaction.CommitAsync(cancellationToken);
-        return result;
+        return new CreateTournamentResult(result, false);
     }
 
     public async Task<TournamentDto> UpdateAsync(
@@ -98,7 +126,11 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
     {
         await using var transaction = await BeginTransactionAsync(cancellationToken);
         await RequireActiveEmployeeAsync(employeeId, cancellationToken);
-        var tournament = await FindTournamentAsync(tournamentId, cancellationToken);
+        var tournament = await FindTournamentForUpdateAsync(tournamentId, cancellationToken);
+        if (!tournament.Version.SequenceEqual(Convert.FromBase64String(request.ExpectedVersion)))
+            throw new BusinessRuleException("VersionConflict: giải đấu đã thay đổi. Vui lòng tải lại.");
+        if (request.StartTimeUtc <= DateTime.UtcNow)
+            throw new ValidationException("Thời gian thi đấu phải ở tương lai.");
         if (tournament.Status is not ("Draft" or "RegistrationOpen" or "RegistrationClosed"))
             throw new BusinessRuleException("Giải đấu không còn cho phép chỉnh sửa.");
         var hasRegistrations = await database.TournamentRegistrations
@@ -115,7 +147,14 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
         tournament.RegistrationEnd = AsUtc(request.RegistrationEndUtc);
         tournament.StartTime = AsUtc(request.StartTimeUtc);
         tournament.EntryFee = request.EntryFee;
-        await database.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await database.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new BusinessRuleException("VersionConflict: giải đấu đã thay đổi. Vui lòng tải lại.");
+        }
         var registrationCount = await database.TournamentRegistrations
             .CountAsync(row => row.TournamentId == tournamentId && row.Status != "Cancelled", cancellationToken);
         var result = ToDto(tournament, game, registrationCount);
@@ -129,7 +168,7 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
     {
         await using var transaction = await BeginTransactionAsync(cancellationToken);
         await RequireActiveEmployeeAsync(employeeId, cancellationToken);
-        var tournament = await FindTournamentAsync(tournamentId, cancellationToken);
+        var tournament = await FindTournamentForUpdateAsync(tournamentId, cancellationToken);
         if (status == "RegistrationOpen")
         {
             var canOpen = tournament.Status == "Draft"
@@ -240,7 +279,7 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
                 tournament.TournamentName, AsUtc(tournament.RegistrationStart), AsUtc(tournament.RegistrationEnd),
                 AsUtc(tournament.StartTime), tournament.EntryFee,
                 tournament.Registrations.Count(registration => registration.Status != "Cancelled"),
-                tournament.Status, tournament.CreatedBy));
+                tournament.Status, tournament.CreatedBy, Convert.ToBase64String(tournament.Version)));
 
     public async Task RequireActiveEmployeeAsync(int employeeId, CancellationToken cancellationToken)
     {
@@ -254,6 +293,16 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
             .SingleOrDefaultAsync(item => item.TournamentId == tournamentId, cancellationToken)
             ?? throw new EntityNotFoundException("Không tìm thấy giải đấu.");
 
+    private async Task<Tournament> FindTournamentForUpdateAsync(int tournamentId, CancellationToken cancellationToken)
+    {
+        var query = database.Database.IsSqlServer()
+            ? database.Tournaments.FromSqlInterpolated(
+                $"SELECT * FROM [Tournaments] WITH (UPDLOCK, HOLDLOCK) WHERE [TournamentId] = {tournamentId}")
+            : database.Tournaments.Where(item => item.TournamentId == tournamentId);
+        return await query.Include(item => item.Game).SingleOrDefaultAsync(cancellationToken)
+            ?? throw new EntityNotFoundException("Không tìm thấy giải đấu.");
+    }
+
     private async Task<IDbContextTransaction?> BeginTransactionAsync(CancellationToken cancellationToken) =>
         database.Database.IsRelational()
             ? await database.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
@@ -265,5 +314,5 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
         new(tournament.TournamentId, tournament.GameId, game.GameName, game.TeamSize,
             tournament.TournamentName, AsUtc(tournament.RegistrationStart), AsUtc(tournament.RegistrationEnd),
             AsUtc(tournament.StartTime), tournament.EntryFee, registeredCount,
-            tournament.Status, tournament.CreatedBy);
+            tournament.Status, tournament.CreatedBy, Convert.ToBase64String(tournament.Version));
 }

@@ -82,10 +82,16 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
     [HttpPost("admin/tournaments")]
     [Authorize(Policy = ApiPolicies.TournamentManage)]
     public async Task<IActionResult> Create(
-        [FromBody] CreateTournamentRequest request, CancellationToken cancellationToken)
+        [FromBody] CreateTournamentRequest request, [FromHeader(Name = "Idempotency-Key")] string key,
+        CancellationToken cancellationToken)
     {
-        var tournament = await tournaments.CreateAsync(GetEmployeeId(), request, cancellationToken);
-        return CreatedAtAction(nameof(GetAdminTournament), new { tournamentId = tournament.Id }, tournament);
+        var result = await tournaments.CreateAsync(GetEmployeeId(), key, request, cancellationToken);
+        if (result.Replayed)
+        {
+            Response.Headers["Idempotency-Replayed"] = "true";
+            return Ok(result.Tournament);
+        }
+        return CreatedAtAction(nameof(GetAdminTournament), new { tournamentId = result.Tournament.Id }, result.Tournament);
     }
 
     [HttpPut("admin/tournaments/{tournamentId:int}")]

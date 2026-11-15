@@ -16,7 +16,10 @@ public sealed record TournamentDto(
     decimal EntryFee,
     int RegisteredCount,
     string Status,
-    int CreatedByEmployeeId);
+    int CreatedByEmployeeId,
+    string Version);
+
+public sealed record CreateTournamentResult(TournamentDto Tournament, bool Replayed);
 
 public sealed record CreateTournamentRequest(
     int GameId,
@@ -32,7 +35,8 @@ public sealed record UpdateTournamentRequest(
     DateTime RegistrationStartUtc,
     DateTime RegistrationEndUtc,
     DateTime StartTimeUtc,
-    decimal EntryFee);
+    decimal EntryFee,
+    string ExpectedVersion);
 
 public sealed record TournamentRegistrationRequest(
     string RiotId,

@@ -40,11 +40,47 @@ internal static class TournamentChecks
         await ExpectStatus("Cashier cannot manage tournaments", HttpStatusCode.Forbidden,
             await SendAsync(HttpMethod.Post, "/api/admin/tournaments", staffTokens["Cashier"], CreateBody(gameId, 0)));
 
+        var createBody = CreateBody(gameId, 0);
+        var createKey = Guid.NewGuid().ToString();
         var draft = await ReadSuccessAsync<JsonElement>(await SendAsync(
-            HttpMethod.Post, "/api/admin/tournaments", adminToken, CreateBody(gameId, 0)));
+            HttpMethod.Post, "/api/admin/tournaments", adminToken, createBody, createKey));
         var tournamentId = draft.GetProperty("id").GetInt32();
         Check("Admin creates a SQL tournament in Draft", draft.GetProperty("status").GetString() == "Draft"
             && draft.GetProperty("createdByEmployeeId").GetInt32() > 0);
+        var replayResponse = await SendAsync(HttpMethod.Post, "/api/admin/tournaments", adminToken, createBody, createKey);
+        Check("Tournament create replay is marked", replayResponse.StatusCode == HttpStatusCode.OK
+            && replayResponse.Headers.TryGetValues("Idempotency-Replayed", out var replayHeader)
+            && replayHeader.Single() == "true");
+        var replay = await ReadSuccessAsync<JsonElement>(replayResponse);
+        Check("Tournament create replay returns the same ID", replay.GetProperty("id").GetInt32() == tournamentId);
+        await ExpectStatus("Create key cannot be reused with different content", HttpStatusCode.Conflict,
+            await SendAsync(HttpMethod.Post, "/api/admin/tournaments", adminToken, CreateBody(gameId, 0), createKey));
+        await ExpectStatus("Create rejects malformed idempotency key", HttpStatusCode.BadRequest,
+            await SendAsync(HttpMethod.Post, "/api/admin/tournaments", adminToken, createBody, "bad"));
+        await using (var scope = services.CreateAsyncScope())
+        {
+            if (scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.IsSqlServer())
+            {
+                var concurrentBody = CreateBody(gameId, 0);
+                var concurrentKey = Guid.NewGuid().ToString();
+                var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ =>
+                    SendAsync(HttpMethod.Post, "/api/admin/tournaments", adminToken, concurrentBody, concurrentKey)));
+                try
+                {
+                    var statuses = string.Join(", ", responses.Select(row => (int)row.StatusCode));
+                    Check($"Concurrent create retries yield one create and five replays ({statuses})",
+                        responses.Count(row => row.StatusCode == HttpStatusCode.Created) == 1
+                        && responses.Count(row => row.StatusCode == HttpStatusCode.OK) == 5);
+                    var rows = await Task.WhenAll(responses.Select(row => row.Content.ReadFromJsonAsync<JsonElement>()));
+                    Check("Concurrent create retries all return the same tournament",
+                        rows.Select(row => row.GetProperty("id").GetInt32()).Distinct().Count() == 1);
+                }
+                finally
+                {
+                    foreach (var response in responses) response.Dispose();
+                }
+            }
+        }
         var clientListBeforeOpen = await ReadSuccessAsync<JsonElement[]>(await SendAsync(
             HttpMethod.Get, "/api/client/tournaments", customerToken));
         Check("Client list does not expose Draft tournaments",
@@ -71,7 +107,8 @@ internal static class TournamentChecks
             await ExpectStatus("Inactive staff cannot create a tournament with an old token", HttpStatusCode.Forbidden,
                 await SendAsync(HttpMethod.Post, "/api/admin/tournaments", adminToken, CreateBody(gameId, 0)));
             await ExpectStatus("Inactive staff cannot edit a tournament with an old token", HttpStatusCode.Forbidden,
-                await SendAsync(HttpMethod.Put, $"/api/admin/tournaments/{tournamentId}", adminToken, CreateBody(gameId, 0)));
+                await SendAsync(HttpMethod.Put, $"/api/admin/tournaments/{tournamentId}", adminToken,
+                    EditBody(gameId, draft.GetProperty("version").GetString()!, 0)));
             await ExpectStatus("Inactive staff cannot open a tournament with an old token", HttpStatusCode.Forbidden,
                 await SendAsync(HttpMethod.Post, $"/api/admin/tournaments/{tournamentId}/transitions", adminToken,
                     new { toStatus = "RegistrationOpen" }));
@@ -81,13 +118,33 @@ internal static class TournamentChecks
             await SetAdminActiveAsync(true);
         }
 
-        var edit = await SendAsync(HttpMethod.Put, $"/api/admin/tournaments/{tournamentId}", adminToken,
-            new
+        var initialVersion = draft.GetProperty("version").GetString()!;
+        var edit = await ReadSuccessAsync<JsonElement>(await SendAsync(HttpMethod.Put,
+            $"/api/admin/tournaments/{tournamentId}", adminToken, EditBody(gameId, initialVersion, 0)));
+        Check("Admin can edit a Draft tournament", edit.GetProperty("name").GetString() == "Updated tournament");
+        await using (var scope = services.CreateAsyncScope())
+        {
+            if (scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.IsSqlServer())
             {
-                gameId, name = "Updated tournament", registrationStartUtc = DateTime.UtcNow.AddMinutes(-2),
-                registrationEndUtc = DateTime.UtcNow.AddDays(1), startTimeUtc = DateTime.UtcNow.AddDays(2), entryFee = 0
-            });
-        await ExpectStatus("Admin can edit a Draft tournament", HttpStatusCode.OK, edit);
+                await ExpectStatus("Stale tournament version cannot overwrite a newer edit", HttpStatusCode.Conflict,
+                    await SendAsync(HttpMethod.Put, $"/api/admin/tournaments/{tournamentId}", adminToken,
+                        EditBody(gameId, initialVersion, 0)));
+                var currentVersion = edit.GetProperty("version").GetString()!;
+                var writes = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ =>
+                    SendAsync(HttpMethod.Put, $"/api/admin/tournaments/{tournamentId}", adminToken,
+                        EditBody(gameId, currentVersion, 0))));
+                try
+                {
+                    Check($"Concurrent tournament edits yield one success and one conflict ({string.Join(", ", writes.Select(row => (int)row.StatusCode))})",
+                        writes.Count(row => row.StatusCode == HttpStatusCode.OK) == 1
+                        && writes.Count(row => row.StatusCode == HttpStatusCode.Conflict) == 1);
+                }
+                finally
+                {
+                    foreach (var response in writes) response.Dispose();
+                }
+            }
+        }
         var opened = await ReadSuccessAsync<JsonElement>(await SendAsync(
             HttpMethod.Post, $"/api/admin/tournaments/{tournamentId}/transitions", adminToken,
             new { toStatus = "RegistrationOpen" }));
@@ -133,11 +190,7 @@ internal static class TournamentChecks
         }
         await ExpectStatus("Entry fee cannot be changed after registration", HttpStatusCode.Conflict,
             await SendAsync(HttpMethod.Put, $"/api/admin/tournaments/{tournamentId}", adminToken,
-                new
-                {
-                    gameId, name = "Updated tournament", registrationStartUtc = DateTime.UtcNow.AddMinutes(-2),
-                    registrationEndUtc = DateTime.UtcNow.AddDays(1), startTimeUtc = DateTime.UtcNow.AddDays(2), entryFee = 1000
-                }));
+                EditBody(gameId, opened.GetProperty("version").GetString()!, 1000)));
 
         var paid = await ReadSuccessAsync<JsonElement>(await SendAsync(
             HttpMethod.Post, "/api/admin/tournaments", adminToken, CreateBody(gameId, 1000)));
@@ -191,10 +244,19 @@ internal static class TournamentChecks
             entryFee
         };
 
-        async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, string? token, object? body = null)
+        object EditBody(int requestedGameId, string expectedVersion, decimal entryFee) => new
+        {
+            gameId = requestedGameId, name = "Updated tournament", registrationStartUtc = DateTime.UtcNow.AddMinutes(-2),
+            registrationEndUtc = DateTime.UtcNow.AddDays(1), startTimeUtc = DateTime.UtcNow.AddDays(2),
+            entryFee, expectedVersion
+        };
+
+        async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, string? token, object? body = null, string? key = null)
         {
             using var request = new HttpRequestMessage(method, path);
             if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            if (method == HttpMethod.Post && path == "/api/admin/tournaments")
+                request.Headers.Add("Idempotency-Key", key ?? Guid.NewGuid().ToString());
             if (body is not null) request.Content = JsonContent.Create(body);
             return await client.SendAsync(request);
         }

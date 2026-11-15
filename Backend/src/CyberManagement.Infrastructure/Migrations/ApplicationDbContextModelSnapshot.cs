@@ -1469,6 +1469,16 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TournamentId"));
 
+                    b.Property<string>("CreateRequestFingerprint")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("CreateRequestKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
                     b.Property<int>("CreatedBy")
                         .HasColumnType("int");
 
@@ -1498,11 +1508,19 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<byte[]>("Version")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.HasKey("TournamentId");
 
-                    b.HasIndex("CreatedBy");
-
                     b.HasIndex("GameId");
+
+                    b.HasIndex("CreatedBy", "CreateRequestKey")
+                        .IsUnique()
+                        .HasFilter("[CreateRequestKey] IS NOT NULL");
 
                     b.ToTable("Tournaments", (string)null);
                 });

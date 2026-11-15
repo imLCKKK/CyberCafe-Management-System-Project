@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 using CyberManagement.Application.DTOs.Realtime;
 using CyberManagement.Application.DTOs.Tournaments;
 using CyberManagement.Application.Exceptions;
@@ -53,15 +54,18 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
         return await repository.GetClientRegistrationsAsync(tournamentId, customerId, cancellationToken);
     }
 
-    public async Task<TournamentDto> CreateAsync(
-        int employeeId, CreateTournamentRequest request, CancellationToken cancellationToken)
+    public async Task<CreateTournamentResult> CreateAsync(
+        int employeeId, string key, CreateTournamentRequest request, CancellationToken cancellationToken)
     {
         ValidateId(employeeId, "EmployeeId");
+        if (key is null || !Regex.IsMatch(key, @"\A[A-Za-z0-9._:-]{8,100}\z"))
+            throw new ValidationException("Idempotency-Key phải có 8–100 ký tự ASCII hợp lệ.");
         ValidateTournament(request.GameId, request.Name, request.RegistrationStartUtc,
             request.RegistrationEndUtc, request.StartTimeUtc, request.EntryFee);
-        var tournament = await repository.CreateAsync(employeeId, request, cancellationToken);
-        await PublishAsync(RealtimeEvent.TournamentChanged, tournament.Id);
-        return tournament;
+        var result = await repository.CreateAsync(employeeId, key, request, cancellationToken);
+        if (!result.Replayed)
+            await PublishAsync(RealtimeEvent.TournamentChanged, result.Tournament.Id);
+        return result;
     }
 
     public async Task<TournamentDto> UpdateAsync(
@@ -69,6 +73,15 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
     {
         ValidateId(employeeId, "EmployeeId");
         ValidateId(tournamentId, "TournamentId");
+        try
+        {
+            if (request.ExpectedVersion is null || Convert.FromBase64String(request.ExpectedVersion).Length != 8)
+                throw new ValidationException("expectedVersion không hợp lệ.");
+        }
+        catch (FormatException)
+        {
+            throw new ValidationException("expectedVersion không hợp lệ.");
+        }
         ValidateTournament(request.GameId, request.Name, request.RegistrationStartUtc,
             request.RegistrationEndUtc, request.StartTimeUtc, request.EntryFee);
         var tournament = await repository.UpdateAsync(employeeId, tournamentId, request, cancellationToken);
@@ -123,7 +136,7 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
         ValidateId(gameId, "GameId");
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 150)
             throw new ValidationException("Tên giải đấu là bắt buộc và tối đa 150 ký tự.");
-        if (registrationStart >= registrationEnd || registrationEnd > startTime || startTime <= DateTime.UtcNow)
+        if (registrationStart >= registrationEnd || registrationEnd > startTime)
             throw new ValidationException("Thời gian phải thỏa mãn mở đăng ký < đóng đăng ký <= giờ thi đấu ở tương lai.");
         if (entryFee < 0 || entryFee > 999999999 || decimal.Truncate(entryFee) != entryFee)
             throw new ValidationException("Lệ phí phải là số nguyên VND từ 0 đến 999.999.999.");

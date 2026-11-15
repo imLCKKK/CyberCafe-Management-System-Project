@@ -12,7 +12,7 @@
 
 **Phạm vi triển khai S2-D-2 (14/11/2026):** CRUD giải, đọc danh sách SQL, đăng ký miễn phí và danh sách người tham gia đã được nối qua API. Đăng ký giải có phí hiện trả 409 cho tới khi ví và quyết toán phiên được tích hợp; lựa chọn này không đổi policy đích D-T02 (chỉ thu bằng Wallet). `RiotId` được thêm nullable để giữ nguyên đăng ký lịch sử; request đăng ký mới bắt buộc cung cấp Riot ID hợp lệ. Team, hủy đăng ký/hoàn phí, export và lưu snapshot OP.GG vẫn ngoài phạm vi triển khai này.
 
-Các endpoint giải đấu phía nhân viên kiểm tra `IsActive` từ DB; các thao tác ghi kiểm tra trong transaction. Idempotency và `expectedVersion` cho giải đấu vẫn chưa triển khai theo hợp đồng bên dưới; không coi S2-D-2 đã hoàn thành.
+Các endpoint giải đấu phía nhân viên kiểm tra `IsActive` từ DB; các thao tác ghi kiểm tra trong transaction. Tạo giải yêu cầu `Idempotency-Key`, lưu fingerprint theo nhân viên và replay 200 với header `Idempotency-Replayed`; sửa giải yêu cầu `expectedVersion` từ DTO và trả 409 khi version cũ. Các thao tác ghi khác chưa hỗ trợ idempotency/version theo hợp đồng bên dưới. Đăng ký có phí và quyết toán phiên vẫn chưa được triển khai; không coi S2-D-2 đã hoàn thành.
 
 **Trạng thái:** bản hợp đồng cập nhật theo review Trưởng nhóm, chưa phải API đang chạy. Các phương án ở Phụ lục A là lựa chọn thiết kế để triển khai; xác nhận liên module của Minh/Phúc và duyệt cuối của Trưởng nhóm được ghi riêng, không suy diễn từ việc cập nhật tài liệu.
 

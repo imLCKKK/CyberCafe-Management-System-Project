@@ -15,8 +15,29 @@ export const getTournamentGames = (audience, signal) =>
 export const getTournamentRanks = (audience, gameId, signal) =>
   apiRequest(`/${audience}/games/${gameId}/ranks`, { signal });
 
-export const createTournament = (request) =>
-  apiRequest('/admin/tournaments', { method: 'POST', body: request });
+export const createTournament = (request, key) =>
+  apiRequest('/admin/tournaments', { method: 'POST', headers: { 'Idempotency-Key': key }, body: request });
+
+export function tournamentCreateKey(employeeId, request, storage = globalThis.localStorage) {
+  if (!Number.isInteger(employeeId) || employeeId <= 0) throw new Error('Không xác định được nhân viên tạo giải.');
+  const storageKey = `cybermanagement.tournament-create.v1:${employeeId}:${JSON.stringify(request)}`;
+  let key;
+  try {
+    key = storage.getItem(storageKey);
+    if (!key) {
+      key = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)),
+        (byte) => byte.toString(16).padStart(2, '0')).join('');
+      storage.setItem(storageKey, key);
+    }
+  } catch {
+    throw new Error('Không thể lưu khóa gửi lại. Chưa gửi yêu cầu tạo giải.');
+  }
+  return { key, storageKey };
+}
+
+export function clearTournamentCreateKey(intent, storage = globalThis.localStorage) {
+  if (storage.getItem(intent.storageKey) === intent.key) storage.removeItem(intent.storageKey);
+}
 
 export const updateTournament = (tournamentId, request) =>
   apiRequest(`/admin/tournaments/${tournamentId}`, { method: 'PUT', body: request });

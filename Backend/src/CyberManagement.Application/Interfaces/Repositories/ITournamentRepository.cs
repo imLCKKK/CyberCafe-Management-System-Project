@@ -12,7 +12,7 @@ public interface ITournamentRepository
     Task<IReadOnlyList<TournamentRegistrationDto>> GetAdminRegistrationsAsync(int tournamentId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ClientTournamentRegistrationDto>> GetClientRegistrationsAsync(
         int tournamentId, int customerId, CancellationToken cancellationToken);
-    Task<TournamentDto> CreateAsync(int employeeId, CreateTournamentRequest request, CancellationToken cancellationToken);
+    Task<CreateTournamentResult> CreateAsync(int employeeId, string key, CreateTournamentRequest request, CancellationToken cancellationToken);
     Task<TournamentDto> UpdateAsync(int employeeId, int tournamentId, UpdateTournamentRequest request, CancellationToken cancellationToken);
     Task<TournamentDto> TransitionAsync(int employeeId, int tournamentId, string status, CancellationToken cancellationToken);
     Task<TournamentRegistrationDto> RegisterAsync(

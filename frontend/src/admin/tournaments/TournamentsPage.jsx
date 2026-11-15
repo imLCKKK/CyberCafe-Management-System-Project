@@ -4,8 +4,8 @@ import { useAuth } from '../../shared/auth/AuthContext';
 import { getAccessToken, expireSession } from '../../shared/auth/api';
 import { useRealtime } from '../../shared/realtime/useRealtime';
 import {
-  createTournament, getTournamentGames, getTournamentRegistrations, getTournaments,
-  transitionTournament, updateTournament,
+  clearTournamentCreateKey, createTournament, getTournamentGames, getTournamentRegistrations, getTournaments,
+  tournamentCreateKey, transitionTournament, updateTournament,
 } from '../../shared/tournamentApi';
 import { AdminPage, DetailDialog, Filter, FormDialog, Notice, Panel, Row, Status, Table, Toolbar, StatCard } from '../shared/AdminUI';
 import { dateTime, matches, money } from '../shared/adminModel';
@@ -105,8 +105,12 @@ export function TournamentsPage() {
       startTimeUtc: utcDate(form.startTimeUtc),
       entryFee: Number(form.entryFee),
     };
-    if (editing) await updateTournament(editing.id, payload);
-    else await createTournament(payload);
+    if (editing) await updateTournament(editing.id, { ...payload, expectedVersion: editing.version });
+    else {
+      const intent = tournamentCreateKey(principal?.employeeId, payload);
+      await createTournament(payload, intent.key);
+      clearTournamentCreateKey(intent);
+    }
     setNotice(editing ? 'Đã cập nhật giải đấu.' : 'Đã tạo giải đấu ở trạng thái bản nháp.');
     reload();
   }
