@@ -23,6 +23,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
+if (args.Contains("--voucher-only"))
+{
+    Console.WriteLine($"{await VoucherChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} voucher SQL/API checks passed.");
+    return;
+}
+
 if (args.Contains("--counter-demo-seed"))
 {
     await CounterDemoSeed.RunAsync();
@@ -114,6 +120,9 @@ builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
+builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
+builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
+builder.Services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
 builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
 builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
 builder.Services
