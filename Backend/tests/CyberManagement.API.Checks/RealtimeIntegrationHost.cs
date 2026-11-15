@@ -73,6 +73,9 @@ internal static class RealtimeIntegrationHost
                 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
                 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
                 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
+                builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
+                builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
+                builder.Services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
                 builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
                 builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
                 builder.Services.AddControllers().AddApplicationPart(typeof(AuthController).Assembly);

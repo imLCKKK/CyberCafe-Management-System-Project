@@ -127,7 +127,11 @@ internal static class SchemaContractChecks
         check("No model changes are missing a migration", !db.Database.HasPendingModelChanges());
         try { await db.GetService<IMigrator>().MigrateAsync(InventoryCheckDatabase.BaselineMigration); throw new InvalidOperationException("Downgrade discarded contract data."); }
         catch (SqlException ex) when (ex.Number == 51003) { check("Downgrade refuses to discard contract data", true); }
-        check("Refused downgrade preserves issue keys and current migration", await db.InvoiceIssueRequests.CountAsync() == 2 && (await db.Database.GetAppliedMigrationsAsync()).Count() == 5);
+        check("Refused downgrade preserves issue keys and the contract migration", await db.InvoiceIssueRequests.CountAsync() == 2 && (await db.Database.GetAppliedMigrationsAsync()).Count() == 5);
+        // Các migration kho/ví đã hạ cấp trước khi guard của migration chứng từ từ chối.
+        // Khôi phục schema mới nhất để các test service phía sau có cột OperationKey.
+        await db.Database.MigrateAsync();
+        check("Latest inventory and wallet migrations are restored after the downgrade guard check", (await db.Database.GetAppliedMigrationsAsync()).Count() == 8);
 
         async Task Reject<T>(string name, T entity, string constraint) where T : class
         {
@@ -159,7 +163,7 @@ internal static class SchemaContractChecks
             // Chỉ fixture của database GUID này được thay đổi để thử tiếp đường nâng hợp lệ.
             await db.Database.ExecuteSqlRawAsync("DELETE dbo.Promotions WHERE PromoName=N'LEGACY_CHECK';");
             await db.Database.MigrateAsync();
-            check("Upgrade preserves safe existing products and appends current migrations", await db.Products.SingleAsync(x => x.ProductName == "UPGRADE_CHECK") is { Stock: 1, Price: 10000m } && (await db.Database.GetAppliedMigrationsAsync()).Count() == 7);
+            check("Upgrade preserves safe existing products through all eight migrations", await db.Products.SingleAsync(x => x.ProductName == "UPGRADE_CHECK") is { Stock: 1, Price: 10000m } && (await db.Database.GetAppliedMigrationsAsync()).Count() == 8);
         }
         finally { await fixture.CleanupAsync(); }
     }

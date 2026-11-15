@@ -529,6 +529,11 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<int?>("EmployeeId")
                         .HasColumnType("int");
 
+                    b.Property<string>("OperationKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
                     b.Property<int?>("OrderDetailId")
                         .HasColumnType("int");
 
@@ -563,6 +568,10 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.HasIndex("EmployeeId");
 
+                    b.HasIndex("OperationKey")
+                        .IsUnique()
+                        .HasFilter("[OperationKey] IS NOT NULL");
+
                     b.HasIndex("OrderId");
 
                     b.HasIndex("ProductId");
@@ -575,6 +584,8 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.ToTable("InventoryTransactions", null, t =>
                         {
+                            t.HasCheckConstraint("CK_InventoryTransactions_OperationKey", "[OperationKey] IS NULL OR LEN(LTRIM(RTRIM([OperationKey]))) > 0");
+
                             t.HasCheckConstraint("CK_InventoryTransactions_Reason", "LEN(LTRIM(RTRIM([Reason]))) BETWEEN 1 AND 200");
 
                             t.HasCheckConstraint("CK_InventoryTransactions_Type", "(([Type] IN ('Receive','Return') AND [Quantity] > 0) OR ([Type] = 'Sale' AND [Quantity] < 0) OR ([Type] = 'Adjust' AND [Quantity] <> 0)) AND (([Type] IN ('Receive','Adjust') AND [OrderDetailId] IS NULL) OR ([Type] IN ('Sale','Return') AND [OrderDetailId] IS NOT NULL AND [OrderId] IS NOT NULL))");

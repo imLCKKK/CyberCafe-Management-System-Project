@@ -14,6 +14,9 @@ public class InventoryTransaction
 
     public string ReferenceType { get; set; } = null!;
 
+    // Khóa chống ghi lặp; nullable để giữ được dữ liệu lịch sử chưa có khóa.
+    public string? OperationKey { get; set; }
+
     public int? ReceiptId { get; set; }
 
     public int? OrderId { get; set; }
