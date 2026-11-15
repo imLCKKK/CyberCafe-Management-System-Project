@@ -1,6 +1,6 @@
 # Client tournaments / OP.GG
 
-Home → “Chi tiết & đăng ký” → `/client/tournaments?tournament=1`. Nhập tên trong game và tag ở hai ô riêng, có dấu `#` cố định ở giữa, rồi chọn vai trò. Tag nhận cả chữ và số. Form nhắc chuyển hồ sơ OP.GG từ Private sang Public để truy vấn thông tin. Rank tự lấy từ OP.GG; không có ô chọn rank. Trang tự tải thống kê thực cho các dòng đang xem khi mở trang hoặc đăng ký; bấm **Đồng bộ OP.GG** để cập nhật/thử lại. Lỗi không tự lặp request. Liên kết **Mở OP.GG** mở hồ sơ nguồn. Danh sách giải/đăng ký vẫn dùng localStorage chung với Home, chưa có database hay xác minh quyền sở hữu Riot ID.
+Home → “Chi tiết & đăng ký” → `/client/tournaments`. Danh sách, giải được chọn và người tham gia tải từ API/SQL; thay đổi giải/đăng ký invalidates hai màn hình qua SignalR rồi client đọc lại API. Nhập tên trong game và tag ở hai ô riêng, chọn rank từ `GameRanks` và chọn vai trò. API lấy CustomerId từ JWT, không từ request body; Riot ID được lưu cùng đăng ký. Giải có phí hiển thị rõ nhưng hiện chưa nhận đăng ký cho tới khi thanh toán ví được tích hợp. Form nhắc chuyển hồ sơ OP.GG từ Private sang Public để truy vấn thông tin. Bấm **Đồng bộ OP.GG** để tải thống kê cho trang hiện tại; thống kê chỉ giữ trong giao diện hiện tại, chưa lưu snapshot SQL. Lỗi không tự lặp request. Liên kết **Mở OP.GG** mở hồ sơ nguồn.
 
 ## Chạy thử
 
@@ -27,7 +27,7 @@ Backend tải trang hồ sơ PC, đọc JSON React Flight, bao gồm các module
 
 Cache thành công 10 phút, lỗi 30 giây, tối đa 200 hồ sơ; gộp các yêu cầu đang xử lý cùng Riot ID. Tối đa 2 hồ sơ xử lý đồng thời và 30 hồ sơ mới/phút cho mỗi instance. Tối đa 12 bundle để tìm action, mỗi response tối đa 4 MiB. Timeout toàn bộ lần đọc 25 giây, mỗi request 10 giây; client chờ tối đa 30 giây/hồ sơ. Đồng bộ tối đa 10 dòng trên trang đang xem, tuần tự. Không tự động quét toàn bộ giải.
 
-Nếu gặp hồ sơ riêng tư, OP.GG từ chối, 429, timeout hoặc cấu trúc thay đổi, UI báo lỗi riêng từng dòng và không bịa số liệu. Bản thống kê đã tải trước đó được giữ kèm lỗi và thời điểm lấy. Snapshot rank và thống kê được lưu trong `OpggSnapshot` của đăng ký, dùng chung giữa admin/client và giữ qua tải lại. Tự làm mới snapshot quá 10 phút khi mở trang, tối đa một lần tự động cho mỗi dòng trong một lần mở trang; lỗi cần bấm thử lại.
+Nếu gặp hồ sơ riêng tư, OP.GG từ chối, 429, timeout hoặc cấu trúc thay đổi, UI báo lỗi riêng từng dòng và không bịa số liệu. Bản thống kê chỉ giữ trong giao diện hiện tại. Snapshot rank và thống kê chưa được lưu vào SQL; tích hợp snapshot/server-side OP.GG thuộc task tiếp theo.
 
 ## Chỉ số và độ mới
 
@@ -67,7 +67,7 @@ Endpoint nhận Riot ID thay vì ID đăng ký demo. Response:
 
 HTTP 400: Riot ID sai; 403: riêng tư/từ chối; 404: không có hồ sơ/thống kê; 409: Riot ID nguồn không khớp; 429: giới hạn; 502: lỗi upstream/cấu trúc/timeout. Body lỗi là `{ "message": "..." }`.
 
-Backend hiện chỉ đọc hồ sơ công khai theo Riot ID, chưa có login/RSO và không xác minh người đăng ký sở hữu hồ sơ. Khi làm hệ thống thật cần xác thực đăng ký, lưu database, kiểm soát quyền và giới hạn truy vấn tại cổng vào; không coi dữ liệu localStorage là dữ liệu đã xác thực. Chia đội trong demo chỉ chạy khi mọi người đã có rank OP.GG hợp lệ; không dùng rank khai báo cũ hoặc mặc định 0 cho người chưa đồng bộ. Chưa chạy migration. DBML cần thêm hồ sơ game/Riot ID và snapshot nullable của HS%, ADR, KDA, scope, nguồn, thời điểm lấy/cập nhật.
+Backend đọc hồ sơ công khai theo Riot ID, chưa có login/RSO và không xác minh người đăng ký sở hữu hồ sơ. Rank đăng ký hiện là lựa chọn từ `GameRanks` để đáp ứng schema hiện có; không đại diện cho rank OP.GG đã xác minh. Thống kê/đội không dùng dữ liệu demo trong hai màn hình giải đấu. Snapshot OP.GG, kiểm chứng quyền sở hữu Riot ID và cập nhật DBML cho các trường snapshot vẫn là việc sau.
 
 ## Kiểm tra
 

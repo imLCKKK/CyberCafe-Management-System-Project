@@ -95,7 +95,7 @@ Chỉ publish realtime sau khi caller commit. Unique nguồn và khóa bền v�
 
 ## Migration và chạy
 
-Hai migration mới AddInvoiceIssuingSnapshots và TrackOrderDetailCancellation (tổng 10, vẫn 39 bảng) mở rộng schema:
+Hai migration mới AddInvoiceIssuingSnapshots và TrackOrderDetailCancellation (sau tích hợp dev: tổng 14 migration, 40 bảng) mở rộng schema:
 Invoice.EmployeeId nullable, ActorType Staff/System; InvoiceDetail thêm voucher snapshot và CancelledAmount.
 OrderDetail.Status theo contract checkout: Pending/Confirmed/Cancelled, default Pending. Service đối chiếu trạng thái này khi chụp/ghi hủy, kể cả hủy trước phát hành.
 Hóa đơn cũ được backfill Staff qua default; giữ tiền/EmployeeId cũ, không tạo khóa hoặc voucher giả cho lịch sử.

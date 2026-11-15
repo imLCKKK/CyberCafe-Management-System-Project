@@ -6,6 +6,8 @@ namespace CyberManagement.API.Realtime;
 
 public static class RealtimeGroups
 {
+    public const string TournamentPublic = "tournament:public";
+
     public static string ForAccount(RealtimeAccountType accountType, int accountId)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(accountId);

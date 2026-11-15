@@ -20,6 +20,12 @@ public class Tournament
 
     public string Status { get; set; } = "Draft";
 
+    public byte[] Version { get; set; } = new byte[8];
+
+    public string? CreateRequestKey { get; set; }
+
+    public string? CreateRequestFingerprint { get; set; }
+
     public Game Game { get; set; } = null!;
 
     public Employee CreatedByEmployee { get; set; } = null!;

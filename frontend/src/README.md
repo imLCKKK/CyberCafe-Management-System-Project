@@ -69,14 +69,12 @@ chức năng cùng phía đặt trong `admin/shared/` hoặc `client/shared/`. K
 | Nguồn | Khóa localStorage | Nơi dùng |
 | --- | --- | --- |
 | `client/shared/ClientDemoContext.jsx` | `tram.client.dbml.demo.v2` | Tài khoản, ví, sản phẩm, kho, đơn và phiên; phần lớn admin/client dùng chung |
-| `client/home/useHomeData.js` | `tram.client.home.demo.v1` | Dữ liệu giải đấu cũ, được Home và giải đấu admin/client đọc |
+| `client/home/useHomeData.js` | `tram.client.home.demo.v1` | Dữ liệu giải đấu demo/legacy; trang chủ và hai màn hình giải đấu hiện đọc API SQL, không dùng kho này |
 | `admin/computers/computerStore.js` | `net-cafe.admin.computers.v1` | Sơ đồ/trạng thái máy; trang máy, dashboard và báo cáo |
 
-`AdminContext` hiện bọc `ClientDemoProvider` và dùng thêm `useHomeData`.
-Đây là phụ thuộc còn lại của bản demo, cần đọc rõ trước khi sửa nghiệp vụ.
-`home/useHomeData` không còn là nguồn dữ liệu chính của trang chủ. Sự kiện
-`storage` chỉ đồng bộ các tab cùng origin trong cùng trình duyệt, không đồng
-bộ hai máy khác nhau.
+`AdminContext` chỉ bọc `ClientDemoProvider`; giải đấu không còn lấy dữ liệu từ
+`useHomeData`. Sự kiện `storage` chỉ đồng bộ các tab cùng origin trong cùng
+trình duyệt, không đồng bộ hai máy khác nhau.
 
 `admin/computers/components/CafeUI.jsx` hiện chứa cả UI dùng chung và UI riêng
 cho máy, còn phụ thuộc nhãn trong mock máy. Việc tách component đó cần làm
@@ -86,12 +84,11 @@ dùng chung nằm trong `client/shared/Dialog.jsx`, giữ nguyên CSS `home-*` �
 
 ## Ranh giới khi nối API
 
-Phần này là hướng triển khai, chưa phải cấu trúc API đã hoàn thành. Thêm
-service/adapter theo từng nghiệp vụ để trang gọi API hoặc demo một cách rõ
-ràng. Không tự quay lại dữ liệu demo khi API lỗi. Khi nghiệp vụ chuyển sang
-API, quyền, giá, tồn kho, số dư và giao dịch do server kiểm tra và ghi nhận;
-frontend gửi yêu cầu thao tác và hiển thị kết quả. Giữ ba store demo hiện tại
-trong quá trình chuyển để tránh làm hỏng các luồng đang dùng.
+Các màn hình giải đấu admin/client đã nối API SQL, xác thực theo JWT và
+SignalR; API lỗi được hiển thị, không fallback sang localStorage. Đăng ký có
+phí chưa bật cho tới khi ví/quyết toán phiên được tích hợp. Các nghiệp vụ khác
+vẫn có thể dùng store demo; khi chuyển API, quyền, giá, tồn kho, số dư và giao
+dịch phải do server kiểm tra và ghi nhận.
 
 Xem [kiến trúc repository](../../docs/architecture.md) và
 [kế hoạch bàn giao của nhóm](../../planning/team-delivery-plan.md) để theo dõi phạm
