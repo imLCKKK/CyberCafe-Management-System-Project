@@ -41,6 +41,20 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
                 .ThenInclude(rolePermission => rolePermission.Permission)
             .ToListAsync(cancellationToken);
 
+    public Task<Employee?> GetEmployeeByIdAsync(
+        int employeeId,
+        CancellationToken cancellationToken) =>
+        database.Employees
+            .Include(e => e.Role)
+            .SingleOrDefaultAsync(e => e.EmployeeId == employeeId, cancellationToken);
+
+    public async Task<IReadOnlyList<Employee>> GetAllEmployeesAsync(
+        CancellationToken cancellationToken) =>
+        await database.Employees
+            .Include(e => e.Role)
+            .OrderBy(e => e.FullName)
+            .ToListAsync(cancellationToken);
+
     public void AddRole(Role role) => database.Roles.Add(role);
 
     public void AddPermission(Permission permission) => database.Permissions.Add(permission);
@@ -52,6 +66,10 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
         database.RolePermissions.Remove(rolePermission);
 
     public void AddEmployee(Employee employee) => database.Employees.Add(employee);
+
+    public void RemoveEmployee(Employee employee) => database.Employees.Remove(employee);
+
+    public void UpdateEmployee(Employee employee) => database.Employees.Update(employee);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         database.SaveChangesAsync(cancellationToken);

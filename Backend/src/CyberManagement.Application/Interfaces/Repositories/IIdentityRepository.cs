@@ -18,6 +18,10 @@ public interface IIdentityRepository
 
     Task<IReadOnlyList<Role>> GetRolesWithPermissionsAsync(CancellationToken cancellationToken);
 
+    Task<Employee?> GetEmployeeByIdAsync(int employeeId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Employee>> GetAllEmployeesAsync(CancellationToken cancellationToken);
+
     void AddRole(Role role);
 
     void AddPermission(Permission permission);
@@ -27,6 +31,10 @@ public interface IIdentityRepository
     void RemoveRolePermission(RolePermission rolePermission);
 
     void AddEmployee(Employee employee);
+
+    void RemoveEmployee(Employee employee);
+
+    void UpdateEmployee(Employee employee);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
