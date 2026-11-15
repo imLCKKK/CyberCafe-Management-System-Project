@@ -24,6 +24,12 @@ public class TournamentRegistration
 
     public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
 
+    public decimal? FeeCharged { get; set; }
+
+    public int? ChargeTransactionId { get; set; }
+
+    public WalletTransaction? ChargeTransaction { get; set; }
+
     public Tournament Tournament { get; set; } = null!;
 
     public Customer Customer { get; set; } = null!;

@@ -5,7 +5,7 @@ import { getAccessToken, expireSession } from '../../shared/auth/api';
 import { useRealtime } from '../../shared/realtime/useRealtime';
 import {
   clearTournamentCreateKey, createTournament, getTournamentGames, getTournamentRegistrations, getTournaments,
-  tournamentCreateKey, transitionTournament, updateTournament,
+  tournamentCreateKey, tournamentTransitionKey, transitionTournament, updateTournament,
 } from '../../shared/tournamentApi';
 import { AdminPage, DetailDialog, Filter, FormDialog, Notice, Panel, Row, Status, Table, Toolbar, StatCard } from '../shared/AdminUI';
 import { dateTime, matches, money } from '../shared/adminModel';
@@ -117,8 +117,11 @@ export function TournamentsPage() {
 
   async function changeStatus(tournament, toStatus) {
     try {
-      await transitionTournament(tournament.id, toStatus);
-      setNotice(toStatus === 'RegistrationOpen' ? 'Đã mở đăng ký.' : 'Đã đóng đăng ký.');
+      const request = { toStatus, expectedVersion: tournament.version };
+      const intent = tournamentTransitionKey(principal?.employeeId, tournament.id, request);
+      await transitionTournament(tournament.id, request, intent.key);
+      clearTournamentCreateKey(intent);
+      setNotice('Đã xử lý yêu cầu chuyển trạng thái. Danh sách sẽ được cập nhật.');
       setError('');
       reload();
     } catch (cause) { setError(cause.message); }
@@ -154,7 +157,7 @@ export function TournamentsPage() {
     {editing !== undefined && <FormDialog
       title={editing ? 'Chỉnh sửa giải đấu' : 'Tạo giải đấu'}
       fields={fields} initial={initial}
-      description="Giải mới ở trạng thái bản nháp. Phí được nhập theo VND nguyên; đăng ký giải có phí chưa khả dụng cho đến khi tích hợp thanh toán ví."
+      description="Giải mới ở trạng thái bản nháp. Phí được nhập theo VND nguyên và thanh toán bằng ví."
       onClose={() => setEditing(undefined)}
       onSave={save}/>}
     {selected && <DetailDialog title={selected.name} onClose={() => setSelectedId(null)}>

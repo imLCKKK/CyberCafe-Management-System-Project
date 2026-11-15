@@ -15,9 +15,14 @@ public class TournamentRegistrationConfiguration : IEntityTypeConfiguration<Tour
         builder.Property(x => x.PreferredRole).HasMaxLength(50);
         builder.Property(x => x.WinRate).HasPrecision(5, 2);
         builder.Property(x => x.SkillScore).HasPrecision(6, 2);
+        builder.Property(x => x.FeeCharged).HasPrecision(18, 0);
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();
 
         builder.HasIndex(x => new { x.TournamentId, x.CustomerId }).IsUnique();
+        builder.HasIndex(x => x.ChargeTransactionId).IsUnique().HasFilter("[ChargeTransactionId] IS NOT NULL");
+
+        builder.HasOne(x => x.ChargeTransaction).WithMany().HasForeignKey(x => x.ChargeTransactionId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.Tournament)
             .WithMany(x => x.Registrations)

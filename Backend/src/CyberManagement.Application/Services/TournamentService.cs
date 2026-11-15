@@ -58,8 +58,7 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
         int employeeId, string key, CreateTournamentRequest request, CancellationToken cancellationToken)
     {
         ValidateId(employeeId, "EmployeeId");
-        if (key is null || !Regex.IsMatch(key, @"\A[A-Za-z0-9._:-]{8,100}\z"))
-            throw new ValidationException("Idempotency-Key phải có 8–100 ký tự ASCII hợp lệ.");
+        ValidateKey(key);
         ValidateTournament(request.GameId, request.Name, request.RegistrationStartUtc,
             request.RegistrationEndUtc, request.StartTimeUtc, request.EntryFee);
         var result = await repository.CreateAsync(employeeId, key, request, cancellationToken);
@@ -73,15 +72,7 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
     {
         ValidateId(employeeId, "EmployeeId");
         ValidateId(tournamentId, "TournamentId");
-        try
-        {
-            if (request.ExpectedVersion is null || Convert.FromBase64String(request.ExpectedVersion).Length != 8)
-                throw new ValidationException("expectedVersion không hợp lệ.");
-        }
-        catch (FormatException)
-        {
-            throw new ValidationException("expectedVersion không hợp lệ.");
-        }
+        ValidateVersion(request.ExpectedVersion);
         ValidateTournament(request.GameId, request.Name, request.RegistrationStartUtc,
             request.RegistrationEndUtc, request.StartTimeUtc, request.EntryFee);
         var tournament = await repository.UpdateAsync(employeeId, tournamentId, request, cancellationToken);
@@ -89,16 +80,18 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
         return tournament;
     }
 
-    public async Task<TournamentDto> TransitionAsync(
-        int employeeId, int tournamentId, string status, CancellationToken cancellationToken)
+    public async Task<TransitionTournamentResult> TransitionAsync(
+        int employeeId, int tournamentId, string key, TransitionTournamentRequest request, CancellationToken cancellationToken)
     {
         ValidateId(employeeId, "EmployeeId");
         ValidateId(tournamentId, "TournamentId");
-        if (status is not ("RegistrationOpen" or "RegistrationClosed"))
+        ValidateKey(key);
+        ValidateVersion(request.ExpectedVersion);
+        if (request.ToStatus is not ("RegistrationOpen" or "RegistrationClosed"))
             throw new ValidationException("Trạng thái đích chỉ được là RegistrationOpen hoặc RegistrationClosed.");
-        var tournament = await repository.TransitionAsync(employeeId, tournamentId, status, cancellationToken);
-        await PublishAsync(RealtimeEvent.TournamentChanged, tournament.Id);
-        return tournament;
+        var result = await repository.TransitionAsync(employeeId, tournamentId, key, request, cancellationToken);
+        if (!result.Replayed) await PublishAsync(RealtimeEvent.TournamentChanged, result.Tournament.Id);
+        return result;
     }
 
     public async Task<TournamentRegistrationDto> RegisterAsync(
@@ -106,6 +99,18 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
     {
         ValidateId(tournamentId, "TournamentId");
         ValidateId(customerId, "CustomerId");
+        if (request.ExpectedVersion is not null)
+        {
+            try
+            {
+                if (Convert.FromBase64String(request.ExpectedVersion).Length != 8)
+                    throw new ValidationException("expectedVersion không hợp lệ.");
+            }
+            catch (FormatException)
+            {
+                throw new ValidationException("expectedVersion không hợp lệ.");
+            }
+        }
         var riotId = NormalizeRiotId(request.RiotId);
         if (request.RankId <= 0)
             throw new ValidationException("Hạng trò chơi là bắt buộc.");
@@ -122,6 +127,12 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
         var result = await repository.RegisterAsync(tournamentId, customerId,
             request with { RiotId = riotId, PreferredRole = request.PreferredRole?.Trim() }, cancellationToken);
         await PublishAsync(RealtimeEvent.RegistrationChanged, tournamentId);
+        if (result.FeeCharged > 0)
+        {
+            var message = new RealtimeEvent(Guid.NewGuid(), "WalletChanged", customerId, DateTimeOffset.UtcNow);
+            await publisher.PublishToAccountAsync(RealtimeAccountType.Customer, customerId, message, CancellationToken.None);
+            await publisher.PublishToPermissionAsync("wallet.view", message, CancellationToken.None);
+        }
         return result;
     }
 
@@ -161,5 +172,24 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
     {
         if (id <= 0)
             throw new ValidationException($"{name} phải là số nguyên dương.");
+    }
+
+    private static void ValidateKey(string? key)
+    {
+        if (key is null || !Regex.IsMatch(key, @"\A[A-Za-z0-9._:-]{8,100}\z"))
+            throw new ValidationException("Idempotency-Key phải có 8–100 ký tự ASCII hợp lệ.");
+    }
+
+    private static void ValidateVersion(string? version)
+    {
+        try
+        {
+            if (version is null || Convert.FromBase64String(version).Length != 8)
+                throw new ValidationException("expectedVersion không hợp lệ.");
+        }
+        catch (FormatException)
+        {
+            throw new ValidationException("expectedVersion không hợp lệ.");
+        }
     }
 }

@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<ITournamentRepository, TournamentRepository>();
         services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
         services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
+        services.AddScoped<ISessionSettlement, SessionSettlement>();
         services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
         services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
 

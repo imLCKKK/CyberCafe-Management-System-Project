@@ -46,7 +46,6 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
             tournamentId, GetOwnCustomerId(), request, cancellationToken);
         return CreatedAtAction(nameof(GetClientRegistrations), new { tournamentId }, registration);
     }
-
     [HttpGet("admin/games")]
     [Authorize(Policy = ApiPolicies.TournamentView)]
     public async Task<IActionResult> GetAdminGames(CancellationToken cancellationToken)
@@ -103,8 +102,13 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
     [HttpPost("admin/tournaments/{tournamentId:int}/transitions")]
     [Authorize(Policy = ApiPolicies.TournamentManage)]
     public async Task<IActionResult> Transition(
-        int tournamentId, [FromBody] TournamentTransitionRequest request, CancellationToken cancellationToken) =>
-        Ok(await tournaments.TransitionAsync(GetEmployeeId(), tournamentId, request.ToStatus, cancellationToken));
+        int tournamentId, [FromBody] TransitionTournamentRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string key, CancellationToken cancellationToken)
+    {
+        var result = await tournaments.TransitionAsync(GetEmployeeId(), tournamentId, key, request, cancellationToken);
+        if (result.Replayed) Response.Headers["Idempotency-Replayed"] = "true";
+        return Ok(result.Tournament);
+    }
 
     [HttpGet("admin/tournaments/{tournamentId:int}/registrations")]
     [Authorize(Policy = ApiPolicies.TournamentView)]
@@ -134,5 +138,3 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
         return employeeId;
     }
 }
-
-public sealed record TournamentTransitionRequest(string ToStatus);

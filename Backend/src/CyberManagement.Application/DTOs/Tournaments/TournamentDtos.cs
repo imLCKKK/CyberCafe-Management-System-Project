@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace CyberManagement.Application.DTOs.Tournaments;
 
 public sealed record GameDto(int GameId, string GameName, int TeamSize, bool IsActive);
@@ -21,6 +23,10 @@ public sealed record TournamentDto(
 
 public sealed record CreateTournamentResult(TournamentDto Tournament, bool Replayed);
 
+public sealed record TransitionTournamentRequest(string ToStatus, string ExpectedVersion);
+
+public sealed record TransitionTournamentResult(TournamentDto Tournament, bool Replayed);
+
 public sealed record CreateTournamentRequest(
     int GameId,
     string Name,
@@ -43,7 +49,8 @@ public sealed record TournamentRegistrationRequest(
     int RankId,
     string? PreferredRole,
     decimal? WinRate,
-    int? HoursPlayed);
+    int? HoursPlayed,
+    string? ExpectedVersion = null);
 
 public sealed record TournamentRegistrationDto(
     int Id,
@@ -58,7 +65,8 @@ public sealed record TournamentRegistrationDto(
     int HoursPlayed,
     decimal? SkillScore,
     string Status,
-    DateTime RegisteredAtUtc);
+    DateTime RegisteredAtUtc,
+    [property: JsonIgnore] decimal? FeeCharged = null);
 
 public sealed record ClientTournamentRegistrationDto(
     int Id,

@@ -14,7 +14,7 @@ public interface ITournamentRepository
         int tournamentId, int customerId, CancellationToken cancellationToken);
     Task<CreateTournamentResult> CreateAsync(int employeeId, string key, CreateTournamentRequest request, CancellationToken cancellationToken);
     Task<TournamentDto> UpdateAsync(int employeeId, int tournamentId, UpdateTournamentRequest request, CancellationToken cancellationToken);
-    Task<TournamentDto> TransitionAsync(int employeeId, int tournamentId, string status, CancellationToken cancellationToken);
+    Task<TransitionTournamentResult> TransitionAsync(int employeeId, int tournamentId, string key, TransitionTournamentRequest request, CancellationToken cancellationToken);
     Task<TournamentRegistrationDto> RegisterAsync(
         int tournamentId, int customerId, TournamentRegistrationRequest request, CancellationToken cancellationToken);
 }

@@ -19,8 +19,18 @@ export const createTournament = (request, key) =>
   apiRequest('/admin/tournaments', { method: 'POST', headers: { 'Idempotency-Key': key }, body: request });
 
 export function tournamentCreateKey(employeeId, request, storage = globalThis.localStorage) {
-  if (!Number.isInteger(employeeId) || employeeId <= 0) throw new Error('Không xác định được nhân viên tạo giải.');
-  const storageKey = `cybermanagement.tournament-create.v1:${employeeId}:${JSON.stringify(request)}`;
+  return tournamentIntentKey('create', employeeId, request, storage);
+}
+
+export function tournamentTransitionKey(employeeId, tournamentId, request, storage = globalThis.localStorage) {
+  return tournamentIntentKey('transition', employeeId, { tournamentId, ...request }, storage);
+}
+
+function tournamentIntentKey(operation, employeeId, request, storage) {
+  const normalizedId = typeof employeeId === 'string' && /^\d+$/.test(employeeId)
+    ? Number(employeeId) : employeeId;
+  if (!Number.isSafeInteger(normalizedId) || normalizedId <= 0) throw new Error('Không xác định được nhân viên tạo giải.');
+  const storageKey = `cybermanagement.tournament-${operation}.v1:${normalizedId}:${JSON.stringify(request)}`;
   let key;
   try {
     key = storage.getItem(storageKey);
@@ -42,9 +52,9 @@ export function clearTournamentCreateKey(intent, storage = globalThis.localStora
 export const updateTournament = (tournamentId, request) =>
   apiRequest(`/admin/tournaments/${tournamentId}`, { method: 'PUT', body: request });
 
-export const transitionTournament = (tournamentId, toStatus) =>
+export const transitionTournament = (tournamentId, request, key) =>
   apiRequest(`/admin/tournaments/${tournamentId}/transitions`, {
-    method: 'POST', body: { toStatus },
+    method: 'POST', headers: { 'Idempotency-Key': key }, body: request,
   });
 
 export const registerTournament = (tournamentId, request) =>

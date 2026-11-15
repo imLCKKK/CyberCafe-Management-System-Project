@@ -5,6 +5,7 @@ using System.Text.Json;
 using CyberManagement.Application.DTOs.Tournaments;
 using CyberManagement.Application.Exceptions;
 using CyberManagement.Application.Interfaces.Repositories;
+using CyberManagement.Application.Wallets;
 using CyberManagement.Domain.Entities;
 using CyberManagement.Infrastructure.Persistance;
 using Microsoft.Data.SqlClient;
@@ -13,7 +14,8 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CyberManagement.Infrastructure.Repositories;
 
-public sealed class TournamentRepository(ApplicationDbContext database) : ITournamentRepository
+public sealed class TournamentRepository(
+    ApplicationDbContext database, IWalletLedgerWriter wallet, ISessionSettlement settlement) : ITournamentRepository
 {
     public async Task<IReadOnlyList<GameDto>> GetGamesAsync(bool includeInactive, CancellationToken cancellationToken) =>
         await database.Games.AsNoTracking()
@@ -54,7 +56,7 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
                 registration.Customer.FullName, registration.RiotId, registration.RankId,
                 registration.Rank.RankName, registration.PreferredRole, registration.WinRate,
                 registration.HoursPlayed, registration.SkillScore, registration.Status,
-                AsUtc(registration.RegisteredAt)))
+                AsUtc(registration.RegisteredAt), registration.FeeCharged))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<ClientTournamentRegistrationDto>> GetClientRegistrationsAsync(
@@ -163,13 +165,29 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
         return result;
     }
 
-    public async Task<TournamentDto> TransitionAsync(
-        int employeeId, int tournamentId, string status, CancellationToken cancellationToken)
+    public async Task<TransitionTournamentResult> TransitionAsync(
+        int employeeId, int tournamentId, string key, TransitionTournamentRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await BeginTransactionAsync(cancellationToken);
         await RequireActiveEmployeeAsync(employeeId, cancellationToken);
         var tournament = await FindTournamentForUpdateAsync(tournamentId, cancellationToken);
-        if (status == "RegistrationOpen")
+        var expectedVersion = Convert.FromBase64String(request.ExpectedVersion);
+        var canonicalVersion = Convert.ToBase64String(expectedVersion);
+        var prior = await database.TournamentTransitions.SingleOrDefaultAsync(
+            row => row.TournamentId == tournamentId && row.EmployeeId == employeeId && row.RequestKey == key,
+            cancellationToken);
+        if (prior is not null)
+        {
+            if (prior.ToStatus != request.ToStatus || prior.ExpectedVersion != canonicalVersion)
+                throw new BusinessRuleException("IdempotencyConflict: khóa đã được dùng với nội dung khác.");
+            var replay = JsonSerializer.Deserialize<TournamentDto>(prior.ResponseJson)
+                ?? throw new InvalidOperationException("Kết quả chuyển trạng thái đã lưu không hợp lệ.");
+            if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+            return new TransitionTournamentResult(replay, true);
+        }
+        if (!tournament.Version.SequenceEqual(expectedVersion))
+            throw new BusinessRuleException("VersionConflict: giải đấu đã thay đổi. Vui lòng tải lại.");
+        if (request.ToStatus == "RegistrationOpen")
         {
             var canOpen = tournament.Status == "Draft"
                 || tournament.Status == "RegistrationClosed" && tournament.RegistrationEnd > DateTime.UtcNow
@@ -178,7 +196,7 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
                 throw new BusinessRuleException("Không thể mở đăng ký ở trạng thái hiện tại hoặc trò chơi đã ngừng hoạt động.");
             tournament.Status = "RegistrationOpen";
         }
-        else if (status == "RegistrationClosed" && tournament.Status == "RegistrationOpen")
+        else if (request.ToStatus == "RegistrationClosed" && tournament.Status == "RegistrationOpen")
         {
             tournament.Status = "RegistrationClosed";
         }
@@ -187,41 +205,70 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
             throw new BusinessRuleException("Trạng thái giải đấu không thể chuyển theo yêu cầu.");
         }
 
-        await database.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await database.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new BusinessRuleException("VersionConflict: giải đấu đã thay đổi. Vui lòng tải lại.");
+        }
         var result = ToDto(tournament, tournament.Game,
             await database.TournamentRegistrations.CountAsync(
                 row => row.TournamentId == tournamentId && row.Status != "Cancelled", cancellationToken));
+        database.TournamentTransitions.Add(new TournamentTransition
+        {
+            TournamentId = tournamentId, EmployeeId = employeeId, RequestKey = key,
+            ToStatus = request.ToStatus, ExpectedVersion = canonicalVersion,
+            ResponseJson = JsonSerializer.Serialize(result)
+        });
+        await database.SaveChangesAsync(cancellationToken);
         if (transaction is not null)
             await transaction.CommitAsync(cancellationToken);
-        return result;
+        return new TransitionTournamentResult(result, false);
     }
 
     public async Task<TournamentRegistrationDto> RegisterAsync(
         int tournamentId, int customerId, TournamentRegistrationRequest request, CancellationToken cancellationToken)
     {
+        var quotedFee = await database.Tournaments.AsNoTracking().Where(row => row.TournamentId == tournamentId)
+            .Select(row => (decimal?)row.EntryFee).SingleOrDefaultAsync(cancellationToken)
+            ?? throw new EntityNotFoundException("Không tìm thấy giải đấu.");
         await using var transaction = await BeginTransactionAsync(cancellationToken);
-        var tournament = await FindTournamentAsync(tournamentId, cancellationToken);
+        var customer = database.Database.IsSqlServer()
+            ? await wallet.LockCustomerAsync(customerId, cancellationToken)
+            : await database.Customers.SingleOrDefaultAsync(item => item.CustomerId == customerId, cancellationToken)
+                ?? throw new EntityNotFoundException("Không tìm thấy khách hàng.");
         var now = DateTime.UtcNow;
+        if (customer.Status != "Active")
+            throw new BusinessRuleException("Tài khoản khách hàng hiện không hoạt động.");
+        if (quotedFee > 0)
+        {
+            if (!database.Database.IsSqlServer())
+                throw new InvalidOperationException("Paid tournament registration requires a SQL Server transaction.");
+            await settlement.BeforeWalletDebitAsync(customerId, now, cancellationToken);
+        }
+        var tournament = await FindTournamentForUpdateAsync(tournamentId, cancellationToken);
+        if (tournament.EntryFee != quotedFee)
+            throw new BusinessRuleException("Lệ phí giải đã thay đổi. Vui lòng tải lại và thử đăng ký.");
+        if (tournament.EntryFee > 0 && request.ExpectedVersion is null
+            || request.ExpectedVersion is not null
+                && !tournament.Version.SequenceEqual(Convert.FromBase64String(request.ExpectedVersion)))
+            throw new BusinessRuleException("Thông tin giải đã thay đổi. Vui lòng tải lại trước khi đăng ký.");
         if (tournament.Status != "RegistrationOpen"
             || now < tournament.RegistrationStart || now >= tournament.RegistrationEnd)
             throw new BusinessRuleException("Giải đấu hiện không nhận đăng ký.");
         if (!tournament.Game.IsActive)
             throw new BusinessRuleException("Trò chơi của giải đấu hiện không hoạt động.");
-        if (tournament.EntryFee != 0)
-            throw new BusinessRuleException("Chưa thể đăng ký giải có phí; hiện chỉ hỗ trợ đăng ký miễn phí.");
-
-        var customer = await database.Customers.SingleOrDefaultAsync(
-            item => item.CustomerId == customerId, cancellationToken)
-            ?? throw new EntityNotFoundException("Không tìm thấy khách hàng.");
-        if (customer.Status != "Active")
-            throw new BusinessRuleException("Tài khoản khách hàng hiện không hoạt động.");
+        if (tournament.EntryFee < 0 || tournament.EntryFee > 999999999
+            || decimal.Truncate(tournament.EntryFee) != tournament.EntryFee)
+            throw new BusinessRuleException("Lệ phí giải không hợp lệ; cần đối soát trước khi đăng ký.");
         if (await database.TournamentRegistrations
             .AnyAsync(row => row.TournamentId == tournamentId && row.CustomerId == customerId, cancellationToken))
             throw new BusinessRuleException("Khách hàng đã đăng ký giải đấu này.");
         if (!await database.GameRanks.AnyAsync(
             rank => rank.RankId == request.RankId && rank.GameId == tournament.GameId, cancellationToken))
             throw new BusinessRuleException("Hạng đã chọn không thuộc trò chơi của giải đấu.");
-
         var rank = await database.GameRanks.SingleAsync(
             item => item.RankId == request.RankId, cancellationToken);
         var maxRankOrder = await database.GameRanks.Where(item => item.GameId == tournament.GameId)
@@ -243,18 +290,31 @@ public sealed class TournamentRepository(ApplicationDbContext database) : ITourn
             HoursPlayed = hoursPlayed,
             SkillScore = skillScore,
             Status = "Registered",
-            RegisteredAt = now
+            RegisteredAt = now,
+            FeeCharged = tournament.EntryFee
         };
         database.TournamentRegistrations.Add(registration);
         var result = new TournamentRegistrationDto(
             registration.RegistrationId, tournamentId, customerId, customer.FullName, registration.RiotId,
             rank.RankId, rank.RankName, registration.PreferredRole, registration.WinRate,
-            registration.HoursPlayed, registration.SkillScore, registration.Status, AsUtc(registration.RegisteredAt));
+            registration.HoursPlayed, registration.SkillScore, registration.Status, AsUtc(registration.RegisteredAt),
+            registration.FeeCharged);
         try
         {
             await database.SaveChangesAsync(cancellationToken);
+            if (tournament.EntryFee > 0)
+            {
+                var source = registration.RegistrationId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var debit = await wallet.RecordAsync(new WalletMutation(customerId, WalletMutationKind.Debit,
+                    tournament.EntryFee, "TournamentFee", "TournamentRegistration", source,
+                    $"TournamentFee:{source}", new WalletActor("System"), now,
+                    Description: $"Đăng ký giải đấu #{tournamentId}"), cancellationToken);
+                registration.ChargeTransaction = debit.Entry;
+                await database.SaveChangesAsync(cancellationToken);
+            }
         }
-        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 } sql
+            && sql.Message.Contains("IX_TournamentRegistrations_TournamentId_CustomerId", StringComparison.Ordinal))
         {
             throw new BusinessRuleException("Khách hàng đã đăng ký giải đấu này.");
         }
