@@ -2616,3 +2616,115 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    DECLARE @var32 nvarchar(max);
+    SELECT @var32 = QUOTENAME([d].[name])
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Invoices]') AND [c].[name] = N'EmployeeId');
+    IF @var32 IS NOT NULL EXEC(N'ALTER TABLE [Invoices] DROP CONSTRAINT ' + @var32 + ';');
+    ALTER TABLE [Invoices] ALTER COLUMN [EmployeeId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    ALTER TABLE [Invoices] ADD [ActorType] nvarchar(10) NOT NULL DEFAULT N'Staff';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    ALTER TABLE [InvoiceDetails] ADD [CancelledAmount] decimal(18,0) NOT NULL DEFAULT 0.0;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    ALTER TABLE [InvoiceDetails] ADD [VoucherCodeSnapshot] nvarchar(50) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    ALTER TABLE [InvoiceDetails] ADD [VoucherDiscountTypeSnapshot] nvarchar(10) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    ALTER TABLE [InvoiceDetails] ADD [VoucherDiscountValueSnapshot] decimal(18,2) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [Invoices] ADD CONSTRAINT [CK_Invoices_Actor] CHECK (([ActorType] = ''Staff'' AND [EmployeeId] IS NOT NULL) OR ([ActorType] = ''System'' AND [EmployeeId] IS NULL AND [GamingSessionId] IS NOT NULL))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [InvoiceDetails] ADD CONSTRAINT [CK_InvoiceDetails_Cancelled] CHECK ([CancelledAmount] >= 0 AND [CancelledAmount] <= [Amount])');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261115142815_AddInvoiceIssuingSnapshots', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115145716_TrackOrderDetailCancellation'
+)
+BEGIN
+    ALTER TABLE [OrderDetails] ADD [Status] nvarchar(30) NOT NULL DEFAULT N'Pending';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115145716_TrackOrderDetailCancellation'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [OrderDetails] ADD CONSTRAINT [CK_OrderDetails_Status] CHECK ([Status] IN (''Pending'',''Confirmed'',''Cancelled''))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115145716_TrackOrderDetailCancellation'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261115145716_TrackOrderDetailCancellation', N'10.0.14');
+END;
+
+COMMIT;
+GO

@@ -234,3 +234,7 @@ Probe chỉ kiểm tra HTTPS/chữ ký, không có SQL/ghi tiền hoặc acknowl
 Ngày 09/11/2026 Query sandbox bằng AppId 554/Key1 dùng thử đã đạt controls chữ ký đúng/sai
 (`2/-101` và `2/-402`), gỡ blocker kết nối trước đó. Xem phạm vi và bằng chứng trong contract;
 Create, callback từ khoản thanh toán thật và ghi tiền vẫn thuộc luồng tích hợp S2.
+
+## Hóa đơn SCRUM-31
+
+[API, phát hành/in và điểm gọi transaction](docs/invoice-api.md).

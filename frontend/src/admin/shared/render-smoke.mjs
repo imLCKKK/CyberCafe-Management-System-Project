@@ -12,11 +12,11 @@ const originalError = console.error;
 const warnings = [];
 console.error = (...args) => { if (!String(args[0]).includes('useLayoutEffect does nothing on the server')) warnings.push(String(args[0])); };
 const frontendRoot = fileURLToPath(new URL('../../../', import.meta.url));
-const server = await createServer({ root: frontendRoot, optimizeDeps: { noDiscovery: true }, resolve: { alias: [{ find: /^(?:\.\.\/)+shared\/auth\/AuthContext(?:\.jsx)?$|^\.\/AuthContext(?:\.jsx)?$/, replacement: fileURLToPath(new URL('../../../tests/auth-render-context.jsx', import.meta.url)) }] }, server: { middlewareMode: true }, appType: 'custom', ssr: { noExternal: ['react-router-dom', 'react-router'], resolve: { conditions: ['module', 'module-sync', 'node', 'development'] } } });
+const server = await createServer({ root: frontendRoot, optimizeDeps: { noDiscovery: true }, resolve: { alias: [{ find: /^(?:\.\.\/)+shared\/auth\/AuthContext(?:\.jsx)?$|^\.\.\/auth\/AuthContext(?:\.jsx)?$|^\.\/AuthContext(?:\.jsx)?$/, replacement: fileURLToPath(new URL('../../../tests/auth-render-context.jsx', import.meta.url)) }] }, server: { middlewareMode: true }, appType: 'custom', ssr: { noExternal: ['react-router-dom', 'react-router'], resolve: { conditions: ['module', 'module-sync', 'node', 'development'] } } });
 try {
   const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
   const { AppRoutes } = await server.ssrLoadModule('/src/app/routes.jsx');
-  const pages = { dashboard: 'Xin chào, Admin', computers: 'Quản lý máy tính', customers: 'Quản lý khách hàng', orders: 'Quản lý gọi món', products: 'Quản lý sản phẩm', inventory: 'Quản lý kho', invoices: 'Hóa đơn &amp; thanh toán', tournaments: 'Quản lý giải đấu', staff: 'Quản lý nhân viên', reports: 'Báo cáo &amp; thống kê' };
+  const pages = { dashboard: 'Xin chào, Admin', computers: 'Quản lý máy tính', customers: 'Quản lý khách hàng', orders: 'Quản lý gọi món', products: 'Quản lý sản phẩm', inventory: 'Quản lý kho', invoices: 'Hóa đơn', tournaments: 'Quản lý giải đấu', staff: 'Quản lý nhân viên', reports: 'Báo cáo &amp; thống kê' };
   for (const [path, title] of Object.entries(pages)) {
     const html = renderToString(React.createElement(MemoryRouter, { initialEntries: [`/admin/${path}`] }, React.createElement(AppRoutes)));
     assert.ok(html.includes(title), `Missing title for ${path}`);
