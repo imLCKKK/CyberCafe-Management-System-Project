@@ -16,6 +16,8 @@ public class GamingSession
 
     public decimal TotalCost { get; set; }
 
+    public decimal? PricePerHourSnapshot { get; set; }
+
     public string Status { get; set; } = "Active";
 
     public Computer Computer { get; set; } = null!;

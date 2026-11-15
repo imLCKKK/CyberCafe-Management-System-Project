@@ -12,6 +12,7 @@ public class GamingSessionConfiguration : IEntityTypeConfiguration<GamingSession
         builder.HasKey(x => x.GamingSessionId);
 
         builder.Property(x => x.TotalCost).HasPrecision(18, 0);
+        builder.Property(x => x.PricePerHourSnapshot).HasPrecision(18, 0);
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();
 
         builder.HasOne(x => x.Computer)

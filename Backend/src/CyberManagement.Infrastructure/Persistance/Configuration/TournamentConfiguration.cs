@@ -14,6 +14,11 @@ public class TournamentConfiguration : IEntityTypeConfiguration<Tournament>
         builder.Property(x => x.TournamentName).HasMaxLength(150).IsRequired();
         builder.Property(x => x.EntryFee).HasPrecision(12, 2);
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();
+        builder.Property(x => x.Version).IsRowVersion();
+        builder.Property(x => x.CreateRequestKey).HasMaxLength(100).UseCollation("Latin1_General_100_BIN2");
+        builder.Property(x => x.CreateRequestFingerprint).HasMaxLength(64).IsUnicode(false);
+        builder.HasIndex(x => new { x.CreatedBy, x.CreateRequestKey }).IsUnique()
+            .HasFilter("[CreateRequestKey] IS NOT NULL");
 
         builder.HasOne(x => x.Game)
             .WithMany(x => x.Tournaments)

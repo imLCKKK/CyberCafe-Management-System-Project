@@ -2616,3 +2616,77 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114115920_AddTournamentRegistrationRiotId'
+)
+BEGIN
+    ALTER TABLE [TournamentRegistrations] ADD [RiotId] nvarchar(128) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114115920_AddTournamentRegistrationRiotId'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261114115920_AddTournamentRegistrationRiotId', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    DROP INDEX [IX_Tournaments_CreatedBy] ON [Tournaments];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    ALTER TABLE [Tournaments] ADD [CreateRequestFingerprint] varchar(64) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    ALTER TABLE [Tournaments] ADD [CreateRequestKey] nvarchar(100) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    ALTER TABLE [Tournaments] ADD [Version] rowversion NOT NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Tournaments_CreatedBy_CreateRequestKey] ON [Tournaments] ([CreatedBy], [CreateRequestKey]) WHERE [CreateRequestKey] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency', N'10.0.14');
+END;
+
+COMMIT;
+GO

@@ -189,6 +189,24 @@ internal static class RealtimeChecks
             Check("Hub closes an active connection when its JWT expires", closed.GetProperty("type").GetInt32() == 7);
         }
 
+        foreach (var recipient in new[] { admin, observer })
+            Check("Computer permission event from reconnect test is drained before next event assertion",
+                Event(await recipient.NextAsync(), "ComputerChanged")
+                    .GetProperty("eventId").GetGuid() != Guid.Empty);
+        var tournamentEvent = NewEvent(RealtimeEvent.TournamentChanged, 47);
+        await publisher.PublishTournamentChangedAsync(tournamentEvent, CancellationToken.None);
+        Check("Tournament event reaches staff with tournament.view",
+            Event(await admin.NextAsync(), RealtimeEvent.TournamentChanged)
+                .GetProperty("eventId").GetGuid() == tournamentEvent.EventId);
+        foreach (var recipient in new[] { customer, otherCustomer })
+            Check("Tournament public event reaches authenticated customers",
+                Event(await recipient.NextAsync(), RealtimeEvent.TournamentChanged)
+                    .GetProperty("eventId").GetGuid() == tournamentEvent.EventId);
+        await ExpectNoEvents(observer, RealtimeAccountType.Staff, observerId,
+            "Staff without tournament.view do not receive tournament events");
+        await ExpectNoEvents(noPermission, RealtimeAccountType.Staff, noPermissionId,
+            "Staff without permission do not receive tournament events");
+
         return checks;
 
         static RealtimeEvent NewEvent(string type, int id) => new(Guid.NewGuid(), type, id, DateTimeOffset.UtcNow);

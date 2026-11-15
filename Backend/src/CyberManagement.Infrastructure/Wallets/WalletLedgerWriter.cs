@@ -184,6 +184,7 @@ public sealed class WalletLedgerWriter(ApplicationDbContext database) : IWalletL
         {
             (WalletMutationKind.Credit, "TopUp", "CounterTopUp" or "ZaloPayTopUp") => true,
             (WalletMutationKind.Debit, "GamingCharge", "SessionCharge") => true,
+            (WalletMutationKind.Debit, "TournamentFee", "TournamentRegistration") => true,
             (WalletMutationKind.Debit, "OrderPayment", "Order") => true,
             (WalletMutationKind.Refund, "OrderRefund", "OrderDetail") => true,
             _ => false

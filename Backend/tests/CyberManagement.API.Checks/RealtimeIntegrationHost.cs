@@ -68,8 +68,10 @@ internal static class RealtimeIntegrationHost
                 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
                 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
                 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+                builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
                 builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
                 builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
+                builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
                 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
                 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
                 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();

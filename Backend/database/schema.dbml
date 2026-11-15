@@ -459,6 +459,7 @@ Table dbo.TournamentRegistrations {
   PreferredRole nvarchar(50) [null]
   RankId int [not null]
   RegisteredAt datetime2 [not null]
+  RiotId nvarchar(128) [null]
   SkillScore decimal(6,2) [null]
   Status nvarchar(50) [not null]
   TournamentId int [not null]
@@ -471,6 +472,8 @@ Table dbo.TournamentRegistrations {
 }
 Table dbo.Tournaments {
   TournamentId int [not null, pk, increment]
+  CreateRequestFingerprint varchar(64) [null]
+  CreateRequestKey nvarchar(100) [null]
   CreatedBy int [not null]
   EntryFee decimal(12,2) [not null]
   GameId int [not null]
@@ -479,8 +482,9 @@ Table dbo.Tournaments {
   StartTime datetime2 [not null]
   Status nvarchar(50) [not null]
   TournamentName nvarchar(150) [not null]
+  Version rowversion [not null]
   indexes {
-    (CreatedBy) [name: 'IX_Tournaments_CreatedBy']
+    (CreatedBy, CreateRequestKey) [name: 'IX_Tournaments_CreatedBy_CreateRequestKey', unique]
     (GameId) [name: 'IX_Tournaments_GameId']
   }
 }

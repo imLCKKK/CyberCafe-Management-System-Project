@@ -10,6 +10,8 @@ public class TournamentRegistration
 
     public int RankId { get; set; }
 
+    public string? RiotId { get; set; }
+
     public string? PreferredRole { get; set; }
 
     public decimal WinRate { get; set; }
@@ -21,6 +23,12 @@ public class TournamentRegistration
     public string Status { get; set; } = "Registered";
 
     public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
+
+    public decimal? FeeCharged { get; set; }
+
+    public int? ChargeTransactionId { get; set; }
+
+    public WalletTransaction? ChargeTransaction { get; set; }
 
     public Tournament Tournament { get; set; } = null!;
 
