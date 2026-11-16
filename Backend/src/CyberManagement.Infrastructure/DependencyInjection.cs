@@ -41,6 +41,9 @@ public static class DependencyInjection
         services.AddScoped<ISessionSettlement, SessionSettlement>();
         services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
         services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
+        services.AddScoped<IVoucherRepository, VoucherRepository>();
+        services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
+        services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
 
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
