@@ -173,15 +173,15 @@ public sealed class VoucherService(
         return ReadApplicationResult(order, promotion.PromotionId);
     }
 
-    // Hủy toàn đơn mới hoàn lượt; giữ nguyên snapshot và lịch sử.
+    // Caller đã xác minh hủy toàn đơn do hủy hoặc hết hạn; giữ snapshot và lịch sử.
     public async Task<bool> ReleaseForCancelledOrderAsync(int orderId, CancellationToken cancellationToken = default)
     {
         RequireTransaction();
         ValidateId(orderId, "Đơn hàng");
         var order = await voucherRepository.GetOrderForUpdateAsync(orderId, cancellationToken)
             ?? throw new EntityNotFoundException($"Không tìm thấy đơn có ID {orderId}.");
-        if (order.Status != "Cancelled")
-            throw new BusinessRuleException("Chỉ hoàn lượt voucher khi đơn đã hủy toàn bộ.");
+        if (order.Status is not ("Cancelled" or "Expired"))
+            throw new BusinessRuleException("Chỉ hoàn lượt voucher khi đơn đã hủy hoặc hết hạn toàn bộ.");
         var usage = await usageRepository.GetByOrderIdAsync(orderId, cancellationToken);
         if (usage is null || usage.ReleasedAt is not null) return false;
         if (usage.CustomerId != order.CustomerId)

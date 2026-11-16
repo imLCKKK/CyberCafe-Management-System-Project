@@ -30,7 +30,7 @@ namespace CyberManagement.Application.Interfaces.Services
         // Caller đã khóa nguồn theo thứ tự chung; không commit tại đây.
         Task<VoucherApplicationResult> ValidateAndUseAsync(int orderId, string code, int customerId, CancellationToken cancellationToken = default);
 
-        // Chỉ hoàn lượt khi nguồn đơn đã được xác minh hủy toàn bộ.
+        // Caller xác minh hủy toàn bộ dòng và lưu nguồn Cancelled/Expired trong transaction chung.
         // True: vừa hoàn; false: đã hoàn hoặc đơn không dùng voucher.
         Task<bool> ReleaseForCancelledOrderAsync(int orderId, CancellationToken cancellationToken = default);
     }

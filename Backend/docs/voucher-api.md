@@ -62,10 +62,15 @@ Repository đọc dữ liệu mới dưới khóa, từ chối thay đổi chưa
 Retry cùng OrderId/mã trả snapshot đã lưu, không tính lại rule hoặc thêm usage.
 Có usage (kể cả đã hoàn) thì mã voucher bất biến; sửa tên/rule không sửa đơn cũ.
 
-Khi hủy toàn đơn, caller xác minh chính sách hủy/tiền/tồn, khóa nguồn và lưu Status=Cancelled trong transaction chung,
+Khi hủy hoặc hết hạn toàn đơn, caller khóa nguồn, xác minh chính sách hủy/tiền/tồn,
+hủy toàn bộ dòng và lưu Status=Cancelled hoặc Expired trong transaction chung,
 rồi gọi `ReleaseForCancelledOrderAsync(orderId, cancellationToken)`.
 Lần đầu true, gọi lại false. Hoàn lượt cập nhật SQL trực tiếp trong transaction, không cần SaveChanges riêng cho ReleasedAt.
-Hủy một phần không gọi hoàn lượt; snapshot và giảm phân bổ giữ nguyên.
+AwaitingPayment chưa hết hạn không được hoàn lượt. Checkout/worker xác minh điều kiện hết hạn và hủy toàn bộ dòng;
+service voucher chỉ kiểm tra trạng thái nguồn đã lưu, không tự quyết định hết hạn hoặc hủy dòng.
+Hủy một phần không gọi hoàn lượt; snapshot và giảm phân bổ giữ nguyên. Retry Expired không đổi ReleasedAt lần đầu;
+đơn khác có thể dùng lượt đã trả, còn đơn Expired đã hoàn lượt không được áp lại voucher.
+Thu muộn không khôi phục đơn hoặc lượt đã hoàn; phần thu/hoàn tiền tiếp tục theo contract checkout.
 Rule voucher không thu/hoàn tiền, trừ/trả tồn hoặc đổi trạng thái đơn thay caller.
 Task checkout nối đường đặt/hủy đơn thực tế; bộ kiểm tra này xác minh điểm gọi qua service.
 
@@ -80,4 +85,5 @@ $env:AUTH_CHECKS_SQL_CONNECTION='Server=(localdb)\MSSQLLocalDB;Integrated Securi
 
 Chỉ dùng database GUID do fixture tạo, migrate mới và tự dọn; không sửa database ứng dụng.
 Kiểm tra quyền HTTP, validation, giá server, trần/làm tròn/phân bổ, hạn mức toàn hệ thống/từng khách,
-retry, snapshot sau sửa rule, hoàn lượt một lần, rollback chung và hai DbContext tranh lượt cuối.
+retry, snapshot sau sửa rule, hoàn lượt một lần khi Cancelled/Expired, trả lại hạn mức,
+rollback cả trạng thái hết hạn và lượt dùng, cùng hai DbContext tranh lượt cuối.

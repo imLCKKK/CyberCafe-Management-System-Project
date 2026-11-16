@@ -221,6 +221,74 @@ internal static class VoucherChecks
             await using (var scope = app.Services.CreateAsyncScope())
                 Check("Release preserves snapshot", (await Db(scope).Orders.AsNoTracking().SingleAsync(x => x.OrderId == orderId)).DiscountAmount == 1);
 
+            var expiryVoucher = await Create(Body("EXPIRY") with { TotalUsageLimit = 1, PerCustomerUsageLimit = 1 });
+            var expiryOrder = await NewOrder(customerA, 100m, 50m);
+            await Apply(expiryOrder, expiryVoucher.Code, customerA);
+            Order expirySnapshot;
+            PromotionUsage usageBeforeExpiry;
+            await using (var scope = app.Services.CreateAsyncScope())
+            {
+                var db = Db(scope);
+                var order = await db.Orders.SingleAsync(x => x.OrderId == expiryOrder);
+                order.Status = "AwaitingPayment";
+                await db.SaveChangesAsync();
+                expirySnapshot = await db.Orders.AsNoTracking().Include(x => x.Details).SingleAsync(x => x.OrderId == expiryOrder);
+                usageBeforeExpiry = await db.PromotionUsages.AsNoTracking().SingleAsync(x => x.OrderId == expiryOrder);
+                await Throws<BusinessRuleException>("AwaitingPayment must not release before expiry",
+                    () => Uow(scope).ExecuteAsync(() => Service(scope).ReleaseForCancelledOrderAsync(expiryOrder)));
+            }
+            var replacementOrder = await NewOrder(customerA, 100m);
+            await Throws<BusinessRuleException>("Reserved gateway order occupies last voucher slot",
+                () => Apply(replacementOrder, expiryVoucher.Code, customerA));
+            Check("Expired gateway order releases its voucher", await Expire(expiryOrder));
+            DateTimeOffset? firstReleasedAt;
+            await using (var scope = app.Services.CreateAsyncScope())
+            {
+                var db = Db(scope);
+                var usage = await db.PromotionUsages.AsNoTracking().SingleAsync(x => x.OrderId == expiryOrder);
+                firstReleasedAt = usage.ReleasedAt;
+                Check("Expiry retains usage identity and original usage time", usage.PromotionUsageId == usageBeforeExpiry.PromotionUsageId
+                    && usage.UsedAt == usageBeforeExpiry.UsedAt && usage.ReleasedAt >= usage.UsedAt);
+                Check("Expiry frees global and personal quota", !await db.PromotionUsages.AnyAsync(x => x.PromotionId == expiryVoucher.Id && x.ReleasedAt == null));
+                var order = await db.Orders.AsNoTracking().Include(x => x.Details).SingleAsync(x => x.OrderId == expiryOrder);
+                Check("Expiry preserves Expired status and all discount snapshots", order.Status == "Expired"
+                    && order.VoucherCodeSnapshot == expirySnapshot.VoucherCodeSnapshot
+                    && order.VoucherDiscountTypeSnapshot == expirySnapshot.VoucherDiscountTypeSnapshot
+                    && order.VoucherDiscountValueSnapshot == expirySnapshot.VoucherDiscountValueSnapshot
+                    && order.DiscountAmount == expirySnapshot.DiscountAmount && order.TotalAmount == expirySnapshot.TotalAmount
+                    && order.Details.OrderBy(x => x.OrderDetailId).Select(x => (x.OrderDetailId, x.UnitPrice, x.Quantity, x.ProductNameSnapshot, x.DiscountAmount))
+                        .SequenceEqual(expirySnapshot.Details.OrderBy(x => x.OrderDetailId).Select(x => (x.OrderDetailId, x.UnitPrice, x.Quantity, x.ProductNameSnapshot, x.DiscountAmount))));
+            }
+            Check("Repeated expiry does not release again", !await Expire(expiryOrder));
+            await using (var scope = app.Services.CreateAsyncScope())
+                Check("Expiry retry retains the first release timestamp", (await Db(scope).PromotionUsages.AsNoTracking()
+                    .SingleAsync(x => x.OrderId == expiryOrder)).ReleasedAt == firstReleasedAt);
+            await Throws<BusinessRuleException>("Expired released order cannot reapply its voucher",
+                () => Apply(expiryOrder, expiryVoucher.Code, customerA));
+            await Apply(replacementOrder, expiryVoucher.Code, customerA);
+            Check("Another order can use the returned global and personal slot", true);
+            Check("Late expiry retry does not release the replacement order slot", !await Expire(expiryOrder));
+            await using (var scope = app.Services.CreateAsyncScope())
+                Check("Replacement usage stays active and expired history remains", await Db(scope).PromotionUsages
+                    .CountAsync(x => x.PromotionId == expiryVoucher.Id) == 2 && await Db(scope).PromotionUsages
+                    .CountAsync(x => x.PromotionId == expiryVoucher.Id && x.OrderId == replacementOrder && x.ReleasedAt == null) == 1);
+
+            var expiryRollbackVoucher = await Create(Body("EXPIRYROLLBACK") with { TotalUsageLimit = 1 });
+            var expiryRollbackOrder = await NewOrder(customerA, 100m);
+            await Apply(expiryRollbackOrder, expiryRollbackVoucher.Code, customerA);
+            await using (var scope = app.Services.CreateAsyncScope())
+            {
+                var order = await Db(scope).Orders.SingleAsync(x => x.OrderId == expiryRollbackOrder);
+                order.Status = "AwaitingPayment"; await Db(scope).SaveChangesAsync();
+            }
+            await Throws<CheckRollback>("Caller rollback undoes expiry and voucher release",
+                () => Expire(expiryRollbackOrder, rollback: true));
+            await using (var scope = app.Services.CreateAsyncScope())
+                Check("Rolled-back expiry retains reservation and source state", (await Db(scope).Orders.AsNoTracking()
+                    .SingleAsync(x => x.OrderId == expiryRollbackOrder)).Status == "AwaitingPayment"
+                    && await Db(scope).PromotionUsages.AnyAsync(x => x.OrderId == expiryRollbackOrder && x.ReleasedAt == null));
+            Check("Expiry can succeed after caller rollback", await Expire(expiryRollbackOrder));
+
             var personal = await Create(Body("PERSONAL") with { PerCustomerUsageLimit = 1 });
             var personalA = await NewOrder(customerA, 100m);
             await Apply(personalA, personal.Code, customerA);
@@ -363,6 +431,25 @@ internal static class VoucherChecks
                     order!.Status = "Cancelled";
                     await Uow(scope).SaveChangesAsync();
                     return await Service(scope).ReleaseForCancelledOrderAsync(id);
+                });
+            }
+            // Caller mô phỏng xác minh hết hạn/hủy toàn đơn; voucher chỉ hoàn lượt.
+            async Task<bool> Expire(int id, bool rollback = false)
+            {
+                await using var scope = app.Services.CreateAsyncScope();
+                return await Uow(scope).ExecuteAsync(async () =>
+                {
+                    var customerId = await Db(scope).Orders.AsNoTracking().Where(x => x.OrderId == id).Select(x => x.CustomerId).SingleAsync();
+                    await Db(scope).Customers.FromSqlInterpolated(
+                        $"SELECT * FROM [dbo].[Customers] WITH (UPDLOCK, HOLDLOCK) WHERE [CustomerId] = {customerId}")
+                        .AsNoTracking().SingleAsync();
+                    var order = await scope.ServiceProvider.GetRequiredService<IVoucherRepository>().GetOrderForUpdateAsync(id);
+                    if (order!.Status is not ("AwaitingPayment" or "Expired")) throw new Exception("Invalid expiry fixture state.");
+                    order.Status = "Expired";
+                    await Uow(scope).SaveChangesAsync();
+                    var released = await Service(scope).ReleaseForCancelledOrderAsync(id);
+                    if (rollback) throw new CheckRollback();
+                    return released;
                 });
             }
             static ApplicationDbContext Db(AsyncServiceScope scope) => scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
