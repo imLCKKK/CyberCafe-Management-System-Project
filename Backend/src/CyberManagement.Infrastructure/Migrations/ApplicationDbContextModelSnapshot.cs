@@ -488,6 +488,10 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<DateTime?>("LastChargedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal?>("PricePerHourSnapshot")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("datetime2");
 
@@ -529,6 +533,11 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<int?>("EmployeeId")
                         .HasColumnType("int");
 
+                    b.Property<string>("OperationKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
                     b.Property<int?>("OrderDetailId")
                         .HasColumnType("int");
 
@@ -563,6 +572,10 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.HasIndex("EmployeeId");
 
+                    b.HasIndex("OperationKey")
+                        .IsUnique()
+                        .HasFilter("[OperationKey] IS NOT NULL");
+
                     b.HasIndex("OrderId");
 
                     b.HasIndex("ProductId");
@@ -575,6 +588,8 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.ToTable("InventoryTransactions", null, t =>
                         {
+                            t.HasCheckConstraint("CK_InventoryTransactions_OperationKey", "[OperationKey] IS NULL OR LEN(LTRIM(RTRIM([OperationKey]))) > 0");
+
                             t.HasCheckConstraint("CK_InventoryTransactions_Reason", "LEN(LTRIM(RTRIM([Reason]))) BETWEEN 1 AND 200");
 
                             t.HasCheckConstraint("CK_InventoryTransactions_Type", "(([Type] IN ('Receive','Return') AND [Quantity] > 0) OR ([Type] = 'Sale' AND [Quantity] < 0) OR ([Type] = 'Adjust' AND [Quantity] <> 0)) AND (([Type] IN ('Receive','Adjust') AND [OrderDetailId] IS NULL) OR ([Type] IN ('Sale','Return') AND [OrderDetailId] IS NOT NULL AND [OrderId] IS NOT NULL))");
@@ -591,6 +606,13 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("InvoiceId"));
 
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasDefaultValue("Staff");
+
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
 
@@ -598,7 +620,7 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
 
-                    b.Property<int>("EmployeeId")
+                    b.Property<int?>("EmployeeId")
                         .HasColumnType("int");
 
                     b.Property<int?>("GamingSessionId")
@@ -635,6 +657,8 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.ToTable("Invoices", null, t =>
                         {
+                            t.HasCheckConstraint("CK_Invoices_Actor", "([ActorType] = 'Staff' AND [EmployeeId] IS NOT NULL) OR ([ActorType] = 'System' AND [EmployeeId] IS NULL AND [GamingSessionId] IS NOT NULL)");
+
                             t.HasCheckConstraint("CK_Invoices_Amounts", "[Subtotal] >= 0 AND [Discount] >= 0 AND [Discount] <= [Subtotal] AND [TotalAmount] = [Subtotal] - [Discount]");
 
                             t.HasCheckConstraint("CK_Invoices_Status", "[Status] IN ('Unpaid','Paid','Cancelled')");
@@ -652,6 +676,12 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<decimal>("Amount")
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
+
+                    b.Property<decimal>("CancelledAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)")
+                        .HasDefaultValue(0m);
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -679,6 +709,18 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
 
+                    b.Property<string>("VoucherCodeSnapshot")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("VoucherDiscountTypeSnapshot")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal?>("VoucherDiscountValueSnapshot")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.HasKey("InvoiceDetailId");
 
                     b.HasIndex("InvoiceId");
@@ -693,6 +735,8 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.ToTable("InvoiceDetails", null, t =>
                         {
+                            t.HasCheckConstraint("CK_InvoiceDetails_Cancelled", "[CancelledAmount] >= 0 AND [CancelledAmount] <= [Amount]");
+
                             t.HasCheckConstraint("CK_InvoiceDetails_Source", "([OrderDetailId] IS NOT NULL AND [SessionChargeId] IS NULL) OR ([OrderDetailId] IS NULL AND [SessionChargeId] IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_InvoiceDetails_Values", "[Quantity] > 0 AND [UnitPrice] >= 0 AND [Amount] >= 0 AND [Amount] <= [UnitPrice] * [Quantity]");
@@ -830,6 +874,13 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Pending");
+
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
@@ -843,6 +894,8 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.ToTable("OrderDetails", null, t =>
                         {
                             t.HasCheckConstraint("CK_OrderDetails_NameSnapshot", "LEN(LTRIM(RTRIM([ProductNameSnapshot]))) > 0");
+
+                            t.HasCheckConstraint("CK_OrderDetails_Status", "[Status] IN ('Pending','Confirmed','Cancelled')");
 
                             t.HasCheckConstraint("CK_OrderDetails_Values", "[Quantity] > 0 AND [UnitPrice] >= 0 AND [DiscountAmount] >= 0 AND [DiscountAmount] <= [UnitPrice] * [Quantity]");
                         });
@@ -1469,6 +1522,16 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TournamentId"));
 
+                    b.Property<string>("CreateRequestFingerprint")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("CreateRequestKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
                     b.Property<int>("CreatedBy")
                         .HasColumnType("int");
 
@@ -1498,11 +1561,19 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<byte[]>("Version")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.HasKey("TournamentId");
 
-                    b.HasIndex("CreatedBy");
-
                     b.HasIndex("GameId");
+
+                    b.HasIndex("CreatedBy", "CreateRequestKey")
+                        .IsUnique()
+                        .HasFilter("[CreateRequestKey] IS NOT NULL");
 
                     b.ToTable("Tournaments", (string)null);
                 });
@@ -1515,8 +1586,15 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RegistrationId"));
 
+                    b.Property<int?>("ChargeTransactionId")
+                        .HasColumnType("int");
+
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
+
+                    b.Property<decimal?>("FeeCharged")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
 
                     b.Property<int>("HoursPlayed")
                         .HasColumnType("int");
@@ -1530,6 +1608,10 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.Property<DateTime>("RegisteredAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("RiotId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<decimal?>("SkillScore")
                         .HasPrecision(6, 2)
@@ -1549,6 +1631,10 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.HasKey("RegistrationId");
 
+                    b.HasIndex("ChargeTransactionId")
+                        .IsUnique()
+                        .HasFilter("[ChargeTransactionId] IS NOT NULL");
+
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("RankId");
@@ -1557,6 +1643,50 @@ namespace CyberManagement.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("TournamentRegistrations", (string)null);
+                });
+
+            modelBuilder.Entity("CyberManagement.Domain.Entities.TournamentTransition", b =>
+                {
+                    b.Property<int>("TournamentTransitionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TournamentTransitionId"));
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ExpectedVersion")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<string>("RequestKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("ResponseJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("TournamentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("TournamentTransitionId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("TournamentId", "EmployeeId", "RequestKey")
+                        .IsUnique();
+
+                    b.ToTable("TournamentTransitions", (string)null);
                 });
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.WalletTransaction", b =>
@@ -1825,8 +1955,7 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.HasOne("CyberManagement.Domain.Entities.Employee", "Employee")
                         .WithMany()
                         .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("CyberManagement.Domain.Entities.GamingSession", "GamingSession")
                         .WithMany()
@@ -2190,6 +2319,11 @@ namespace CyberManagement.Infrastructure.Migrations
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.TournamentRegistration", b =>
                 {
+                    b.HasOne("CyberManagement.Domain.Entities.WalletTransaction", "ChargeTransaction")
+                        .WithMany()
+                        .HasForeignKey("ChargeTransactionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("CyberManagement.Domain.Entities.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
@@ -2208,9 +2342,30 @@ namespace CyberManagement.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("ChargeTransaction");
+
                     b.Navigation("Customer");
 
                     b.Navigation("Rank");
+
+                    b.Navigation("Tournament");
+                });
+
+            modelBuilder.Entity("CyberManagement.Domain.Entities.TournamentTransition", b =>
+                {
+                    b.HasOne("CyberManagement.Domain.Entities.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CyberManagement.Domain.Entities.Tournament", "Tournament")
+                        .WithMany()
+                        .HasForeignKey("TournamentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
 
                     b.Navigation("Tournament");
                 });

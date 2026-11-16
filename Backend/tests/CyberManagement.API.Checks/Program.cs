@@ -29,6 +29,11 @@ if (args.Contains("--voucher-only"))
     return;
 }
 
+if (args.Contains("--invoice-only") || args.Contains("--invoice-browser-host"))
+{
+    Console.WriteLine($"{await InvoiceChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"), args.Contains("--invoice-browser-host"))} invoice SQL/API checks passed.");
+    return;
+}
 if (args.Contains("--counter-demo-seed"))
 {
     await CounterDemoSeed.RunAsync();
@@ -115,14 +120,21 @@ builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
 builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
 builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
+builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
 builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
 builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
 builder.Services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
+builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+builder.Services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
+builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
+builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
+builder.Services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
 builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
 builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
 builder.Services
@@ -273,6 +285,7 @@ try
     {
         checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
         checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+        checks += await TournamentChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
     }
     if (!customerOnly && !walletOnly)
         checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);

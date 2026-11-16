@@ -55,6 +55,11 @@ internal static class CustomerBrowserHost
         builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
         builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
         builder.Services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
+        builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        builder.Services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
+        builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
+        builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
+        builder.Services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
         builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
         builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
         builder.Services.AddControllers().AddApplicationPart(typeof(AuthController).Assembly);

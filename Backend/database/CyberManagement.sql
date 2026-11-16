@@ -2337,6 +2337,43 @@ GO
 BEGIN TRANSACTION;
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114071953_AddInventoryMovementOperationKey'
+)
+BEGIN
+    ALTER TABLE [InventoryTransactions] ADD [OperationKey] nvarchar(200) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114071953_AddInventoryMovementOperationKey'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_InventoryTransactions_OperationKey] ON [InventoryTransactions] ([OperationKey]) WHERE [OperationKey] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114071953_AddInventoryMovementOperationKey'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [InventoryTransactions] ADD CONSTRAINT [CK_InventoryTransactions_OperationKey] CHECK ([OperationKey] IS NULL OR LEN(LTRIM(RTRIM([OperationKey]))) > 0)');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114071953_AddInventoryMovementOperationKey'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261114071953_AddInventoryMovementOperationKey', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
     WHERE [MigrationId] = N'20261114112809_WalletLedgerCounterTopUps'
 )
 BEGIN
@@ -2575,6 +2612,293 @@ IF NOT EXISTS (
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
     VALUES (N'20261114112818_CounterTopUpBonuses', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114115920_AddTournamentRegistrationRiotId'
+)
+BEGIN
+    ALTER TABLE [TournamentRegistrations] ADD [RiotId] nvarchar(128) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114115920_AddTournamentRegistrationRiotId'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261114115920_AddTournamentRegistrationRiotId', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    DROP INDEX [IX_Tournaments_CreatedBy] ON [Tournaments];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    ALTER TABLE [Tournaments] ADD [CreateRequestFingerprint] varchar(64) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    ALTER TABLE [Tournaments] ADD [CreateRequestKey] nvarchar(100) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    ALTER TABLE [Tournaments] ADD [Version] rowversion NOT NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Tournaments_CreatedBy_CreateRequestKey] ON [Tournaments] ([CreatedBy], [CreateRequestKey]) WHERE [CreateRequestKey] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261115041906_AddTournamentConcurrencyAndCreateIdempotency', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115113051_AddTournamentWalletSettlement'
+)
+BEGIN
+    ALTER TABLE [TournamentRegistrations] ADD [ChargeTransactionId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115113051_AddTournamentWalletSettlement'
+)
+BEGIN
+    ALTER TABLE [TournamentRegistrations] ADD [FeeCharged] decimal(18,0) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115113051_AddTournamentWalletSettlement'
+)
+BEGIN
+    ALTER TABLE [GamingSessions] ADD [PricePerHourSnapshot] decimal(18,0) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115113051_AddTournamentWalletSettlement'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_TournamentRegistrations_ChargeTransactionId] ON [TournamentRegistrations] ([ChargeTransactionId]) WHERE [ChargeTransactionId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115113051_AddTournamentWalletSettlement'
+)
+BEGIN
+    ALTER TABLE [TournamentRegistrations] ADD CONSTRAINT [FK_TournamentRegistrations_WalletTransactions_ChargeTransactionId] FOREIGN KEY ([ChargeTransactionId]) REFERENCES [WalletTransactions] ([TransactionId]) ON DELETE NO ACTION;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115113051_AddTournamentWalletSettlement'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261115113051_AddTournamentWalletSettlement', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115115310_AddTournamentTransitionIdempotency'
+)
+BEGIN
+    CREATE TABLE [TournamentTransitions] (
+        [TournamentTransitionId] int NOT NULL IDENTITY,
+        [TournamentId] int NOT NULL,
+        [EmployeeId] int NOT NULL,
+        [RequestKey] nvarchar(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [ToStatus] nvarchar(50) NOT NULL,
+        [ExpectedVersion] nvarchar(12) NOT NULL,
+        [ResponseJson] nvarchar(max) NOT NULL,
+        CONSTRAINT [PK_TournamentTransitions] PRIMARY KEY ([TournamentTransitionId]),
+        CONSTRAINT [FK_TournamentTransitions_Employees_EmployeeId] FOREIGN KEY ([EmployeeId]) REFERENCES [Employees] ([EmployeeId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_TournamentTransitions_Tournaments_TournamentId] FOREIGN KEY ([TournamentId]) REFERENCES [Tournaments] ([TournamentId]) ON DELETE NO ACTION
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115115310_AddTournamentTransitionIdempotency'
+)
+BEGIN
+    CREATE INDEX [IX_TournamentTransitions_EmployeeId] ON [TournamentTransitions] ([EmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115115310_AddTournamentTransitionIdempotency'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_TournamentTransitions_TournamentId_EmployeeId_RequestKey] ON [TournamentTransitions] ([TournamentId], [EmployeeId], [RequestKey]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115115310_AddTournamentTransitionIdempotency'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261115115310_AddTournamentTransitionIdempotency', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    DECLARE @var32 nvarchar(max);
+    SELECT @var32 = QUOTENAME([d].[name])
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Invoices]') AND [c].[name] = N'EmployeeId');
+    IF @var32 IS NOT NULL EXEC(N'ALTER TABLE [Invoices] DROP CONSTRAINT ' + @var32 + ';');
+    ALTER TABLE [Invoices] ALTER COLUMN [EmployeeId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    ALTER TABLE [Invoices] ADD [ActorType] nvarchar(10) NOT NULL DEFAULT N'Staff';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    ALTER TABLE [InvoiceDetails] ADD [CancelledAmount] decimal(18,0) NOT NULL DEFAULT 0.0;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    ALTER TABLE [InvoiceDetails] ADD [VoucherCodeSnapshot] nvarchar(50) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    ALTER TABLE [InvoiceDetails] ADD [VoucherDiscountTypeSnapshot] nvarchar(10) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    ALTER TABLE [InvoiceDetails] ADD [VoucherDiscountValueSnapshot] decimal(18,2) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [Invoices] ADD CONSTRAINT [CK_Invoices_Actor] CHECK (([ActorType] = ''Staff'' AND [EmployeeId] IS NOT NULL) OR ([ActorType] = ''System'' AND [EmployeeId] IS NULL AND [GamingSessionId] IS NOT NULL))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [InvoiceDetails] ADD CONSTRAINT [CK_InvoiceDetails_Cancelled] CHECK ([CancelledAmount] >= 0 AND [CancelledAmount] <= [Amount])');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115142815_AddInvoiceIssuingSnapshots'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261115142815_AddInvoiceIssuingSnapshots', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115145716_TrackOrderDetailCancellation'
+)
+BEGIN
+    ALTER TABLE [OrderDetails] ADD [Status] nvarchar(30) NOT NULL DEFAULT N'Pending';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115145716_TrackOrderDetailCancellation'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [OrderDetails] ADD CONSTRAINT [CK_OrderDetails_Status] CHECK ([Status] IN (''Pending'',''Confirmed'',''Cancelled''))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261115145716_TrackOrderDetailCancellation'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261115145716_TrackOrderDetailCancellation', N'10.0.14');
 END;
 
 COMMIT;

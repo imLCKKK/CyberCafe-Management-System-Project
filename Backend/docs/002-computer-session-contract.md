@@ -87,7 +87,7 @@ Ví dụ `P = 10.000`: tổng phí tại 0/60/120/180 giây là 0/167/334/500 đ
 
 Khi đóng có thu bổ sung, khoản thu cuối, kết thúc phiên, trạng thái máy và hóa đơn/payment phải cùng transaction. Nếu tất cả phí đã thu trước đó, transaction đóng chỉ lập chứng từ/thay trạng thái. Quyết định 14/11/2026 chọn actor `System` cho tự đóng, còn người mở phiên được lưu riêng. Migration bổ sung cho `Invoice.EmployeeId` nullable cùng `ActorType` và ràng buộc tại mục 5.1 cho phép phát hành đúng nguồn thực hiện.
 
-Các thiếu hụt schema hiện đã xác minh gồm snapshot giá/người mở/lý do đóng trên GamingSession, liên kết ledger và khóa chống lặp cho SessionCharge/WalletTransaction, ràng buộc phiên chưa đóng theo máy/khách và nguồn hóa đơn. Dữ liệu actor được chốt tại mục 5.1 ngày 14/11/2026 làm đầu vào triển khai Sprint 2. Phúc/Minh/Trường thực hiện migration và kiểm thử phần module mình, dựa trên entity/config và lịch sử migration thực tế.
+Các thiếu hụt schema đã xác minh gồm snapshot giá/người mở/lý do đóng trên GamingSession, liên kết ledger và khóa chống lặp cho SessionCharge/WalletTransaction, ràng buộc phiên chưa đóng theo máy/khách và nguồn hóa đơn. Ngày 15/11, migration phí giải thêm `PricePerHourSnapshot` nullable; hàng lịch sử không tự suy giá, còn module mở phiên phải lưu snapshot thật. Những phần còn lại và worker đóng phiên vẫn do Phúc/Minh/Trường phối hợp triển khai và kiểm thử theo entity/config và lịch sử migration thực tế.
 
 ### Đối chiếu SCRUM-12 ngày 06/11/2026
 

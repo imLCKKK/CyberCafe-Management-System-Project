@@ -4,6 +4,10 @@ export { opggUrl } from '../../../../Backend/integrations/opgg/shared.js';
 export const roles = ['Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex'];
 export const statColumns = [['winRate', 'Tỷ lệ thắng', '%'], ['headshotRate', 'Headshot', '%'], ['damagePerRound', 'Damage / round', ''], ['kda', 'KDA', '']];
 
+export function validRankSelection(rankId, ranks) {
+  return ranks.some((rank) => String(rank.rankId) === rankId) ? rankId : ranks.length ? String(ranks[0].rankId) : '';
+}
+
 export function getParticipants(db, tournamentId) {
   return db.TournamentRegistrations.filter((row) => row.TournamentId === tournamentId && row.Status !== 'Cancelled').map((row) => {
     let stats;

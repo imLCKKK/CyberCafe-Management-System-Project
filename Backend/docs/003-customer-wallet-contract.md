@@ -110,6 +110,7 @@ Tạo hóa đơn sau đó chỉ liên kết các khoản thu, không debit lại
 | Nạp quầy đã thu | Credit / `TopUp` / dương | `CounterTopUp` / RequestId | `CounterTopUp:{requestId}` |
 | Điểm nối nạp ZaloPay đã xác minh | Credit / `TopUp` / dương | `ZaloPayTopUp` / merchantTransactionId | `ZaloPayTopUp:{merchantTransactionId}` |
 | Điểm nối phí phiên | Debit / `GamingCharge` / âm | `SessionCharge` / ID hoặc khóa kỳ thu duy nhất | `SessionCharge:{sessionId}:{chargedThroughUtcTicks}` |
+| Phí đăng ký giải | Debit / `TournamentFee` / âm | `TournamentRegistration` / RegistrationId | `TournamentFee:{registrationId}` |
 | Điểm nối đơn ví | Debit / `OrderPayment` / âm | `Order` / OrderId | `OrderPayment:{orderId}` |
 | Điểm nối hoàn dòng đơn ví | Refund / `OrderRefund` / dương | `OrderDetail` / OrderId:OrderDetailId | `OrderRefund:{orderId}:{orderDetailId}` |
 
