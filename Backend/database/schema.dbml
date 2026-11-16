@@ -143,6 +143,7 @@ Table dbo.GamingSessions {
   CustomerId int [not null]
   EndTime datetime2 [null]
   LastChargedAt datetime2 [null]
+  PricePerHourSnapshot decimal(18,0) [null]
   StartTime datetime2 [not null]
   Status nvarchar(50) [not null]
   TotalCost decimal(18,0) [not null]
@@ -178,6 +179,7 @@ Table dbo.InventoryTransactions {
 Table dbo.InvoiceDetails {
   InvoiceDetailId int [not null, pk, increment]
   Amount decimal(18,0) [not null]
+  CancelledAmount decimal(18,0) [not null, default: `0`]
   Description nvarchar(255) [not null]
   InvoiceId int [not null]
   ItemType nvarchar(50) [not null]
@@ -185,6 +187,9 @@ Table dbo.InvoiceDetails {
   Quantity int [not null]
   SessionChargeId int [null]
   UnitPrice decimal(18,0) [not null]
+  VoucherCodeSnapshot nvarchar(50) [null]
+  VoucherDiscountTypeSnapshot nvarchar(10) [null]
+  VoucherDiscountValueSnapshot decimal(18,2) [null]
   indexes {
     (InvoiceId) [name: 'IX_InvoiceDetails_InvoiceId']
     (OrderDetailId) [name: 'IX_InvoiceDetails_OrderDetailId', unique]
@@ -209,9 +214,10 @@ Table dbo.InvoiceOrders {
 }
 Table dbo.Invoices {
   InvoiceId int [not null, pk, increment]
+  ActorType nvarchar(10) [not null, default: `Staff`]
   CustomerId int [not null]
   Discount decimal(18,0) [not null]
-  EmployeeId int [not null]
+  EmployeeId int [null]
   GamingSessionId int [null]
   InvoiceDate datetime2 [not null]
   PromotionId int [null]
@@ -232,6 +238,7 @@ Table dbo.OrderDetails {
   ProductId int [not null]
   ProductNameSnapshot nvarchar(150) [not null]
   Quantity int [not null]
+  Status nvarchar(30) [not null, default: `Pending`]
   UnitPrice decimal(18,0) [not null]
   indexes {
     (OrderId) [name: 'IX_OrderDetails_OrderId']
@@ -454,7 +461,9 @@ Table dbo.Teams {
 }
 Table dbo.TournamentRegistrations {
   RegistrationId int [not null, pk, increment]
+  ChargeTransactionId int [null]
   CustomerId int [not null]
+  FeeCharged decimal(18,0) [null]
   HoursPlayed int [not null]
   PreferredRole nvarchar(50) [null]
   RankId int [not null]
@@ -465,6 +474,7 @@ Table dbo.TournamentRegistrations {
   TournamentId int [not null]
   WinRate decimal(5,2) [not null]
   indexes {
+    (ChargeTransactionId) [name: 'IX_TournamentRegistrations_ChargeTransactionId', unique]
     (CustomerId) [name: 'IX_TournamentRegistrations_CustomerId']
     (RankId) [name: 'IX_TournamentRegistrations_RankId']
     (TournamentId, CustomerId) [name: 'IX_TournamentRegistrations_TournamentId_CustomerId', unique]
@@ -486,6 +496,19 @@ Table dbo.Tournaments {
   indexes {
     (CreatedBy, CreateRequestKey) [name: 'IX_Tournaments_CreatedBy_CreateRequestKey', unique]
     (GameId) [name: 'IX_Tournaments_GameId']
+  }
+}
+Table dbo.TournamentTransitions {
+  TournamentTransitionId int [not null, pk, increment]
+  EmployeeId int [not null]
+  ExpectedVersion nvarchar(12) [not null]
+  RequestKey nvarchar(100) [not null]
+  ResponseJson nvarchar(max) [not null]
+  ToStatus nvarchar(50) [not null]
+  TournamentId int [not null]
+  indexes {
+    (EmployeeId) [name: 'IX_TournamentTransitions_EmployeeId']
+    (TournamentId, EmployeeId, RequestKey) [name: 'IX_TournamentTransitions_TournamentId_EmployeeId_RequestKey', unique]
   }
 }
 Table dbo.WalletTransactions {
@@ -572,8 +595,11 @@ Ref: dbo.Teams.(TournamentId) > dbo.Tournaments.(TournamentId)
 Ref: dbo.TournamentRegistrations.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.TournamentRegistrations.(RankId) > dbo.GameRanks.(RankId)
 Ref: dbo.TournamentRegistrations.(TournamentId) > dbo.Tournaments.(TournamentId)
+Ref: dbo.TournamentRegistrations.(ChargeTransactionId) > dbo.WalletTransactions.(TransactionId)
 Ref: dbo.Tournaments.(CreatedBy) > dbo.Employees.(EmployeeId)
 Ref: dbo.Tournaments.(GameId) > dbo.Games.(GameId)
+Ref: dbo.TournamentTransitions.(EmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.TournamentTransitions.(TournamentId) > dbo.Tournaments.(TournamentId)
 Ref: dbo.WalletTransactions.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.WalletTransactions.(ActorEmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.WalletTransactions.(OriginalDebitId) > dbo.WalletTransactions.(TransactionId)
