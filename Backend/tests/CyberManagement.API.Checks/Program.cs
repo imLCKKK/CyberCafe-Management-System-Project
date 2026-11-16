@@ -27,6 +27,12 @@ if (args.Contains("--realtime-host", StringComparer.Ordinal))
     return;
 }
 
+if (args.Contains("--session-schema", StringComparer.Ordinal))
+{
+    SessionSchemaChecks.RunModel();
+    return;
+}
+
 if (args.Contains("--computer-browser-host"))
 {
     await ComputerBrowserHost.RunAsync();
@@ -218,6 +224,10 @@ try
     {
         checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
         checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+        checks += await ComputerManagementChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+        checks += SessionSchemaChecks.RunModel();
+        await using var sessionSchemaScope = app.Services.CreateAsyncScope();
+        checks += await SessionSchemaChecks.RunSqlAsync(sessionSchemaScope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
     }
     checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
 

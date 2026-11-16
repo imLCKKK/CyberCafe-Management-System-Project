@@ -5,6 +5,7 @@ import { statusLabels, currency } from './mockData';
 import { PageHeading, StatCard, Station, StatusBadge, Modal } from './components/CafeUI';
 import { updateComputerStatus } from './computerApi';
 import { useComputerData } from './useComputerData';
+import { ComputerEditor, ComputerTypesDialog, MaintenancePanel } from './ComputerManagement';
 import { getAccessToken } from '../../shared/auth/api';
 import '../shared/cafe.css';
 
@@ -29,6 +30,7 @@ export function ComputersPage() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [actionError, setActionError] = useState('');
+  const [editor, setEditor] = useState(null);
   const pending = useRef(null);
   useEffect(() => () => pending.current?.abort(), []);
   useEffect(() => { if (loading) { setNotice(''); setActionError(''); } }, [loading]);
@@ -37,6 +39,8 @@ export function ComputersPage() {
   const selected = computers.find((pc) => pc.ComputerId === Number(params.get('computer')));
   const selectedType = selected && typeById.get(selected.ComputerTypeId);
   const canUpdate = permissions.includes('computer.status.update');
+  const canManage = permissions.includes('computer.manage');
+  const onManaged = (message) => { setNotice(message); reload(); };
   const counts = { Available: 0, Occupied: 0, Maintenance: 0, Other: 0 };
   let readyCount = 0;
   for (const pc of computers) {
@@ -82,6 +86,11 @@ export function ComputersPage() {
     <section className="cafe-page cafe-computers" aria-busy={loading || refreshing}>
       <PageHeading eyebrow="KHÔNG GIAN LÀM VIỆC / MÁY TÍNH" title="Quản lý máy tính"
         description="Theo dõi trạng thái và quản lý toàn bộ máy tại quán.">
+        {canManage && !loading && !error && <>
+          <button className="cafe-button" disabled={saving} onClick={() => { select(null); setEditor({ kind: 'types' }); }}>Quản lý loại máy</button>
+          <button className="cafe-button primary" disabled={saving || !rooms.length || !types.length}
+            onClick={() => { select(null); setEditor({ kind: 'computer' }); }}>Thêm máy tính</button>
+        </>}
         <button className="cafe-button" onClick={() => { setNotice(''); reload(); }} disabled={loading || refreshing || saving}>Tải lại</button>
       </PageHeading>
       <p className="cafe-muted" role="status" aria-live="polite" data-realtime-status={realtimeStatus}>
@@ -154,7 +163,7 @@ export function ComputersPage() {
           </table></div>}
           <div className="cafe-computer-footer"><span>Dữ liệu được lưu trên hệ thống quản lý</span><span>{filtered.length} máy</span></div>
         </article>
-        {selected && <Modal title={selected.ComputerName} onClose={() => select(null)}>
+        {selected && !editor && <Modal title={selected.ComputerName} onClose={() => select(null)}>
           <div className="cafe-computer-detail">
             <StatusBadge status={selected.Status} />
             <p>{roomById.get(selected.RoomId).RoomName} · {selectedType.TypeName}</p>
@@ -172,14 +181,20 @@ export function ComputersPage() {
               Máy còn hồ sơ bảo trì chưa kết thúc. Cần hoàn tất hồ sơ trước khi đưa máy vào sử dụng.
             </p> : null}
             {!canUpdate && <p className="cafe-detail-note">Bạn có quyền xem thông tin máy.</p>}
+            {canManage && <button className="cafe-button" disabled={saving || selected.HasOpenSession || selected.HasOpenMaintenance
+              || !['Available', 'Maintenance'].includes(selected.Status)} onClick={() => setEditor({ kind: 'computer', computer: selected })}>Sửa máy</button>}
             {actionError && <p className="cafe-error" role="alert">{actionError}</p>}
             {canUpdate && <div className="cafe-dialog-actions"><button className="cafe-button primary" onClick={updateMaintenance}
               disabled={saving || selected.HasOpenSession || selected.Status === 'Occupied'
                 || !Object.hasOwn(statusLabels, selected.Status) || (selected.Status === 'Maintenance' && selected.HasOpenMaintenance)}>
               <Wrench size={15} />{saving ? 'Đang lưu...' : selected.Status === 'Maintenance' ? 'Đưa máy vào sử dụng' : 'Chuyển bảo trì'}
             </button></div>}
+            <MaintenancePanel computer={selected} permissions={permissions} onSaved={onManaged} />
           </div>
         </Modal>}
+        {canManage && editor?.kind === 'computer' && <ComputerEditor computer={editor.computer} rooms={rooms} types={types}
+          onClose={() => setEditor(null)} onSaved={onManaged} />}
+        {canManage && editor?.kind === 'types' && <ComputerTypesDialog types={types} onClose={() => setEditor(null)} onSaved={onManaged} />}
       </>}
     </section>
   );

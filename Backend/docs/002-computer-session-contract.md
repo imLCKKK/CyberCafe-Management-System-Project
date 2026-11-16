@@ -37,6 +37,46 @@ Ngày soạn: 03/11/2026. Task tham chiếu: `S1-P-1 — Implement-Computer-Quer
 - Quyền `session.pause` đã có trong catalog nhưng model chưa lưu khoảng tạm dừng. Contract này chưa cung cấp pause/resume; không nhận trạng thái `Paused` hoặc tự trừ thời gian nghỉ.
 - Theo identity hiện tại, khách `Locked` không được trừ ví. Nếu khóa khách đang chơi, cần quyết toán trước khi khóa trong transaction chung; trường hợp đã bị khóa nhưng còn phiên phải báo đối soát, không tự vượt kiểm tra khóa. Minh cần xác nhận luồng này trước S2.
 
+## SCRUM-24 — Bước 1: CRUD và hồ sơ bảo trì
+
+Phần này bổ sung API vào nền SCRUM-8, giữ schema/migration hiện tại. Mở/đóng phiên, ví và chứng từ chưa thuộc bước 1.
+
+| Endpoint dưới `/api/admin` | Permission | Hành vi |
+| --- | --- | --- |
+| `POST /computers` | `computer.manage` | Tạo máy; chỉ nhận computerName/roomId/computerTypeId; trạng thái server đặt Available |
+| `PUT /computers/{id}` | `computer.manage` | Sửa tên/phòng/loại khi không có phiên hoặc bảo trì chưa đóng |
+| `DELETE /computers/{id}` | `computer.manage` | Chỉ xóa máy không có lịch sử phiên/bảo trì và trạng thái hợp lệ |
+| `POST /computer-types`, `PUT /computer-types/{id}` | `computer.manage` | Lưu tên, thông số, mô tả và giá giờ nguyên đồng dương |
+| `DELETE /computer-types/{id}` | `computer.manage` | Chặn xóa loại đang được máy tham chiếu |
+| `GET /computers/{id}/maintenances` | `maintenance.view` | Lịch sử theo giờ bắt đầu/ID giảm dần; timestamp UTC |
+| `POST /computers/{id}/maintenances` | `maintenance.manage` | Bắt đầu hồ sơ InProgress; EmployeeId từ JWT và phải đang hoạt động; StartTime từ server |
+| `PUT /computers/{id}/maintenances/{maintenanceId}` | `maintenance.manage` | Chỉ sửa mô tả hồ sơ InProgress chưa kết thúc |
+| `POST /computers/{id}/maintenances/{maintenanceId}/complete` | `maintenance.manage` | Chốt Completed/EndTime UTC và trả máy Available cùng transaction |
+
+- Tên máy được trim, duy nhất trong phòng theo index SQL hiện có. Giá giờ phải nguyên đồng, từ 1 đến giới hạn decimal(18,0); các độ dài field theo mapping EF. Không nhận status, EmployeeId hoặc thời gian do browser tự khai vào các lệnh tạo/sửa này.
+- Máy Occupied, trạng thái lạ, phiên Active **hoặc** EndTime null, bảo trì EndTime null đều chặn sửa metadata/mở bảo trì. Cho phép lập hồ sơ cho máy đã được chuyển Maintenance nhưng chưa có hồ sơ mở. Không tự sửa dữ liệu mâu thuẫn.
+- Lệnh bảo trì dùng transaction Serializable và khóa máy UPDLOCK/HOLDLOCK tại SQL Server, cùng quy ước với API đổi trạng thái. Không cho hai hồ sơ mở. Hoàn tất lại trả đúng hồ sơ đã lưu và không phát event; không đổi trạng thái máy nếu một lượt bảo trì/phiên khác đã bắt đầu sau đó.
+- Hồ sơ đã hoàn tất không được sửa hoặc xóa. Hoàn tất đòi hỏi hồ sơ InProgress, máy Maintenance, không có phiên hoặc hồ sơ mở khác. Dữ liệu legacy mâu thuẫn cần đối soát, không tự ghi đè.
+- Repository trả về sau commit. Tạo/sửa/xóa máy và mở/hoàn tất bảo trì phát ComputerChanged tới computer.view; sửa loại phát ComputerTypesChanged tới computer.view; sửa hồ sơ phát MaintenanceChanged tới maintenance.view. Payload vẫn chỉ gồm eventId/type/entityId/occurredAtUtc; EntityId của event bảo trì là ComputerId. Validation, conflict hoặc save thất bại không phát event.
+- API cũ đọc máy/loại/phòng và PATCH trạng thái giữ contract hiện tại. Không tạo ledger, thu tiền hoặc thay đổi phiên trong bước này. Bộ ComputerManagementChecks thêm kiểm tra HTTP/quyền/persistence/event; chỉ nhánh chạy SQL mới kiểm chứng cạnh tranh/transaction SQL. Browser suite computers-management dùng HTTP fixtures, không thay thế nghiệm thu hai máy LAN.
+
+## SCRUM-24 — Bước 2: schema phục vụ quyết toán phiên
+
+Migration mới `20261114104346_PrepareSessionBilling` kế thừa SCRUM-13 (38 bảng/5 migration thực tế trong code), không thêm bảng hoặc sửa migration cũ. SQL/DBML ở `Backend/database` được xuất lại từ model và đủ 6 migration. Việc tạo file migration không đồng nghĩa đã áp dụng lên SQL Server.
+
+| Bảng | Bổ sung | Ràng buộc |
+| --- | --- | --- |
+| GamingSessions | HourlyRateSnapshot decimal(18,0), OpenedByEmployeeId, ClosedByEmployeeId, OpenOperationKey, CloseOperationKey, CloseReason | Snapshot dương khi có; actor FK Employees NoAction; khóa tối đa 100 ký tự, BIN2, không trắng và unique khi khác null; lý do tối đa 250 ký tự |
+| GamingSessions | OpenSessionSlot, cột tính toán persisted, không thêm vào Domain/API DTO | `CASE WHEN Status = Active OR EndTime IS NULL THEN 0 ELSE GamingSessionId END`; unique ComputerId/slot và CustomerId/slot, bao phủ cả phiên legacy mâu thuẫn |
+| SessionCharges | OperationKey, WalletTransactionId | Khóa unique khi có; FK ledger NoAction và unique khi có; unique GamingSessionId/EndTime; khoản thu có khóa phải dương và EndTime > StartTime |
+
+- Các cột metadata cho phép null để giữ nguyên bản ghi cũ. Không lấy giá loại máy hiện tại làm giá lịch sử, không giả người mở/đóng hoặc liên kết ledger từ Description. API mở/thu/đóng ở bước 3 phải ghi đầy đủ metadata mới; phiên thiếu snapshot cần đối soát trước khi quyết toán.
+- Slot 0 chỉ dành cho phiên chưa đóng. Khi Status không còn Active **và** EndTime đã có, slot là PK dương riêng của phiên; lịch sử nhiều phiên trên cùng máy/khách vẫn được giữ. Cách này bảo vệ cả trường hợp một phiên Active có EndTime và một phiên Ended thiếu EndTime tranh cùng máy/khách.
+- Up kiểm tra phiên chưa đóng trùng theo máy/khách và khoản thu trùng mốc trước khi đổi schema; gặp dữ liệu đó thì THROW 51024 và dừng, không chọn/xóa bản ghi. Down dừng với THROW 51025 khi có metadata tiền mới, tránh làm mất snapshot và khóa truy vết.
+- Không đổi bảng WalletTransactions hoặc quy ước dấu/type của module ví. Bước này chỉ chuẩn bị liên kết bền vững; caller ở bước 3 phải kiểm tra ledger đúng khách/số tiền/nguồn và lưu ví–charge–Payment–chứng từ cùng transaction. Không thêm unique Invoice.GamingSessionId vì contract chứng từ hiện cho phép phát hành theo nguồn và đã có unique InvoiceDetails.SessionChargeId.
+- Chưa chốt actor hệ thống cho tự đóng, không tự cấp quyền cho worker hoặc giả người mở thành người phát hành. ClosedByEmployeeId là chỗ lưu actor được xác thực khi có; không thay quyết định nghiệp vụ ở mục 5.
+- `--session-schema` kiểm tra offline model/snapshot và sinh script, không mở kết nối SQL. Bộ SQL trong SessionSchemaChecks chỉ chạy khi API checks được cấp DB thử riêng; InMemory không chứng minh unique/FK/check constraint hay rollback migration.
+
 ## 3. Công thức và thời điểm thu
 
 Dùng số thập phân chính xác phía server; timestamp lưu UTC và trả ISO 8601 có múi giờ. UI hiển thị giờ Việt Nam, không gửi thời lượng hoặc tiền do trình duyệt tự tính để ghi sổ.
@@ -85,7 +125,7 @@ Ví dụ `P = 10.000`: tổng phí tại 0/60/120/180 giây là 0/167/334/500 đ
 
 Khi đóng có thu bổ sung, khoản thu cuối, kết thúc phiên, trạng thái máy và hóa đơn/payment phải cùng transaction. Nếu tất cả phí đã thu trước đó, transaction đóng chỉ lập chứng từ/thay trạng thái, không thu lại. Hóa đơn tự đóng cần actor hợp lệ vì `Invoice.EmployeeId` bắt buộc: đề xuất lưu người mở để làm actor khi hết tiền; Trường phải xác nhận trước triển khai, không tự dùng tài khoản admin/ID giả.
 
-Các thiếu hụt schema hiện đã xác minh: `GamingSession` chưa có snapshot giá/người mở/lý do đóng; `SessionCharge` chưa liên kết ledger hoặc có khóa chống lặp; `WalletTransaction` chưa có định danh nguồn/khóa nghiệp vụ; chưa có ràng buộc duy nhất phiên chưa đóng theo máy/khách hay hóa đơn tiền giờ theo phiên. **Chỉ ghi yêu cầu dữ liệu tại đây; tên cột, cơ chế khóa và migration cần đề xuất/duyệt riêng ở S2 cùng Minh/Trường.** SCRUM-7 không thay schema hoặc coi các bảo đảm tiền này đã được thực thi.
+Tại baseline SCRUM-7, `GamingSession` chưa có snapshot giá/người mở/lý do đóng; `SessionCharge` chưa liên kết ledger hoặc có khóa chống lặp; chưa có ràng buộc duy nhất phiên chưa đóng theo máy/khách. SCRUM-24 bước 2 bổ sung các phần này theo mục schema bên trên. `WalletTransaction` vẫn chưa có định danh nguồn/khóa nghiệp vụ dùng chung và dịch vụ ví/chứng từ chưa được tích hợp ở bước 2; không coi bảo đảm tiền đã chạy chỉ vì có migration. Quyết định liên module còn mở tiếp tục do Trưởng nhóm điều phối Minh/Trường.
 
 ### Đối chiếu SCRUM-12 ngày 06/11/2026
 

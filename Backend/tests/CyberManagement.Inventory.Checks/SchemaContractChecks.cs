@@ -159,7 +159,9 @@ internal static class SchemaContractChecks
             // Chỉ fixture của database GUID này được thay đổi để thử tiếp đường nâng hợp lệ.
             await db.Database.ExecuteSqlRawAsync("DELETE dbo.Promotions WHERE PromoName=N'LEGACY_CHECK';");
             await db.Database.MigrateAsync();
-            check("Upgrade preserves safe existing products and appends the fifth migration", await db.Products.SingleAsync(x => x.ProductName == "UPGRADE_CHECK") is { Stock: 1, Price: 10000m } && (await db.Database.GetAppliedMigrationsAsync()).Count() == 5);
+            check("Upgrade preserves safe existing products and applies all pending migrations",
+                await db.Products.SingleAsync(x => x.ProductName == "UPGRADE_CHECK") is { Stock: 1, Price: 10000m }
+                && (await db.Database.GetAppliedMigrationsAsync()).SequenceEqual(db.Database.GetMigrations()));
         }
         finally { await fixture.CleanupAsync(); }
     }

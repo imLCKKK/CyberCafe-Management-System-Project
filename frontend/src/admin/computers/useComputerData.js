@@ -7,7 +7,7 @@ import { getComputerData } from './computerApi';
 
 const empty = { computers: [], rooms: [], types: [], permissions: [] };
 const initial = { ...empty, loading: true, refreshing: false, error: null };
-const computerEvents = ['ComputerChanged'];
+const computerEvents = ['ComputerChanged', 'ComputerTypesChanged', 'MaintenanceChanged'];
 
 export function useComputerData() {
   const { principal, loading: authLoading, accessToken: token } = useAuth();

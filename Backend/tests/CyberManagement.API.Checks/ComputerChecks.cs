@@ -280,6 +280,13 @@ internal static class ComputerChecks
         var employeeId = await database.Employees.Where(row => row.Username == "admin")
             .Select(row => row.EmployeeId).SingleAsync();
         var start = new DateTime(2026, 11, 3, 1, 0, 0, DateTimeKind.Utc);
+        var legacyCustomers = new[]
+        {
+            new Customer { FullName = "Active ended fixture", Phone = "0900000024", Status = "Active" },
+            new Customer { FullName = "Ended open fixture", Phone = "0900000025", Status = "Active" }
+        };
+        database.Customers.AddRange(legacyCustomers);
+        await database.SaveChangesAsync();
         foreach (var (key, status, end) in new (string, string, DateTime?)[]
         {
             ("Free", "Ended", start.AddMinutes(10)), ("Occupied", "Active", null),
@@ -287,7 +294,12 @@ internal static class ComputerChecks
         })
             database.GamingSessions.Add(new GamingSession
             {
-                Computer = stations[key], CustomerId = customerId, Status = status, StartTime = start, EndTime = end
+                Computer = stations[key], CustomerId = key switch
+                {
+                    "ActiveEnded" => legacyCustomers[0].CustomerId,
+                    "EndedOpen" => legacyCustomers[1].CustomerId,
+                    _ => customerId
+                }, Status = status, StartTime = start, EndTime = end
             });
         database.ComputerMaintenances.AddRange(
             new ComputerMaintenance

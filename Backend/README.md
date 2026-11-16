@@ -98,6 +98,19 @@ Seed test nằm trong `src/CyberManagement.Infrastructure/DataTest/InventoryRead
 SQL/DBML được xuất từ migrations/model hiện tại ở [database](database/).
 Hướng dẫn DB thử, seed, đăng nhập, màn hình và kiểm thử: [SCRUM-13](../docs/scrum-13-inventory-setup.md).
 
+## SCRUM-24 bước 2: schema phiên và khóa quyết toán
+
+`20261114104346_PrepareSessionBilling` bổ sung snapshot giá/actor, khóa mở/đóng/thu, liên kết ledger và unique slot phiên chưa đóng theo máy/khách; giữ 38 bảng hiện có. Metadata lịch sử giữ null, không backfill giá hoặc nhân viên giả. Migration dừng nếu có phiên chưa đóng trùng hoặc khoản thu trùng mốc; downgrade dừng khi đã có metadata tiền mới. Chưa triển khai API phiên/thu tiền hoặc tự động áp migration lên DB chung.
+
+Kiểm tra schema offline, không cần connection string và không mở kết nối SQL:
+
+```powershell
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --session-schema
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.Inventory.Checks -- --check-schema
+```
+
+Đối chiếu trường/ràng buộc và giới hạn tích hợp tại [contract máy/phiên](docs/002-computer-session-contract.md). Cần phê duyệt DB thử cụ thể trước khi áp migrations/chạy ca SQL; kết quả offline/InMemory không thay thế kiểm chứng SQL Server hoặc hai máy LAN.
+
 ## S1-K-1 / SCRUM-10: danh mục, sản phẩm và menu
 
 Module dùng `Categories`/`Products` và DbContext CyberManagement hiện có, bao gồm migration

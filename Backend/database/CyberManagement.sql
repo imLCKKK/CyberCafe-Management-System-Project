@@ -2333,3 +2333,252 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    SET ANSI_WARNINGS ON;
+    SET ANSI_NULLS ON;
+    SET QUOTED_IDENTIFIER ON;
+    SET ANSI_PADDING ON;
+    SET CONCAT_NULL_YIELDS_NULL ON;
+    SET ARITHABORT ON;
+    SET NUMERIC_ROUNDABORT OFF;
+    IF EXISTS (SELECT 1 FROM [GamingSessions] WHERE [Status] = N'Active' OR [EndTime] IS NULL GROUP BY [ComputerId] HAVING COUNT_BIG(*) > 1)
+        THROW 51024, 'SCRUM24: duplicate open sessions per computer; reconcile before migration.', 1;
+    IF EXISTS (SELECT 1 FROM [GamingSessions] WHERE [Status] = N'Active' OR [EndTime] IS NULL GROUP BY [CustomerId] HAVING COUNT_BIG(*) > 1)
+        THROW 51024, 'SCRUM24: duplicate open sessions per customer; reconcile before migration.', 1;
+    IF EXISTS (SELECT 1 FROM [SessionCharges] GROUP BY [GamingSessionId], [EndTime] HAVING COUNT_BIG(*) > 1)
+        THROW 51024, 'SCRUM24: duplicate session charge settlement times; reconcile before migration.', 1;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    DROP INDEX [IX_SessionCharges_GamingSessionId] ON [SessionCharges];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    DROP INDEX [IX_GamingSessions_ComputerId] ON [GamingSessions];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    DROP INDEX [IX_GamingSessions_CustomerId] ON [GamingSessions];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [SessionCharges] ADD [OperationKey] nvarchar(100) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [SessionCharges] ADD [WalletTransactionId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [GamingSessions] ADD [CloseOperationKey] nvarchar(100) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [GamingSessions] ADD [CloseReason] nvarchar(250) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [GamingSessions] ADD [ClosedByEmployeeId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [GamingSessions] ADD [HourlyRateSnapshot] decimal(18,0) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [GamingSessions] ADD [OpenOperationKey] nvarchar(100) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [GamingSessions] ADD [OpenedByEmployeeId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [GamingSessions] ADD [OpenSessionSlot] AS CASE WHEN [Status] = N''Active'' OR [EndTime] IS NULL THEN 0 ELSE [GamingSessionId] END PERSISTED');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_SessionCharges_GamingSessionId_EndTime] ON [SessionCharges] ([GamingSessionId], [EndTime]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_SessionCharges_OperationKey] ON [SessionCharges] ([OperationKey]) WHERE [OperationKey] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_SessionCharges_WalletTransactionId] ON [SessionCharges] ([WalletTransactionId]) WHERE [WalletTransactionId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [SessionCharges] ADD CONSTRAINT [CK_SessionCharges_BillingMetadata] CHECK ([OperationKey] IS NULL OR (LEN(LTRIM(RTRIM([OperationKey]))) > 0 AND [Amount] > 0 AND [EndTime] > [StartTime]))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    CREATE INDEX [IX_GamingSessions_ClosedByEmployeeId] ON [GamingSessions] ([ClosedByEmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_GamingSessions_CloseOperationKey] ON [GamingSessions] ([CloseOperationKey]) WHERE [CloseOperationKey] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    CREATE INDEX [IX_GamingSessions_OpenedByEmployeeId] ON [GamingSessions] ([OpenedByEmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_GamingSessions_OpenOperationKey] ON [GamingSessions] ([OpenOperationKey]) WHERE [OpenOperationKey] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_GamingSessions_OpenComputer] ON [GamingSessions] ([ComputerId], [OpenSessionSlot]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_GamingSessions_OpenCustomer] ON [GamingSessions] ([CustomerId], [OpenSessionSlot]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [GamingSessions] ADD CONSTRAINT [CK_GamingSessions_OperationKeys] CHECK (([OpenOperationKey] IS NULL OR LEN(LTRIM(RTRIM([OpenOperationKey]))) > 0) AND ([CloseOperationKey] IS NULL OR LEN(LTRIM(RTRIM([CloseOperationKey]))) > 0))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [GamingSessions] ADD CONSTRAINT [CK_GamingSessions_RateSnapshot] CHECK ([HourlyRateSnapshot] IS NULL OR [HourlyRateSnapshot] > 0)');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [GamingSessions] ADD CONSTRAINT [FK_GamingSessions_Employees_ClosedByEmployeeId] FOREIGN KEY ([ClosedByEmployeeId]) REFERENCES [Employees] ([EmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [GamingSessions] ADD CONSTRAINT [FK_GamingSessions_Employees_OpenedByEmployeeId] FOREIGN KEY ([OpenedByEmployeeId]) REFERENCES [Employees] ([EmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    ALTER TABLE [SessionCharges] ADD CONSTRAINT [FK_SessionCharges_WalletTransactions_WalletTransactionId] FOREIGN KEY ([WalletTransactionId]) REFERENCES [WalletTransactions] ([TransactionId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261114104346_PrepareSessionBilling'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261114104346_PrepareSessionBilling', N'10.0.14');
+END;
+
+COMMIT;
+GO
