@@ -63,6 +63,10 @@ Danh sách, chi tiết và bản in đọc hóa đơn/thu/hoàn/ledger trong cù
 khóa các khách theo CustomerId tăng dần trước khi đọc nguồn/Payment/Invoice; hóa đơn mới xuất hiện
 trong lúc đọc sẽ được lấy ở lần tải sau. Lần đọc chỉ commit transaction do chính nó mở;
 nếu caller đã mở transaction thì dùng chung và để caller quyết định commit/rollback.
+Mỗi giao dịch trả paymentTime, confirmedAt, providerOccurredAt (có thể null) và paymentTimeBasis.
+paidAt được giữ làm alias của paymentTime cho client cũ. UI và bản in hiển thị theo +07:00;
+Basis=Confirmation được ghi rõ là mốc hệ thống xác nhận, không khẳng định thời điểm thực hoàn.
+Nếu provider bổ sung bằng chứng thời gian sau đó, Basis và mốc ghi nhận đã lưu vẫn được giữ nguyên.
 UI từ chối giá trị ngoài Number.MAX_SAFE_INTEGER để tránh làm tròn tiền ngầm; API và bản in HTML server dùng decimal(18,0).
 
 ## Điểm tích hợp nội bộ
@@ -89,6 +93,9 @@ Repository chụp nguồn mới từ SQL dưới khóa và từ chối entity ng
   tạo khóa SessionAutoInvoice:{id}, hash v2 và actor System/EmployeeId null. Không có đường HTTP System.
   Phiên 0 đồng hoặc không còn phí chưa lên chứng từ trả null; replay khóa đã thành công trả InvoiceId cũ.
   Worker đóng phiên và adapter callback thuộc task Phúc/Minh/Khang; SCRUM-31 cung cấp điểm gọi để họ nối.
+
+Audit phát hành System ghi rõ session, reason=InsufficientBalance và key=SessionAutoInvoice:{id}.
+Replay dùng khóa đã lưu và không thêm audit phát hành lần hai.
 
 Invoice/InvoiceOrders/InvoiceDetails/khóa phát hành/liên kết tiền/audit nằm trong cùng transaction.
 Chỉ publish realtime sau khi caller commit. Unique nguồn và khóa bền vững bảo vệ cạnh tranh/restart.

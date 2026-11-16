@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { clearVerifiedSession, markSessionVerified, storeSession } from '../auth/api.js';
+import * as invoiceApi from './invoiceApi.js';
 import { getInvoice, issueInvoice, listInvoices, validateInvoice } from './invoiceApi.js';
 
 const original = { fetch: globalThis.fetch, storage: globalThis.localStorage, window: globalThis.window };
@@ -55,4 +56,32 @@ test('reject unsafe money or malformed payment instead of rounding/NaN', () => {
   assert.throws(() => validateInvoice({ ...fixture(), paidAmount: Number.MAX_SAFE_INTEGER + 1 }));
   assert.throws(() => validateInvoice({ ...fixture(), payments: [{}] }));
   assert.throws(() => validateInvoice({ ...fixture(), grossAmount: 99999 }));
+});
+
+const confirmationRefund = () => ({ id: 2, type: 'Refund', method: 'ZaloPay', status: 'Succeeded', amount: 20000,
+  walletTransactionId: null, paidAt: '2026-11-16T17:03:00Z', paymentTime: '2026-11-16T17:03:00Z',
+  confirmedAt: '2026-11-16T17:03:00Z', providerOccurredAt: null, paymentTimeBasis: 'Confirmation' });
+
+test('confirmation refund preserves nullable provider metadata', async () => {
+  const refund = confirmationRefund();
+  globalThis.fetch = async () => Response.json({ ...fixture(), payments: [refund] });
+  assert.deepEqual((await getInvoice(true, 1)).payments[0], refund);
+});
+test('reject invalid or inconsistent successful payment timestamps', () => {
+  for (const change of [{ paymentTime: null }, { confirmedAt: null }, { confirmedAt: 'invalid' },
+    { providerOccurredAt: 'invalid' }, { paymentTimeBasis: 'Unknown' },
+    { confirmedAt: '2026-11-16T17:04:00Z' }]) {
+    assert.throws(() => validateInvoice({ ...fixture(), payments: [{ ...confirmationRefund(), ...change }] }), undefined, JSON.stringify(change));
+  }
+});
+test('confirmation label uses Vietnam time and never claims provider time', () => {
+  assert.equal(typeof invoiceApi.invoicePaymentTiming, 'function');
+  const lines = invoiceApi.invoicePaymentTiming(confirmationRefund()).join(' ');
+  assert.ok(lines.includes('Ghi nhận theo thời điểm hệ thống xác nhận'));
+  assert.ok(lines.includes('17/11/2026') && lines.includes('00:03:00') && lines.includes('UTC+07:00'));
+  assert.ok(lines.includes('Chưa có thời điểm giao dịch từ nhà cung cấp'));
+  const later = invoiceApi.invoicePaymentTiming({ ...confirmationRefund(), providerOccurredAt: '2026-11-16T17:00:00Z' }).join(' ');
+  assert.ok(later.includes('Ghi nhận theo thời điểm hệ thống xác nhận'));
+  assert.ok(!later.includes('Chưa có thời điểm giao dịch từ nhà cung cấp'));
+  assert.deepEqual(invoiceApi.invoicePaymentTiming({ ...confirmationRefund(), status: 'Pending', paymentTime: null, confirmedAt: null, paymentTimeBasis: null }), []);
 });

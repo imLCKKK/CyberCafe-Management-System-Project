@@ -77,6 +77,8 @@ internal static class InvoiceChecks
                 var order = await NewOrder(customerA,100000,10000);
                 await AddCash(order,90000,true);
                 app.MapGet("/__checks/invoices/source",()=>new {orderId=order,customerId=customerA,productId}).RequireAuthorization("permission:invoice.view");
+                app.MapPost("/__checks/invoices/confirmation-refund", () => SeedConfirmationRefundAsync())
+                    .RequireAuthorization("permission:invoice.create");
                 app.MapPost("/__checks/invoices/change-product",async ()=>
                 {
                     await using var scope=app.Services.CreateAsyncScope(); var db=Db(scope);
@@ -233,9 +235,39 @@ internal static class InvoiceChecks
             Check("System session invoice has no fake employee",systemInvoice is {ActorType:"System",EmployeeId:null,PaidAmount:5000}&&systemInvoice.OrderIds.Count==0);
             await using(var scope=app.Services.CreateAsyncScope())
             {
+                var audits=await Db(scope).AuditLogs.AsNoTracking().Where(x=>x.EntityType=="Invoice"&&x.EntityId==systemInvoice!.Id).ToListAsync();
+                Check("System audit stores reason, session and operation key",audits.Count==1 && audits[0].EmployeeId is null
+                    && audits[0].Action.Contains($"session={session};",StringComparison.Ordinal)
+                    && audits[0].Action.Contains("reason=InsufficientBalance;",StringComparison.Ordinal)
+                    && audits[0].Action.Contains($"key=SessionAutoInvoice:{session}",StringComparison.Ordinal)
+                    && audits[0].Action.Length<=255);
                 var replay=await Uow(scope).ExecuteAsync(()=>scope.ServiceProvider.GetRequiredService<ISessionInvoiceIssuer>().IssueForAutoClosedSessionAsync(session));
                 Check("Worker retry returns same invoice",replay!.Id==systemInvoice!.Id);
-                Check("System audit saved",await Db(scope).AuditLogs.AnyAsync(x=>x.EntityType=="Invoice"&&x.EntityId==systemInvoice!.Id&&x.EmployeeId==null));
+                Check("Worker retry does not duplicate audit",await Db(scope).AuditLogs.CountAsync(x=>x.EntityType=="Invoice"&&x.EntityId==systemInvoice!.Id)==audits.Count);
+            }
+            var gatewayInvoice=await SeedConfirmationRefundAsync();
+            using(var response=await Send(HttpMethod.Get,$"{route}/{gatewayInvoice.Id}",admin))
+            {
+                await Status("Confirmation refund invoice detail",HttpStatusCode.OK,response);
+                using var document=JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                var refund=document.RootElement.GetProperty("payments").EnumerateArray().Single(x=>x.GetProperty("type").GetString()=="Refund");
+                Check("Refund DTO includes all timestamp metadata",new[]{"paymentTime","confirmedAt","providerOccurredAt","paymentTimeBasis"}.All(name=>refund.TryGetProperty(name,out _)));
+                Check("Confirmation refund preserves its basis and nullable provider time",refund.GetProperty("paymentTimeBasis").GetString()=="Confirmation"
+                    &&refund.GetProperty("providerOccurredAt").ValueKind==JsonValueKind.Null
+                    &&refund.GetProperty("paymentTime").GetDateTimeOffset()==refund.GetProperty("confirmedAt").GetDateTimeOffset()
+                    &&refund.GetProperty("paidAt").GetDateTimeOffset()==refund.GetProperty("paymentTime").GetDateTimeOffset());
+                Check("Timestamp metadata does not change collected/refunded money",gatewayInvoice.PaidAmount==0&&gatewayInvoice.RefundAmount==90000
+                    &&gatewayInvoice.CancelledAmount==90000&&gatewayInvoice.AmountDue==0);
+                var original=document.RootElement.GetProperty("payments").EnumerateArray().Single(x=>x.GetProperty("type").GetString()=="Payment");
+                Check("Source payment keeps verified provider time",original.GetProperty("paymentTimeBasis").GetString()=="Source"
+                    &&original.GetProperty("providerOccurredAt").GetDateTimeOffset()==original.GetProperty("paymentTime").GetDateTimeOffset());
+            }
+            using(var print=await Send(HttpMethod.Get,$"{route}/{gatewayInvoice.Id}/print",admin))
+            {
+                await Status("Confirmation refund print",HttpStatusCode.OK,print);
+                var html=WebUtility.HtmlDecode(await print.Content.ReadAsStringAsync());
+                Check("Print distinguishes confirmation from provider transaction time",html.Contains("Ghi nhận theo thời điểm hệ thống xác nhận")
+                    &&html.Contains("Chưa có thời điểm giao dịch từ nhà cung cấp")&&html.Contains("17/11/2026 00:03:00 UTC+07:00"));
             }
             var emptySession=await NewSession(customerB,0);
             await using(var scope=app.Services.CreateAsyncScope())
@@ -351,6 +383,37 @@ internal static class InvoiceChecks
             {if(response.StatusCode!=expected)throw new Exception($"{name}: expected {expected}, got {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");Check(name,true);}
         }
         finally{await app.StopAsync();await fixture.CleanupAsync();}
+
+        // Fixture SQL: mô phỏng khoản thu/hoàn đã được xác minh, không gọi provider.
+        async Task<InvoiceDto> SeedConfirmationRefundAsync()
+        {
+            var orderId=await NewOrder(customerA,100000,10000);
+            var suffix=Guid.NewGuid().ToString("N")[..8];
+            await using var scope=app.Services.CreateAsyncScope();var db=Db(scope);
+            var sourceAt=DateTimeOffset.Parse("2026-11-16T16:55:00Z");
+            var confirmedAt=DateTimeOffset.Parse("2026-11-16T17:03:00Z");
+            var original=new Payment{OrderId=orderId,Amount=90000,Method="ZaloPay",Status="Succeeded",
+                OperationKey="gateway-time-charge:"+suffix,MerchantTransactionId="261116_invoice_"+suffix,
+                GatewayTransactionId="fixture-charge-"+suffix,PaymentTime=sourceAt,ProviderOccurredAt=sourceAt,
+                ConfirmedAt=sourceAt.AddSeconds(1),PaymentTimeBasis="Source"};
+            db.Payments.Add(original);await db.SaveChangesAsync();
+            var issued=await Service(scope).IssueAsync(new IssueInvoiceRequest{Kind="Orders",OrderIds=[orderId]},employeeId,"gateway-time-issue:"+suffix);
+            return (await Uow(scope).ExecuteAsync(async ()=>
+            {
+                await db.Customers.FromSqlInterpolated($"SELECT * FROM [dbo].[Customers] WITH (UPDLOCK,HOLDLOCK) WHERE [CustomerId]={customerA}").AsNoTracking().SingleAsync();
+                var order=await db.Orders.Include(x=>x.Details).SingleAsync(x=>x.OrderId==orderId);
+                order.Status="Cancelled";order.Details.Single().Status="Cancelled";
+                var refund=new Payment{OrderId=orderId,OrderDetailId=order.Details.Single().OrderDetailId,
+                    RefundOfPaymentId=original.PaymentId,Type="Refund",Method="ZaloPay",Amount=90000,Status="Succeeded",
+                    OperationKey="gateway-time-refund:"+suffix,Reason="Verified full cancellation",PaymentTime=confirmedAt,
+                    ConfirmedAt=confirmedAt,ProviderOccurredAt=null,PaymentTimeBasis="Confirmation"};
+                db.Payments.Add(refund);await db.SaveChangesAsync();
+                db.RefundAttempts.Add(new RefundAttempt{PaymentId=refund.PaymentId,ProviderAppId=2553,
+                    MerchantRefundId="261117_2553_"+suffix,Status="Succeeded",LastApi="QueryRefund",
+                    LastQueriedAt=confirmedAt,LastReturnCode=1});await db.SaveChangesAsync();
+                return await Service(scope).ApplyFinancialChangeAsync(orderId,null);
+            }))!;
+        }
 
         async Task<int> NewOrder(int customerId,decimal gross,decimal discount=0)
         {

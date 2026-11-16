@@ -39,7 +39,8 @@ internal static class InvoiceAccounting
                 x.UnitPrice, x.UnitPrice * x.Quantity, x.UnitPrice * x.Quantity - x.Amount, x.Amount,
                 x.CancelledAmount, x.VoucherCodeSnapshot, x.VoucherDiscountTypeSnapshot, x.VoucherDiscountValueSnapshot)).ToArray(),
             payments.OrderBy(x => x.PaymentId).Select(x => new InvoicePaymentDto(x.PaymentId, x.Type,
-                x.Method, x.Status, x.Amount, x.WalletTransactionId, x.PaymentTime)).ToArray());
+                x.Method, x.Status, x.Amount, x.WalletTransactionId, x.PaymentTime,
+                x.ConfirmedAt, x.ProviderOccurredAt, x.PaymentTimeBasis)).ToArray());
     }
 
     public static (decimal Net, decimal Refunded) Totals(int customerId, IReadOnlyList<int> orderIds,

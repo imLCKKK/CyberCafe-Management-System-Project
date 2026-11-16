@@ -13,6 +13,7 @@ public sealed class InvoiceService(IInvoiceRepository repository, IInvoiceUnitOf
     : IInvoiceService, ISessionInvoiceIssuer
 {
     private const decimal MaxMoney = 999999999999999999m;
+    private const string AutoIssueReason = "InsufficientBalance";
 
     public async Task<IReadOnlyList<InvoiceDto>> GetAllAsync(int employeeId, CancellationToken ct = default)
     {
@@ -84,7 +85,7 @@ public sealed class InvoiceService(IInvoiceRepository repository, IInvoiceUnitOf
         var key = $"SessionAutoInvoice:{sessionId}";
         var hash = Hash(new { version = 2, kind = "Session", customerId = identity.CustomerId,
             actorType = "System", actorKey = "SessionBilling", employeeId = (int?)null,
-            reason = "InsufficientBalance", gamingSessionId = sessionId, orderIds = Array.Empty<int>() });
+            reason = AutoIssueReason, gamingSessionId = sessionId, orderIds = Array.Empty<int>() });
         var sources = await repository.LockSourcesAsync(identity.CustomerId, sessionId, [], ct);
         var replay = await ReplayAsync(key, hash, ct);
         if (replay is not null) return replay;
@@ -224,7 +225,9 @@ public sealed class InvoiceService(IInvoiceRepository repository, IInvoiceUnitOf
             selectedCharges, selectedPayments, sources.Ledgers);
         LinkPayments(invoice, selectedPayments);
         var audit = new AuditLog { EntityType = "Invoice", EmployeeId = employeeId,
-            Action = $"Issue {invoice.ActorType}; key={key}", CreatedAt = DateTime.UtcNow };
+            Action = system
+                ? $"Issue System; session={invoice.GamingSessionId}; reason={AutoIssueReason}; key={key}"
+                : $"Issue {invoice.ActorType}; key={key}", CreatedAt = DateTime.UtcNow };
         await repository.AddAsync(invoice, new InvoiceIssueRequest { OperationKey = key, RequestHash = hash, Invoice = invoice }, audit, ct);
         await unitOfWork.SaveChangesAsync(ct);
         audit.EntityId = invoice.InvoiceId;

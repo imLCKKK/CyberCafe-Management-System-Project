@@ -82,5 +82,47 @@ try {
   await click('Thử lại'); await until('document.body.innerText.includes("Chưa có hóa đơn được phát hành")');
   assert.ok(responses.some(response => new URL(response.url).pathname === '/api/admin/invoices' && response.status === 201));
   assert.ok(responses.some(response => new URL(response.url).pathname === '/api/client/invoices' && response.status === 200));
+  // Real API/SQL fixture for the review case; no provider network call.
+  await logout();
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+  await login(false, 'admin');
+  const refundResponse = await fetch(`${api}/__checks/invoices/confirmation-refund`, { method: 'POST', headers });
+  assert.equal(refundResponse.status, 200);
+  const refunded = await refundResponse.json();
+  const refund = refunded.payments.find(payment => payment.type === 'Refund');
+  assert.equal(refund.paymentTimeBasis, 'Confirmation'); assert.equal(refund.providerOccurredAt, null);
+  assert.equal(refund.paymentTime, refund.confirmedAt); assert.equal(refund.paymentTime, refund.paidAt);
+  assert.equal(refunded.refundAmount, 90000); assert.equal(refunded.paidAmount, 0); assert.equal(refunded.amountDue, 0);
+  await click('Tải lại'); await until('document.querySelectorAll(".sql-invoice-table tbody tr").length === 2');
+  await click(`Chi tiết / In`, `button[aria-label="Xem và in hóa đơn ${refunded.id}"]`);
+  await until('Boolean(document.querySelector("dialog .invoice-money-history"))');
+  for (const selector of ['dialog .invoice-money-history', '.invoice-print-root .invoice-money-history']) {
+    const text = await evaluate(`document.querySelector(${JSON.stringify(selector)}).textContent`);
+    assert.ok(text.includes('Ghi nhận theo thời điểm hệ thống xác nhận'));
+    assert.ok(text.includes('Chưa có thời điểm giao dịch từ nhà cung cấp'));
+    assert.ok(text.includes('17/11/2026') && text.includes('00:03:00') && text.includes('UTC+07:00'));
+  }
+  await evaluate('document.querySelector("dialog .invoice-money-history").scrollIntoView({ block: "center" })');
+  await screenshot('invoices-live-confirmation-refund-admin.png');
+  await cdp('Emulation.setEmulatedMedia', { media: 'print' });
+  await screenshot('invoices-live-confirmation-refund-print.png');
+  const refundPdf = await cdp('Page.printToPDF', { printBackground: true, preferCSSPageSize: true });
+  await writeFile(path.join(outputDir, 'invoices-live-confirmation-refund.pdf'), Buffer.from(refundPdf.data, 'base64'));
+  await cdp('Emulation.setEmulatedMedia', { media: 'screen' });
+  const refundPrint = await fetch(`${api}/api/admin/invoices/${refunded.id}/print`, { headers });
+  assert.equal(refundPrint.status, 200);
+  const refundHtml = await refundPrint.text();
+  assert.ok(refundHtml.includes('Ghi nhận theo thời điểm hệ thống xác nhận'));
+  await logout(); await login(true, '0900031001');
+  await until('document.querySelectorAll(".sql-invoice-table tbody tr").length === 2');
+  await click('Chi tiết / In', `button[aria-label="Xem và in hóa đơn ${refunded.id}"]`);
+  await until('Boolean(document.querySelector("dialog .invoice-money-history"))');
+  assert.ok(await evaluate('document.querySelector("dialog .invoice-money-history").textContent.includes("Chưa có thời điểm giao dịch từ nhà cung cấp")'));
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+  await evaluate('document.querySelector("dialog .invoice-money-history li:last-child").scrollIntoView({ block: "center" })');
+  assert.equal(await evaluate('(() => { const rect = document.querySelector("dialog .invoice-money-history li:last-child").getBoundingClientRect(); return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight; })()'), true);
+  await screenshot('invoices-live-confirmation-refund-customer-mobile.png');
+  console.log('PASS confirmation refund UI: real API/SQL metadata, Vietnam time, admin/client, HTML/PDF and mobile.');
   console.log('PASS invoice live SQL: real login, UI issue POST 201, persisted reload, price-change snapshot, admin/client ownership, PDF print, mobile, empty/error/recovery.');
 } finally { socket.close(); }

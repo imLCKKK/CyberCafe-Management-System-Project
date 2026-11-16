@@ -17,7 +17,12 @@ public sealed record InvoiceLineDto(int Id, int? OrderDetailId, int? SessionChar
     string? VoucherCode, string? VoucherDiscountType, decimal? VoucherDiscountValue);
 
 public sealed record InvoicePaymentDto(int Id, string Type, string Method, string Status,
-    decimal Amount, int? WalletTransactionId, DateTimeOffset? PaidAt);
+    decimal Amount, int? WalletTransactionId, DateTimeOffset? PaidAt,
+    DateTimeOffset? ConfirmedAt, DateTimeOffset? ProviderOccurredAt, string? PaymentTimeBasis)
+{
+    // Giữ paidAt cho client cũ; paymentTime là tên theo contract.
+    public DateTimeOffset? PaymentTime => PaidAt;
+}
 
 public sealed record InvoiceDto(int Id, int CustomerId, string CustomerName,
     IReadOnlyList<int> OrderIds, int? GamingSessionId, string ActorType, int? EmployeeId,

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Printer, RefreshCw, Search, Plus, ReceiptText } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import Dialog from '../../client/shared/Dialog';
-import { getInvoice, listInvoices, issueInvoice, invoiceMoney as money, invoiceDate as date, invoiceStatus as statusLabel } from './invoiceApi';
+import { getInvoice, listInvoices, issueInvoice, invoicePaymentTiming, invoiceMoney as money, invoiceDate as date, invoiceStatus as statusLabel } from './invoiceApi';
 import './invoices.css';
 
 function Snapshot({ invoice }) {
@@ -15,7 +15,7 @@ function Snapshot({ invoice }) {
       ['Giá trị đã hủy', invoice.cancelledAmount], ['Đã hoàn thành công', invoice.refundAmount],
       ['Đã thu ròng', invoice.paidAmount], ['Còn phải thu', invoice.amountDue], ['Tiền dư / cần đối soát', invoice.overpaidAmount],
     ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{money(value)}</dd></div>)}</dl>
-    {invoice.payments.length > 0 && <section className="invoice-money-history"><h3>Giao dịch thu / hoàn</h3><ul>{invoice.payments.map(payment => <li key={payment.id}>#{payment.id} · {payment.type === 'Refund' ? 'Hoàn' : 'Thu'} {payment.method} · {money(payment.amount)} · {payment.status === 'Succeeded' ? 'Đã xác nhận' : payment.status === 'Pending' ? 'Đang chờ xác nhận' : payment.status === 'Failed' ? 'Thất bại' : 'Hết hạn'}</li>)}</ul></section>}
+    {invoice.payments.length > 0 && <section className="invoice-money-history"><h3>Giao dịch thu / hoàn</h3><ul>{invoice.payments.map(payment => <li key={payment.id}>#{payment.id} · {payment.type === 'Refund' ? 'Hoàn' : 'Thu'} {payment.method} · {money(payment.amount)} · {payment.status === 'Succeeded' ? 'Đã xác nhận' : payment.status === 'Pending' ? 'Đang chờ xác nhận' : payment.status === 'Failed' ? 'Thất bại' : 'Hết hạn'}{invoicePaymentTiming(payment).map((line, index) => <div key={index}><small>{line}</small></div>)}</li>)}</ul></section>}
     <p className="sql-invoice-note">Chứng từ thanh toán nội bộ. Khoản hoàn đang chờ chưa được tính là đã hoàn. Giá và giảm được giữ theo thời điểm phát hành.</p>
   </article>;
 }
