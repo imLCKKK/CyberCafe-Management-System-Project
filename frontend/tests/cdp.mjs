@@ -84,7 +84,7 @@ export async function setupWorkflowLogin(accountType, { resetDemo = false } = {}
       employeeId: 99,
       username: identifier,
       role: 'Admin',
-      permissions: ['order.view', 'computer.view', 'customer.view', 'product.view', 'stockreceipt.view', 'inventory.adjust', 'invoice.view', 'tournament.view', 'employee.view', 'report.view'],
+      permissions: ['order.view', 'computer.view', 'customer.view', 'product.view', 'stockreceipt.view', 'inventory.adjust', 'invoice.view', 'tournament.view', 'employee.view', 'employee.manage', 'report.view'],
     };
 
   const alreadyAtOrigin = await evaluate(`location.origin === ${JSON.stringify(new URL(origin).origin)}`);

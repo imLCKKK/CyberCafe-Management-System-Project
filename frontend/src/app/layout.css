@@ -35,7 +35,7 @@
 @media (max-width: 700px) {
   .admin-shell { flex-direction: column; }
   .sidebar, .collapsed .sidebar { width: 100%; min-width: 0; height: auto; position: relative; border-right: 0; border-bottom: 1px solid var(--line); }
-  .sidebar-brand, .collapsed .sidebar-brand { min-height: 76px; padding: 16px; padding-right: 104px; justify-content: flex-start; }
+  .sidebar-brand, .collapsed .sidebar-brand { min-height: 76px; padding: 16px; padding-right: 146px; justify-content: flex-start; }
   .sidebar-footer, .collapsed .sidebar-footer { position: absolute; right: 12px; top: 16px; padding: 0; border: 0; flex-wrap: nowrap; }
   .user, .nav-label { display: none; }
   .nav { display: flex; flex: none; padding: 8px 12px 12px; gap: 6px; overflow-x: auto; }

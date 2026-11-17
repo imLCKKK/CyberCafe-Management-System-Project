@@ -87,8 +87,9 @@ if (args.Contains("--catalog-browser-host"))
 var catalogOnly = args.Contains("--catalog-only");
 var customerOnly = args.Contains("--customer-only");
 var walletOnly = args.Contains("--wallet-only");
-if (new[] { catalogOnly, customerOnly, walletOnly }.Count(value => value) > 1)
-    throw new ArgumentException("Select one of --catalog-only, --customer-only or --wallet-only.");
+var employeesOnly = args.Contains("--employees-only");
+if (new[] { catalogOnly, customerOnly, walletOnly, employeesOnly }.Count(value => value) > 1)
+    throw new ArgumentException("Select one of --catalog-only, --customer-only, --wallet-only or --employees-only.");
 if (walletOnly && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION")))
     throw new ArgumentException("--wallet-only requires AUTH_CHECKS_SQL_CONNECTION; wallet writers are verified on SQL Server.");
 
@@ -110,10 +111,13 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     ["SeedAccounts:Technician:Password"] = "Technician-check-password-2026!"
 });
 var realtimeSaveFailure = new RealtimeSaveFailure();
+var employeeAuditSaveFailure = new EmployeeAuditSaveFailure();
+var adminInvariantLockBarrier = new AdminInvariantLockBarrier();
+builder.Services.AddSingleton(adminInvariantLockBarrier);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     databaseFixture.Configure(options);
-    options.AddInterceptors(realtimeSaveFailure);
+    options.AddInterceptors(realtimeSaveFailure, employeeAuditSaveFailure, adminInvariantLockBarrier);
 });
 builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
@@ -283,15 +287,21 @@ try
 
     if (!catalogOnly && !customerOnly && !walletOnly)
     {
+        checks += await EmployeeAccessChecks.RunAsync(
+            app.Services, client, staffTokens, customer.AccessToken, adminInvariantLockBarrier);
+        checks += await EmployeeAuditChecks.RunAsync(app.Services, client, staffTokens, employeeAuditSaveFailure);
+    }
+    if (!catalogOnly && !customerOnly && !walletOnly && !employeesOnly)
+    {
         checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
         checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
         checks += await TournamentChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
     }
-    if (!customerOnly && !walletOnly)
+    if (!customerOnly && !walletOnly && !employeesOnly)
         checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
-    if (!catalogOnly && !walletOnly)
+    if (!catalogOnly && !walletOnly && !employeesOnly)
         checks += await CustomerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
-    if (!catalogOnly && !customerOnly && databaseFixture.Provider == "SQL Server")
+    if (!catalogOnly && !customerOnly && !employeesOnly && databaseFixture.Provider == "SQL Server")
     {
         checks += await CounterTopUpChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
         checks += await WalletLedgerChecks.RunAsync(app.Services);

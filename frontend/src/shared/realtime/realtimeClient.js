@@ -34,6 +34,11 @@ export function createRealtimeClient({ connection, schedule = setTimeout, cancel
     for (const subscriber of subscribers) subscriber.onReady?.();
   }
 
+  function accountLocked() {
+    authenticationFailed({ statusCode: 403 });
+    void connection.stop().catch(() => {});
+  }
+
   function retry() {
     if (disposed || unauthorized || starting || retryTimer !== null || !subscribers.size) return;
     const delays = [2000, 5000, 10000, 30000];
@@ -61,6 +66,7 @@ export function createRealtimeClient({ connection, schedule = setTimeout, cancel
   }
 
   connection.on('RealtimeReady', ready);
+  connection.on('AccountLocked', accountLocked);
   connection.onreconnecting((error) => {
     if (disposed || unauthorized) return;
     if (authFailureStatus(error)) authenticationFailed(error);
@@ -79,6 +85,7 @@ export function createRealtimeClient({ connection, schedule = setTimeout, cancel
     if (retryTimer !== null) cancel(retryTimer);
     retryTimer = null;
     connection.off('RealtimeReady', ready);
+    connection.off('AccountLocked', accountLocked);
     for (const [name, handler] of eventHandlers) connection.off(name, handler);
     eventHandlers.clear();
     subscribers.clear();

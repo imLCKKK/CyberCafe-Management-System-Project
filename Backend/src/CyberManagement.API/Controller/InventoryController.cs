@@ -3,6 +3,7 @@ using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using CyberManagement.API.Security;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
@@ -10,7 +11,7 @@ namespace CyberManagement.API.Controller;
 
 [ApiController]
 [Route("api/admin/inventory")]
-[Authorize]
+[Authorize(Policy = ApiPolicies.ActiveAccount)]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]
 [ProducesResponseType(StatusCodes.Status403Forbidden)]
 public sealed class InventoryController : ControllerBase

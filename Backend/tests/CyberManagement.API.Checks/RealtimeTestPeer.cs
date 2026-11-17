@@ -46,7 +46,25 @@ internal sealed class RealtimeTestPeer(WebSocket socket) : IAsyncDisposable
 
     public async Task<JsonElement> NextAsync()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        return await ReceiveAsync(TimeSpan.FromSeconds(5))
+            ?? throw new TimeoutException("Timed out waiting for a SignalR test message.");
+    }
+
+    public async Task<JsonElement?> TryNextAsync(TimeSpan duration)
+    {
+        try
+        {
+            return await ReceiveAsync(duration);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<JsonElement?> ReceiveAsync(TimeSpan duration)
+    {
+        using var timeout = new CancellationTokenSource(duration);
         while (true)
         {
             if (_messages.TryDequeue(out var message))

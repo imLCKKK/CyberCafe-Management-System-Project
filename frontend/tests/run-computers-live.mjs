@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 if (!process.env.AUTH_CHECKS_SQL_CONNECTION) throw Error('AUTH_CHECKS_SQL_CONNECTION is required.');
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const dotnet = process.env.DOTNET_EXE || 'dotnet';
+const suite = process.argv[2] || 'computers-live';
 const run = (command, args, env = process.env) => new Promise((resolve, reject) => {
   const child = spawn(command, args, { cwd: root, windowsHide: true, env, stdio: 'inherit' });
   child.once('error', reject);
@@ -35,7 +36,7 @@ try {
     stopped.then(() => { clearTimeout(timer); reject(Error('SQL host stopped before readiness.')); },
       error => { clearTimeout(timer); reject(error); });
   });
-  await run(process.execPath, ['frontend/tests/run.mjs', 'computers-live'], {
+  await run(process.execPath, ['frontend/tests/run.mjs', suite], {
     ...process.env, VITE_API_PROXY_TARGET: url, API_PROXY_TARGET: url,
     VITE_API_BASE_URL: '/api', COMPUTERS_LIVE_API_URL: url,
   });

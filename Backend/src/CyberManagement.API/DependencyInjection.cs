@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddExceptionHandler<ExceptionHandling.ApiExceptionHandler>();
         services.AddSignalR();
         services.AddScoped<IRealtimePublisher, SignalRRealtimePublisher>();
+        services.AddSingleton<RealtimeAccountConnections>();
 
         var signingKey = configuration["Authentication:Jwt:SigningKey"];
         if (string.IsNullOrWhiteSpace(signingKey) || Encoding.UTF8.GetByteCount(signingKey) < 32)
@@ -76,12 +77,16 @@ public static class DependencyInjection
             options.AddPolicy(ApiPolicies.RealtimeConnect, policy => policy
                 .RequireAuthenticatedUser()
                 .RequireAssertion(context => RealtimeGroups.FromPrincipal(context.User) is not null));
+            options.AddPolicy(ApiPolicies.ActiveAccount, policy => policy
+                .RequireAuthenticatedUser()
+                .AddRequirements(new AccountStatusRequirement()));
             options.FallbackPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .Build();
         });
         services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, AccountStatusAuthorizationHandler>();
 
         return services;
     }

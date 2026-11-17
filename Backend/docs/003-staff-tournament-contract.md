@@ -18,6 +18,36 @@ Migration `AddTournamentWalletSettlement` thêm `FeeCharged`, `ChargeTransaction
 
 **Trạng thái:** bản hợp đồng cập nhật theo review Trưởng nhóm, chưa phải API đang chạy. Các phương án ở Phụ lục A là lựa chọn thiết kế để triển khai; xác nhận liên module của Minh/Phúc và duyệt cuối của Trưởng nhóm được ghi riêng, không suy diễn từ việc cập nhật tài liệu.
 
+**Cập nhật triển khai SCRUM-17 (17/11/2026):** Route nhân viên hiện hành là
+`/api/employees` (bảng thiết kế mục 3 vẫn giữ route đích).
+GET/list/create/update trả `version` Base64 của `Employees.Version` (SQL rowversion).
+PUT `/api/employees/{id}` yêu cầu `expectedVersion` Base64 8 byte: thiếu/sai định dạng
+trả 400; không còn khớp hoặc đua ghi tại SQL trả 409 ProblemDetails `VersionConflict`.
+Xung đột không đổi Employee và không thêm audit. Đọc lại để chỉnh sửa trên dữ liệu mới,
+không tự retry payload cũ bằng token mới. Migration `AddEmployeeRowVersion` thêm cột,
+không reset dữ liệu. Khóa/mở khóa/đổi mật khẩu cũng làm token thay đổi tại SQL;
+yêu cầu token từ client cho các POST này chưa thuộc đợt sửa PUT này.
+
+Tạo nhân viên hiện nhận `password` (tên trường khác `initialPassword` trong thiết kế),
+được kiểm tra chung policy với đổi mật khẩu ở Application service: 12–72 ký tự,
+ít nhất một chữ và một số. Đổi mật khẩu yêu cầu `currentPassword` đúng,
+`newPassword` khác mật khẩu cũ và `confirmNewPassword` khớp chính xác.
+Mật khẩu không được trim; xác nhận phân biệt hoa/thường. Vi phạm trả 400,
+không thay Employee/hash/version hoặc thêm audit. Không đổi policy seed/đăng nhập/khách hàng.
+
+GET list/detail `/api/employees` dùng `employee.view`; tạo/sửa/khóa/mở khóa dùng
+`employee.manage`. Theo catalog hiện tại, Manager chỉ đọc; form quản lý chỉ dành cho
+principal có `employee.manage` và catalog role hiện hành vẫn yêu cầu `role.manage`.
+`POST /api/auth/change-password` đã được triển khai cho Admin, Manager, Cashier,
+Waiter, Technician đang hoạt động, không cần quyền quản lý nhân viên. Actor và đối tượng
+đều lấy từ JWT; token khách không được dùng kể cả ID trùng nhân viên.
+Alias cũ `POST /api/employees/{id}/change-password` chỉ cho ID chính chủ; Admin
+cũng không thể đổi mật khẩu người khác qua alias. Sai mật khẩu hiện tại trả 400;
+khác chủ thể/không còn hoạt động trả 403, không thay dữ liệu/audit. Thành công trả 204
+và audit `PasswordChanged` có actor bằng đối tượng. JWT hiện tại không bị thu hồi.
+Reset mật khẩu quản trị và đổi mật khẩu khách trong bảng thiết kế bên dưới không thuộc
+đợt sửa này; không suy ra đã triển khai từ alias đổi mật khẩu chính chủ.
+
 **Quyết định bổ sung ngày 10/11/2026:** Trưởng nhóm chọn baseline/fallback `rank-snake-v1` theo [SCRUM-9, mục 5](https://github.com/imLCKKK/CyberCafe-Management-System-Project/blob/1b2ceb9b34cf91b81c61d5dc5c30b5918487527b/docs/contracts/ml-team-balancing-pipeline.md#L146-L153), thay cách xếp theo SkillScore tổng hợp trong v0.5 đã merge ở PR #18. Giữ yêu cầu ML; không chờ xác nhận riêng của Minh/Phúc để chốt phương án này. Bản bổ sung vẫn do Trưởng nhóm duyệt cuối.
 
 **Thay đổi v0.7 sau review PR #21:** Confirm giữ nguyên phân đội/vai trò từ đề xuất server; chỉ tên đội được sửa. Swap sau xác nhận chuyển kết quả hiện tại sang `Manual`, giữ đề xuất gốc và lịch sử chỉnh sửa trong snapshot; không gắn nhãn baseline/ML cho đội đã chỉnh tay.

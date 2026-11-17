@@ -30,6 +30,41 @@ và cần mạng; các suite mặc định dùng fixture cho OP.GG.
 
 ## Auth frontend
 
+Trang nhân viên giữ nguyên `roleName` từ API cho bảng, bộ lọc và thống kê.
+Không fallback về nhân viên demo: khi đang tải hoặc tải lỗi, ẩn bảng/thống kê,
+vô hiệu nút thêm và hiển thị trạng thái tải hoặc lỗi kèm nút **Thử lại**.
+Sau khi lưu/khóa/mở khóa, danh sách cũ bị vô hiệu cho đến khi tải lại thành công.
+Response rỗng là danh sách rỗng thật, không phải lỗi và không sinh dữ liệu mẫu.
+Form tạo/sửa tải catalog từ `GET /api/admin/roles`, tra tên vai trò hiện tại
+sang `roleId` và không giả định ID cố định. Khi sửa hồ sơ mà không đổi vai trò,
+request bỏ `roleId`; nếu catalog lỗi hoặc rỗng, form báo lỗi và không cho lưu.
+Mật khẩu ban đầu có 12–72 ký tự, ít nhất một chữ và một số; API kiểm tra độc lập
+với form và trả lỗi 400 nếu không đạt policy.
+Form sửa gửi `expectedVersion` lấy từ chính hồ sơ đang hiển thị. Nếu API trả 409,
+giữ dữ liệu chưa lưu, hiện lỗi và nút **Tải lại danh sách**; không tự ghi đè hay
+tự retry bằng token mới. Sau tải lại, mở form để sửa trên phiên bản server mới.
+Kiểm tra hồi quy bằng `npm.cmd run test:frontend -- staff-roles` (API fixture).
+
+Form nhân viên gọi và chờ `POST /api/employees` hoặc `PUT /api/employees/{id}`
+trước khi báo lưu và tải lại danh sách; không dùng `saveAccount`/commit kho demo.
+Proxy Vite (dev/preview) chuyển cả `/api/employees` tới backend, không chỉ các
+route `/api/admin`; base API client vẫn là `/api`, không lặp thành `/api/api`.
+Kiểm tra trình duyệt với SQL thật (cần `AUTH_CHECKS_SQL_CONNECTION` cho SQL test
+và `DOTNET_EXE` nếu SDK không có trong PATH), từ gốc repository:
+`node frontend\tests\run-computers-live.mjs staff-live`.
+Runner tái sử dụng host kiểm thử SQL, tạo/xóa database riêng; không dùng DB ứng dụng.
+Suite đăng nhập thật, tạo/sửa tên–điện thoại–role bằng UI, đọc SQL độc lập và reload
+trình duyệt để đối chiếu; kiểm tra API 400 không báo thành công, không ghi kho demo.
+
+Người có `employee.view` nhưng thiếu `employee.manage` (Manager theo catalog)
+chỉ xem bảng/chi tiết/thống kê: không có nút thêm/sửa/khóa và không mount form
+gọi catalog role. API vẫn kiểm tra quyền độc lập.
+Mọi nhân viên có nút **Đổi mật khẩu** ở sidebar, kể cả không có `employee.view`.
+Form gửi `currentPassword/newPassword/confirmNewPassword` tới
+`POST /api/auth/change-password`, không gửi EmployeeId. Lỗi 400 hiện trong form,
+không đăng xuất; chặn gửi lặp khi đang lưu. Chỉ báo thành công sau 204,
+đóng/xóa form; không giữ mật khẩu khi mở lại và không thu hồi JWT đang dùng.
+
 Đăng nhập nhân viên và khách dùng chung API client tại `src/shared/auth/api.js`.
 Nhân viên gọi `POST /api/auth/login` bằng `username/password`; khách gọi
 `POST /api/auth/customer/login` bằng `phone/password`. Sau đăng nhập, frontend

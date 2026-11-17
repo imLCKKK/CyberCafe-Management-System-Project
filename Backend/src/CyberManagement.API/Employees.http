@@ -1,0 +1,81 @@
+@baseUrl = http://127.0.0.1:5088
+@employeeId = 1
+@otherEmployeeId = 2
+@token = replace-with-local-admin-token
+
+### Read the current profile and copy its version before editing
+GET {{baseUrl}}/api/employees/{{employeeId}}
+Authorization: Bearer {{token}}
+
+### Update with the version from GET (replace this example token)
+PUT {{baseUrl}}/api/employees/{{employeeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fullName": "Employee profile update",
+  "expectedVersion": "AAAAAAAAAAE="
+}
+
+### Repeat that PUT with the same token after success: expect 409 VersionConflict
+PUT {{baseUrl}}/api/employees/{{employeeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fullName": "Stale edit must not be saved",
+  "expectedVersion": "AAAAAAAAAAE="
+}
+
+### Missing expectedVersion: expect 400, no employee or audit changes
+PUT {{baseUrl}}/api/employees/{{employeeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fullName": "Invalid edit"
+}
+
+### Self password change: any active staff role, no employee.view/manage needed
+POST {{baseUrl}}/api/auth/change-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "currentPassword": "replace-with-current-password",
+  "newPassword": "replace-with-valid-new-password-2026",
+  "confirmNewPassword": "replace-with-valid-new-password-2026"
+}
+
+### Weak new password: expect 400, unchanged hash/version/audit
+POST {{baseUrl}}/api/auth/change-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "currentPassword": "replace-with-current-password",
+  "newPassword": "a",
+  "confirmNewPassword": "a"
+}
+
+### Legacy compatibility alias: employeeId must equal the token subject
+POST {{baseUrl}}/api/employees/{{employeeId}}/change-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "currentPassword": "replace-with-current-password",
+  "newPassword": "replace-with-valid-new-password-2026",
+  "confirmNewPassword": "replace-with-valid-new-password-2026"
+}
+
+### Cross-ID password change: expect 403 even for Admin, no hash/version/audit changes
+POST {{baseUrl}}/api/employees/{{otherEmployeeId}}/change-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "currentPassword": "replace-with-current-password",
+  "newPassword": "replace-with-valid-new-password-2026",
+  "confirmNewPassword": "replace-with-valid-new-password-2026"
+}

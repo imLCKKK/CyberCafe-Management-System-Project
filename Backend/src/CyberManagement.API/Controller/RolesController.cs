@@ -7,6 +7,7 @@ namespace CyberManagement.API.Controller;
 
 [ApiController]
 [Route("api/admin/roles")]
+[Authorize(Policy = ApiPolicies.ActiveAccount)]
 [Authorize(Policy = ApiPolicies.RoleManage)]
 public sealed class RolesController(IIdentityService identityService) : ControllerBase
 {

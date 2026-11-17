@@ -8,6 +8,7 @@ namespace CyberManagement.API.Controller;
 
 [ApiController]
 [Route("api/admin")]
+[Authorize(Policy = ApiPolicies.ActiveAccount)]
 public sealed class ComputersController(IComputerService computers) : ControllerBase
 {
     [HttpGet("computers")]

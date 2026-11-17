@@ -2903,3 +2903,61 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117034907_AddEmployeeRowVersion'
+)
+BEGIN
+    ALTER TABLE [Employees] ADD [Version] rowversion NOT NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117034907_AddEmployeeRowVersion'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261117034907_AddEmployeeRowVersion', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117144841_AddEmployeeIdempotency'
+)
+BEGIN
+    ALTER TABLE [Employees] ADD [CreateRequestKey] nvarchar(100) COLLATE Latin1_General_100_BIN2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117144841_AddEmployeeIdempotency'
+)
+BEGIN
+    ALTER TABLE [Employees] ADD [CreateRequestFingerprint] varchar(64) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117144841_AddEmployeeIdempotency'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Employees_CreateRequestKey] ON [Employees] ([CreateRequestKey]) WHERE [CreateRequestKey] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117144841_AddEmployeeIdempotency'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261117144841_AddEmployeeIdempotency', N'10.0.14');
+END;
+
+COMMIT;
+GO

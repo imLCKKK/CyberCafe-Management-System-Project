@@ -14,11 +14,14 @@ import {
   ChevronRight,
   LogOut,
   Banknote,
+  KeyRound,
 } from 'lucide-react';
 import './layout.css';
 import { AdminProvider } from '../admin/shared/AdminContext';
 import { useAuth } from '../shared/auth/AuthContext';
 import Brand from '../shared/branding/Brand';
+import ChangePasswordDialog from '../admin/auth/ChangePasswordDialog';
+import { Notice } from '../admin/shared/AdminUI';
 
 const menu = [
   ['/admin/dashboard', 'Tổng quan', LayoutDashboard],
@@ -40,6 +43,8 @@ export function AdminLayout() {
 
 function AdminShell() {
   const [collapsed, setCollapsed] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordNotice, setPasswordNotice] = useState('');
   const menuToggle = useRef(null);
   const { pathname } = useLocation();
   const { principal, signOut } = useAuth();
@@ -99,7 +104,7 @@ function AdminShell() {
               </div>
             </div>
           )}
-          {principal?.type === 'employee' && <button className="admin-logout" aria-label="Đăng xuất" title="Đăng xuất" onClick={() => void signOut()}><LogOut size={18}/></button>}
+          {principal?.type === 'employee' && <><button className="admin-logout" aria-label="Đổi mật khẩu" title="Đổi mật khẩu" onClick={() => { setPasswordNotice(''); setChangingPassword(true); }}><KeyRound size={18}/></button><button className="admin-logout" aria-label="Đăng xuất" title="Đăng xuất" onClick={() => void signOut()}><LogOut size={18}/></button></>}
           <button ref={menuToggle} aria-controls="admin-navigation" aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} aria-expanded={!collapsed} onClick={() => setCollapsed(v => !v)}>
             <Menu size={19} />
           </button>
@@ -117,7 +122,9 @@ function AdminShell() {
             </div>
           </div>
         </header>
+        <Notice notice={passwordNotice} clear={() => setPasswordNotice('')}/>
         <Outlet />
+        {changingPassword && principal?.type === 'employee' && <ChangePasswordDialog onClose={() => setChangingPassword(false)} onSaved={() => setPasswordNotice('Đã đổi mật khẩu. Phiên hiện tại vẫn có hiệu lực đến khi hết hạn.')}/>}
       </main>
     </div>
   );

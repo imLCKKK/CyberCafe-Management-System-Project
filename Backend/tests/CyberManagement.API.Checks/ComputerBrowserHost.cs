@@ -36,6 +36,7 @@ internal static class ComputerBrowserHost
         });
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
+        builder.Logging.AddConsole().SetMinimumLevel(LogLevel.Warning);
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Authentication:Jwt:SigningKey"] = "checks-only-signing-key-that-is-at-least-32-bytes"
@@ -46,8 +47,10 @@ internal static class ComputerBrowserHost
         builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
         builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
         builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+        builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
         builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
         builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
+        builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
         builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
         builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
         builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
@@ -106,6 +109,20 @@ internal static class ComputerBrowserHost
                     .AsNoTracking().OrderBy(row => row.ComputerId)
                     .Select(row => new { row.ComputerId, row.ComputerName, row.Status, row.RoomId, row.ComputerTypeId })
                     .ToListAsync()))
+                .RequireAuthorization(policy => policy.RequireRole("Admin"));
+            app.MapGet("/api/admin/__checks/employees-sql", async (ApplicationDbContext database) =>
+                Results.Ok(new
+                {
+                    employees = await database.Employees.AsNoTracking().OrderBy(row => row.EmployeeId)
+                        .Select(row => new
+                        {
+                            row.EmployeeId, row.Username, row.FullName, row.Phone, row.RoleId,
+                            row.Role.RoleName, row.IsActive, row.Version
+                        }).ToListAsync(),
+                    audits = await database.AuditLogs.AsNoTracking().Where(row => row.EntityType == "Employee")
+                        .OrderBy(row => row.LogId)
+                        .Select(row => new { row.EmployeeId, row.EntityId, row.Action, row.CreatedAt }).ToListAsync()
+                }))
                 .RequireAuthorization(policy => policy.RequireRole("Admin"));
             await app.StartAsync();
             Console.WriteLine(JsonSerializer.Serialize(new { type = "ready", url = app.Urls.Single() }));

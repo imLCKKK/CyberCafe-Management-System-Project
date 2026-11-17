@@ -109,6 +109,7 @@ Table dbo.CustomerStatusHistory {
 Table dbo.Employees {
   EmployeeId int [not null, pk, increment]
   CreatedAt datetime2 [not null]
+  Version rowversion [not null]
   FullName nvarchar(150) [not null]
   IsActive bit [not null]
   PasswordHash nvarchar(255) [not null]
