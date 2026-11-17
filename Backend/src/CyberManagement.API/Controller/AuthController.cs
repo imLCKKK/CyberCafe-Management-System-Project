@@ -110,16 +110,23 @@ public sealed class AuthController(
         return NoContent();
     }
 
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Roles = "Admin,Manager,Cashier,Waiter,Technician")]
     [HttpGet("me")]
-    public IActionResult GetCurrentUser()
+    public async Task<IActionResult> GetCurrentUser(CancellationToken cancellationToken)
     {
-        var employeeId = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        if (!int.TryParse(User.FindFirstValue(JwtRegisteredClaimNames.Sub), out var employeeId))
+            return Unauthorized();
+
+        var employee = await employeesService.GetEmployeeByIdAsync(employeeId, cancellationToken);
+        if (employee is null || !employee.IsActive)
+            return Forbid();
+
         return Ok(new
         {
             EmployeeId = employeeId,
-            Username = User.FindFirstValue("name"),
-            Role = User.FindFirstValue("role"),
+            Username = employee.Username,
+            Role = employee.RoleName,
             Permissions = User.FindAll("permission").Select(claim => claim.Value).Order(StringComparer.Ordinal)
         });
     }

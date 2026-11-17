@@ -382,6 +382,16 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CreateRequestFingerprint")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("CreateRequestKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -414,6 +424,10 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasColumnType("rowversion");
 
                     b.HasKey("EmployeeId");
+
+                    b.HasIndex("CreateRequestKey")
+                        .IsUnique()
+                        .HasFilter("[CreateRequestKey] IS NOT NULL");
 
                     b.HasIndex("RoleId");
 

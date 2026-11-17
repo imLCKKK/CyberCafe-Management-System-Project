@@ -1,7 +1,9 @@
 using CyberManagement.Application.DTOs.Employees;
 using CyberManagement.Application.Exceptions;
 using CyberManagement.Application.Services;
+using CyberManagement.API.Realtime;
 using System.IdentityModel.Tokens.Jwt;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using CyberManagement.API.Security;
@@ -11,7 +13,9 @@ namespace CyberManagement.API.Controller;
 [ApiController]
 [Route("api/employees")]
 [Authorize(Policy = ApiPolicies.ActiveAccount)]
-public sealed class EmployeesController(EmployeesService employeesService) : ControllerBase
+public sealed class EmployeesController(
+    EmployeesService employeesService,
+    RealtimeAccountConnections realtimeAccountConnections) : ControllerBase
 {
     [HttpGet]
     [Authorize(Policy = ApiPolicies.EmployeeView)]
@@ -47,12 +51,31 @@ public sealed class EmployeesController(EmployeesService employeesService) : Con
             if (string.IsNullOrEmpty(currentEmployeeIdClaim) || !int.TryParse(currentEmployeeIdClaim, out var currentEmployeeId))
                 return Unauthorized(new { message = "Không thể xác định nhân viên hiện tại." });
 
-            var employee = await employeesService.CreateEmployeeAsync(request, currentEmployeeId, cancellationToken);
-            return CreatedAtAction(nameof(GetEmployee), new { employeeId = employee.EmployeeId }, employee);
+            var raw = Request.Headers["Idempotency-Key"];
+            if (raw.Count != 1 || !Guid.TryParseExact(raw[0], "D", out var key))
+                return BadRequest(new { message = "Idempotency-Key phải là UUID dạng chuẩn." });
+
+            var result = await employeesService.CreateEmployeeWithIdempotencyAsync(
+                request, key, currentEmployeeId, cancellationToken);
+            
+            if (result.Replayed)
+                Response.Headers["Idempotency-Replayed"] = "true";
+
+            return result.Replayed
+                ? Ok(result.Employee)
+                : CreatedAtAction(nameof(GetEmployee), new { employeeId = result.Employee.EmployeeId }, result.Employee);
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
         catch (InvalidOperationException ex) when (ex is not BusinessRuleException)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (ConflictException ex)
+        {
+            return Conflict(new { message = ex.Message });
         }
     }
 
@@ -94,6 +117,7 @@ public sealed class EmployeesController(EmployeesService employeesService) : Con
                 return Unauthorized(new { message = "Không thể xác định nhân viên hiện tại." });
 
             var employee = await employeesService.LockEmployeeAsync(employeeId, currentEmployeeId, cancellationToken);
+            await realtimeAccountConnections.RevokeEmployeeAsync(employeeId);
             return Ok(employee);
         }
         catch (InvalidOperationException ex) when (ex is not BusinessRuleException)

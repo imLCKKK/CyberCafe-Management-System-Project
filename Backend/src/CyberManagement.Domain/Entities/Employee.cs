@@ -20,6 +20,10 @@ public class Employee
 
     public byte[] Version { get; set; } = new byte[8];
 
+    public string? CreateRequestKey { get; set; }
+
+    public string? CreateRequestFingerprint { get; set; }
+
     public Role Role { get; set; } = null!;
 
     public ICollection<Shift> Shifts { get; set; } = new List<Shift>();

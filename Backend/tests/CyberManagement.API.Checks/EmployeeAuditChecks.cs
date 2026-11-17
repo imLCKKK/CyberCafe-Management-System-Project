@@ -17,7 +17,7 @@ internal static class EmployeeAuditChecks
         string? passwordToken = null;
         var startedAt = DateTime.UtcNow;
         int actorId, waiterRoleId, managerRoleId, initialAuditCount;
-        bool relational;
+        bool relational, sqlServer;
         await using (var scope = services.CreateAsyncScope())
         {
             var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -26,18 +26,46 @@ internal static class EmployeeAuditChecks
             managerRoleId = await database.Roles.Where(row => row.RoleName == "Manager").Select(row => row.RoleId).SingleAsync();
             initialAuditCount = await database.AuditLogs.CountAsync();
             relational = database.Database.IsRelational();
+            sqlServer = database.Database.IsSqlServer();
         }
 
         const string originalPassword = "Employee-audit-original-2026!";
         const string changedPassword = "Employee-audit-changed-2026!";
         var create = new { username = "employee-audit-target", fullName = "Audit target", phone = "0900000199", roleId = waiterRoleId, password = originalPassword };
+        var createKey = Guid.NewGuid().ToString("D");
         int targetId;
-        using (var response = await SendAsync(HttpMethod.Post, "/api/employees", create))
+        string createdVersion;
+        using (var response = await SendAsync(HttpMethod.Post, "/api/employees", create, idempotencyKey: createKey))
         {
             Check("Employee creation succeeds", response.StatusCode == HttpStatusCode.Created);
             var employee = await response.Content.ReadFromJsonAsync<EmployeeDto>()
                 ?? throw new InvalidOperationException("Missing created employee.");
             targetId = employee.EmployeeId;
+            createdVersion = employee.Version;
+        }
+        using (var response = await SendAsync(HttpMethod.Post, "/api/employees", create, idempotencyKey: createKey))
+        {
+            Check("Repeated employee create replays with 200 and replay marker",
+                response.StatusCode == HttpStatusCode.OK
+                && response.Headers.TryGetValues("Idempotency-Replayed", out var replayHeader)
+                && replayHeader.Single() == "true");
+            var replay = await response.Content.ReadFromJsonAsync<EmployeeDto>()
+                ?? throw new InvalidOperationException("Missing replayed employee.");
+            Check("Employee create replay returns the original ID and version",
+                replay.EmployeeId == targetId && replay.Version == createdVersion);
+        }
+        using (var response = await SendAsync(HttpMethod.Post, "/api/employees",
+            new
+            {
+                username = create.username,
+                fullName = "Different payload",
+                phone = create.phone,
+                roleId = create.roleId,
+                password = originalPassword
+            }, idempotencyKey: createKey))
+        {
+            Check("Reusing an employee create key with another payload returns 409",
+                response.StatusCode == HttpStatusCode.Conflict);
         }
         var targetPath = $"/api/employees/{targetId}";
         using (var loginResponse = await SendAsync(HttpMethod.Post, "/api/auth/login",
@@ -71,9 +99,50 @@ internal static class EmployeeAuditChecks
             Check("Wrong current password is rejected", response.StatusCode == HttpStatusCode.BadRequest);
         using (var response = await SendAsync(HttpMethod.Post, "/api/employees", create))
             Check("Duplicate employee creation is rejected", response.StatusCode == HttpStatusCode.BadRequest);
+        foreach (var invalidCreate in new object[]
+        {
+            new { username = "   ", fullName = "Valid name", roleId = waiterRoleId, password = originalPassword },
+            new { username = "valid-name", fullName = "   ", roleId = waiterRoleId, password = originalPassword },
+            new { username = new string('u', 51), fullName = "Valid name", roleId = waiterRoleId, password = originalPassword },
+            new { username = "long-name", fullName = new string('n', 151), roleId = waiterRoleId, password = originalPassword }
+        })
+        {
+            using var response = await SendAsync(HttpMethod.Post, "/api/employees", invalidCreate);
+            Check("Invalid employee username/name is rejected with 400", response.StatusCode == HttpStatusCode.BadRequest);
+        }
         using (var response = await SendAsync(HttpMethod.Put, targetPath, new { fullName = "Forbidden change" }, staffTokens["Waiter"]))
             Check("Unauthorized employee mutation is rejected", response.StatusCode == HttpStatusCode.Forbidden);
         Check("Rejected requests leave employees and audit unchanged", beforeRejections == await SnapshotAsync());
+
+        if (sqlServer)
+        {
+            var concurrentCreate = new
+            {
+                username = "employee-audit-idempotent-race",
+                fullName = "Idempotent race target",
+                roleId = waiterRoleId,
+                password = originalPassword
+            };
+            var concurrentKey = Guid.NewGuid().ToString("D");
+            var concurrentResponses = await Task.WhenAll(
+                SendAsync(HttpMethod.Post, "/api/employees", concurrentCreate, idempotencyKey: concurrentKey),
+                SendAsync(HttpMethod.Post, "/api/employees", concurrentCreate, idempotencyKey: concurrentKey));
+            try
+            {
+                Check("Concurrent identical employee creates return one 201 and one 200",
+                    concurrentResponses.Count(response => response.StatusCode == HttpStatusCode.Created) == 1
+                    && concurrentResponses.Count(response => response.StatusCode == HttpStatusCode.OK) == 1);
+                var ids = await Task.WhenAll(concurrentResponses.Select(async response =>
+                    (await response.Content.ReadFromJsonAsync<EmployeeDto>()
+                        ?? throw new InvalidOperationException("Missing concurrent employee response.")).EmployeeId));
+                Check("Concurrent employee create replay returns the same employee ID", ids[0] == ids[1]);
+                await ExpectAuditAsync("Created", ids[0]);
+            }
+            finally
+            {
+                foreach (var response in concurrentResponses) response.Dispose();
+            }
+        }
 
         foreach (var invalid in new object[]
         {
@@ -203,11 +272,14 @@ internal static class EmployeeAuditChecks
         }
         return checks;
 
-        async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, object? body = null, string? token = null)
+        async Task<HttpResponseMessage> SendAsync(
+            HttpMethod method, string path, object? body = null, string? token = null, string? idempotencyKey = null)
         {
             using var request = new HttpRequestMessage(method, path);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer",
                 token ?? (path.EndsWith("/change-password", StringComparison.Ordinal) ? passwordToken : staffTokens["Admin"]));
+            if (method == HttpMethod.Post && path == "/api/employees")
+                request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString("D"));
             if (body is not null) request.Content = JsonContent.Create(body);
             return await client.SendAsync(request);
         }

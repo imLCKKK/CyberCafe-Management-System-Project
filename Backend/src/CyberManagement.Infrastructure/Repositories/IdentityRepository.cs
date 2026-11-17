@@ -50,6 +50,13 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
             .Include(e => e.Role)
             .SingleOrDefaultAsync(e => e.EmployeeId == employeeId, cancellationToken);
 
+    public Task<Employee?> GetEmployeeByCreateKeyAsync(
+        string createRequestKey,
+        CancellationToken cancellationToken) =>
+        database.Employees
+            .Include(e => e.Role)
+            .SingleOrDefaultAsync(e => e.CreateRequestKey == createRequestKey, cancellationToken);
+
     public async Task<IReadOnlyList<Employee>> GetAllEmployeesAsync(
         CancellationToken cancellationToken) =>
         await database.Employees
@@ -79,9 +86,26 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
         bool preserveAnotherActiveAdmin,
         CancellationToken cancellationToken)
     {
+        var isNewEmployee = database.Entry(employee).State == EntityState.Added;
         await using var transaction = database.Database.IsRelational()
             ? await database.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
             : null;
+
+        if (isNewEmployee && employee.CreateRequestKey is not null)
+        {
+            if (database.Database.IsSqlServer())
+            {
+                var lockResource = $"EmployeeCreate:{employee.CreateRequestKey}";
+                await database.Database.ExecuteSqlInterpolatedAsync(
+                    $"DECLARE @lockResult int; EXEC @lockResult = sys.sp_getapplock @Resource = {lockResource}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000; IF @lockResult < 0 THROW 51001, 'Could not acquire employee create idempotency lock.', 1;",
+                    cancellationToken);
+            }
+
+            if (await database.Employees.AnyAsync(
+                    row => row.CreateRequestKey == employee.CreateRequestKey,
+                    cancellationToken))
+                throw new ConflictException("Idempotency-Key đã được sử dụng.");
+        }
 
         if (preserveAnotherActiveAdmin)
         {
@@ -104,7 +128,7 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
         }
 
         // A new employee needs its SQL-generated ID before it can be the audit target.
-        if (database.Entry(employee).State == EntityState.Added)
+        if (isNewEmployee)
             await database.SaveChangesAsync(cancellationToken);
 
         audit.EntityId = employee.EmployeeId;

@@ -5,6 +5,9 @@ using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Security;
 using CyberManagement.Domain.Entities;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json; 
 
 namespace CyberManagement.Application.Services;
 
@@ -49,11 +52,30 @@ public sealed class EmployeesService(
     public async Task<EmployeeDto> CreateEmployeeAsync(
         CreateEmployeeRequest request,
         int currentEmployeeId,
+        CancellationToken cancellationToken) =>
+        await CreateEmployeeCoreAsync(request, currentEmployeeId, null, null, cancellationToken);
+
+    private async Task<EmployeeDto> CreateEmployeeCoreAsync(
+        CreateEmployeeRequest request,
+        int currentEmployeeId,
+        string? createRequestKey,
+        string? createRequestFingerprint,
         CancellationToken cancellationToken)
     {
         EmployeePasswordPolicy.Validate(request.Password);
-        var username = request.Username.Trim();
-        
+        var username = request.Username?.Trim() ?? "";
+        var fullName = request.FullName?.Trim() ?? "";
+        var phone = request.Phone?.Trim() ?? "";
+
+        if (string.IsNullOrEmpty(username) || username.Length > 50)
+            throw new ValidationException("Tên đăng nhập phải 1–50 ký tự không rỗng.");
+
+        if (string.IsNullOrEmpty(fullName) || fullName.Length > 150)
+            throw new ValidationException("Họ và tên phải 1–150 ký tự không rỗng.");
+
+        if (phone.Length > 11)
+            throw new ValidationException("Số điện thoại tối đa 11 ký tự.");
+
         if (await repository.EmployeeUsernameExistsAsync(username, cancellationToken))
             throw new InvalidOperationException("Tên đăng nhập đã tồn tại.");
 
@@ -65,15 +87,16 @@ public sealed class EmployeesService(
         var employee = new Employee
         {
             Username = username,
-            FullName = request.FullName,
-            Phone = request.Phone,
+            FullName = fullName,
+            Phone = phone.Length > 0 ? phone : null,
             RoleId = request.RoleId,
             IsActive = true,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            CreateRequestKey = createRequestKey,
+            CreateRequestFingerprint = createRequestFingerprint
         };
 
         employee.PasswordHash = passwordHasher.HashPassword(employee, request.Password);
-
         repository.AddEmployee(employee);
         await SaveWithAuditAsync(employee, currentEmployeeId, "Created", cancellationToken);
 
@@ -107,11 +130,25 @@ public sealed class EmployeesService(
             throw new BusinessRuleException("VersionConflict: hồ sơ nhân viên đã thay đổi. Vui lòng tải lại.");
 
         var preserveAnotherActiveAdmin = false;
-        if (!string.IsNullOrWhiteSpace(request.FullName))
-            employee.FullName = request.FullName.Trim();
+        
+        if (request.FullName is not null)
+        {
+            var fullName = request.FullName.Trim();
+            if (fullName.Length > 0 && fullName.Length <= 150)
+                employee.FullName = fullName;
+            else if (fullName.Length > 150)
+                throw new ValidationException("Họ và tên tối đa 150 ký tự.");
+            else if (fullName.Length == 0)
+                throw new ValidationException("Họ và tên không được để trống.");
+        }
 
-        if (!string.IsNullOrWhiteSpace(request.Phone))
-            employee.Phone = request.Phone.Trim();
+        if (request.Phone is not null)
+        {
+            var phone = request.Phone.Trim();
+            if (phone.Length > 11)
+                throw new ValidationException("Số điện thoại tối đa 11 ký tự.");
+            employee.Phone = phone.Length > 0 ? phone : null;
+        }
 
         if (request.RoleId.HasValue)
         {
@@ -263,4 +300,65 @@ public sealed class EmployeesService(
             },
             preserveAnotherActiveAdmin,
             cancellationToken);
+    
+    public async Task<(EmployeeDto Employee, bool Replayed)> CreateEmployeeWithIdempotencyAsync(
+        CreateEmployeeRequest request,
+        Guid idempotencyKey,
+        int currentEmployeeId,
+        CancellationToken cancellationToken)
+    {
+        var keyStr = idempotencyKey.ToString("D");
+        var fingerprint = ComputeFingerprint(request);
+
+        var existing = await repository.GetEmployeeByCreateKeyAsync(keyStr, cancellationToken);
+        if (existing is not null)
+        {
+            var existingFingerprint = existing.CreateRequestFingerprint ?? "";
+            if (!string.Equals(fingerprint, existingFingerprint, StringComparison.Ordinal))
+                throw new ConflictException("409: Idempotency-Key đã được sử dụng với payload khác.");
+
+            return (new EmployeeDto(
+                existing.EmployeeId,
+                existing.Username,
+                existing.FullName,
+                existing.Phone,
+                existing.Role.RoleName,
+                existing.IsActive,
+                existing.CreatedAt,
+                Convert.ToBase64String(existing.Version)), true);
+        }
+
+        try
+        {
+            var employee = await CreateEmployeeCoreAsync(
+                request, currentEmployeeId, keyStr, fingerprint, cancellationToken);
+            return (employee, false);
+        }
+        catch (ConflictException)
+        {
+            var concurrentResult = await repository.GetEmployeeByCreateKeyAsync(keyStr, cancellationToken)
+                ?? throw new InvalidOperationException("Không tìm thấy kết quả của yêu cầu idempotent đồng thời.");
+
+            if (!string.Equals(fingerprint, concurrentResult.CreateRequestFingerprint, StringComparison.Ordinal))
+                throw new ConflictException("409: Idempotency-Key đã được sử dụng với payload khác.");
+
+            return (new EmployeeDto(
+                concurrentResult.EmployeeId,
+                concurrentResult.Username,
+                concurrentResult.FullName,
+                concurrentResult.Phone,
+                concurrentResult.Role.RoleName,
+                concurrentResult.IsActive,
+                concurrentResult.CreatedAt,
+                Convert.ToBase64String(concurrentResult.Version)), true);
+        }
+    }
+
+    private static string ComputeFingerprint(CreateEmployeeRequest request)
+    {
+        var json = JsonSerializer.Serialize(request, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        using var sha256 = SHA256.Create();
+        var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(json));
+        return Convert.ToHexString(hash).ToUpperInvariant();
+    }
 }

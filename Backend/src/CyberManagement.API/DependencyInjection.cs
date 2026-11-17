@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddExceptionHandler<ExceptionHandling.ApiExceptionHandler>();
         services.AddSignalR();
         services.AddScoped<IRealtimePublisher, SignalRRealtimePublisher>();
+        services.AddSingleton<RealtimeAccountConnections>();
 
         var signingKey = configuration["Authentication:Jwt:SigningKey"];
         if (string.IsNullOrWhiteSpace(signingKey) || Encoding.UTF8.GetByteCount(signingKey) < 32)

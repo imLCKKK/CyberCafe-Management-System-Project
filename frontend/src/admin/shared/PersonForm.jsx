@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DetailDialog, FormDialog } from './AdminUI';
-import { employeesApi } from './employeesApi';
+import { employeesApi, newEmployeeCreateKey } from './employeesApi';
 
 export default function PersonForm({ account, kind, onClose, onSaved, onReload }) {
   const [roles, setRoles] = useState(null);
   const [rolesError, setRolesError] = useState('');
   const [conflict, setConflict] = useState(false);
+  const createIntent = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -26,15 +27,14 @@ export default function PersonForm({ account, kind, onClose, onSaved, onReload }
 
   const currentRole = roles.find((role) => role.roleName === account?.role);
   const fields = [
-    { name: 'display_name', label: 'Họ và tên', maxLength: 100 },
+    { name: 'username', label: 'Tên đăng nhập', maxLength: 50, pattern: '^\\S+$', help: 'Không được có khoảng trắng' },
+    { name: 'display_name', label: 'Họ và tên', maxLength: 150 },
     { name: 'phone', label: 'Số điện thoại', type: 'tel', maxLength: 11 }
   ];
 
   if (kind === 'staff') {
     fields.push(
-      { name: 'role', label: 'Phân quyền', options: [['', 'Chọn vai trò'], ...roles.map((role) => [String(role.roleId), role.roleName])] },
-      { name: 'position', label: 'Chức danh' },
-      { name: 'shift', label: 'Ca làm việc', help: 'Ví dụ: 08:00–16:00 hoặc Linh hoạt.' }
+      { name: 'role', label: 'Phân quyền', options: [['', 'Chọn vai trò'], ...roles.map((role) => [String(role.roleId), role.roleName])] }
     );
   }
 
@@ -56,13 +56,17 @@ export default function PersonForm({ account, kind, onClose, onSaved, onReload }
         await employeesApi.update(account.id, updateData);
       } else {
         const createData = {
-          username: form.phone,
+          username: form.username,
           fullName: form.display_name,
           phone: form.phone,
           password: form.password,
           roleId: selectedRole.roleId
         };
-        await employeesApi.create(createData);
+        const fingerprint = JSON.stringify(createData);
+        if (createIntent.current?.fingerprint !== fingerprint)
+          createIntent.current = { fingerprint, key: newEmployeeCreateKey() };
+        await employeesApi.create(createData, createIntent.current.key);
+        createIntent.current = null;
       }
       onSaved?.();
     } catch (error) {
@@ -77,8 +81,8 @@ export default function PersonForm({ account, kind, onClose, onSaved, onReload }
       fields={fields}
       initial={
         account
-          ? { ...account, role: currentRole ? String(currentRole.roleId) : '', display_name: account.display_name }
-          : { display_name: '', phone: '', role: '', position: 'Thu ngân', shift: '08:00–16:00' }
+          ? { ...account, role: currentRole ? String(currentRole.roleId) : '', display_name: account.display_name, username: account.username }
+          : { username: '', display_name: '', phone: '', role: '' }
       }
       description={
         conflict
@@ -92,3 +96,4 @@ export default function PersonForm({ account, kind, onClose, onSaved, onReload }
     />
   );
 }
+

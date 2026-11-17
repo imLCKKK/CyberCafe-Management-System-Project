@@ -207,6 +207,22 @@ internal static class RealtimeChecks
         await ExpectNoEvents(noPermission, RealtimeAccountType.Staff, noPermissionId,
             "Staff without permission do not receive tournament events");
 
+        await ExpectStatus("Locking a connected employee succeeds", HttpStatusCode.OK,
+            await SendAsync(HttpMethod.Post, $"/api/employees/{observerId}/lock", adminToken));
+        var locked = await observer.NextAsync();
+        Check("An already-open employee connection is notified when access is revoked",
+            locked.GetProperty("type").GetInt32() == 1
+            && locked.GetProperty("target").GetString() == "AccountLocked");
+        await ExpectStatus("Locked employee cannot verify their old session", HttpStatusCode.Forbidden,
+            await SendAsync(HttpMethod.Get, "/api/auth/me", staffTokens["Waiter"]));
+        var postLockEvent = NewEvent(RealtimeEvent.ComputerChanged, computerId);
+        await publisher.PublishToPermissionAsync("computer.view", postLockEvent, CancellationToken.None);
+        Check("Active Admin still receives permission broadcast after another employee is locked",
+            Event(await admin.NextAsync(), RealtimeEvent.ComputerChanged)
+                .GetProperty("eventId").GetGuid() == postLockEvent.EventId);
+        Check("Locked employee connection is removed from permission broadcast groups",
+            await observer.TryNextAsync(TimeSpan.FromMilliseconds(250)) is null);
+
         return checks;
 
         static RealtimeEvent NewEvent(string type, int id) => new(Guid.NewGuid(), type, id, DateTimeOffset.UtcNow);

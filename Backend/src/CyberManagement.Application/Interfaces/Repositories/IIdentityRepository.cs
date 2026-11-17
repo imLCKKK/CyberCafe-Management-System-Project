@@ -20,6 +20,8 @@ public interface IIdentityRepository
 
     Task<Employee?> GetEmployeeByIdAsync(int employeeId, CancellationToken cancellationToken);
 
+    Task<Employee?> GetEmployeeByCreateKeyAsync(string createRequestKey, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<Employee>> GetAllEmployeesAsync(CancellationToken cancellationToken);
 
     void AddRole(Role role);

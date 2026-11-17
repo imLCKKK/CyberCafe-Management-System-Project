@@ -114,6 +114,8 @@ internal static class EmployeeAccessChecks
             var beforeInactive = await SnapshotAsync();
             await ExpectStatusAsync("Inactive Manager cannot read employee profiles with an old token",
                 HttpMethod.Get, "/api/employees", staffTokens["Manager"], HttpStatusCode.Forbidden);
+            await ExpectStatusAsync("Inactive Manager cannot verify a session with an old token",
+                HttpMethod.Get, "/api/auth/me", staffTokens["Manager"], HttpStatusCode.Forbidden);
             await ExpectStatusAsync("Inactive Manager cannot change password on auth route",
                 HttpMethod.Post, passwordPath, staffTokens["Manager"], HttpStatusCode.Forbidden, validPassword);
             await ExpectStatusAsync("Inactive Manager cannot change password on legacy alias",
@@ -136,6 +138,7 @@ internal static class EmployeeAccessChecks
             using (var request = new HttpRequestMessage(HttpMethod.Post, "/api/employees"))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffTokens["Admin"]);
+                request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
                 request.Content = JsonContent.Create(new { username, fullName = "Locked admin fixture", password, roleId = adminRoleId });
                 using var response = await client.SendAsync(request);
                 Check("Active Admin can create a second Admin for lock checks", response.StatusCode == HttpStatusCode.Created);
@@ -216,6 +219,7 @@ internal static class EmployeeAccessChecks
             {
                 using var createRequest = new HttpRequestMessage(HttpMethod.Post, "/api/employees");
                 createRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffTokens["Admin"]);
+                createRequest.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
                 createRequest.Content = JsonContent.Create(new
                 {
                     username,
@@ -401,6 +405,8 @@ internal static class EmployeeAccessChecks
         {
             using var request = new HttpRequestMessage(method, path);
             if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            if (method == HttpMethod.Post && path == "/api/employees")
+                request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
             if (body is not null) request.Content = JsonContent.Create(body);
             using var response = await client.SendAsync(request);
             Check($"{name} ({(int)response.StatusCode})", response.StatusCode == status);
