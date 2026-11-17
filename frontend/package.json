@@ -13,6 +13,8 @@
     "test:customer-wallet": "node --test src/shared/customerWalletApi.test.js",
     "test:counter-topups": "node --test src/shared/counterTopUpApi.test.js",
     "test:counter-topups:render": "node tests/counter-topups-render.mjs",
+    "test:zalopay-payments": "node --test src/shared/zaloPayPaymentApi.test.js src/client/wallet/zaloPayPaymentQr.test.js",
+    "test:zalopay-payments:render": "node tests/zalopay-payments-render.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -28,12 +30,14 @@
   "dependencies": {
     "@microsoft/signalr": "^10.0.11",
     "lucide-react": "^0.468.0",
+    "qrcode": "1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.1.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "jsqr": "1.4.0",
     "vite": "^6.0.5"
   }
 }

@@ -3,6 +3,17 @@
 **SCRUM-21 / S2-M-1** bổ sung shared credit/debit/refund và nạp tiền mặt tại quầy; xem
 [hợp đồng ví](Backend/docs/003-customer-wallet-contract.md) để biết API, tiền tặng, migration và cách kiểm tra.
 
+**SCRUM-22 / S2-M-2** thêm adapter ZaloPay sandbox chung TopUp/Order, lưu intent/receipt và xử lý callback/Query.
+Xem [API, cấu hình và kiểm tra gateway](Backend/docs/007-zalopay-gateway-callbacks.md).
+Task này chưa cộng ví hoặc hoàn tất Order; consumer nghiệp vụ thuộc S2-M-3.
+Create/Query sandbox chính thức cho cả hai purpose đã được kiểm tra ngày 16/11/2026;
+cả hai còn Pending, chưa phải bằng chứng đã trả tiền. Cách chạy helper thật và giới hạn callback ở hợp đồng.
+
+```powershell
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --zalopay-gateway-checks
+# SQL riêng: đặt AUTH_CHECKS_SQL_CONNECTION rồi chạy cùng project với --gateway-only.
+```
+
 Đồ án .NET quản lý phòng máy: máy/phiên, khách hàng, nhân viên, ví, món/đơn, kho, hóa đơn/báo cáo, giải đấu và khuyến mãi. Nhận diện NEXORA CYBER; React/Vite + ASP.NET Core .NET 10 + EF Core + SQL Server.
 
 ## Nền được chọn
@@ -12,6 +23,13 @@ Ngày 02/11/2026, Trưởng nhóm chọn **backend CyberManagement, database SQL
 Backend đã có auth nhân viên/khách, JWT/permission, seed và health. Frontend hiện vẫn chủ yếu demo/localStorage; nối UI và các nghiệp vụ còn triển khai theo [55 task hiện hữu](codex/SPRINT_TASKS.md). Giữ tên/owner/sprint; chưa tự nghiệm thu Task hoặc đưa thay đổi lên `dev`.
 
 DB mới tạo từ migrations CyberManagement; không áp InitialCreate mới lên DB 19 bảng cũ. OP.GG vẫn dùng adapter Node tại `Backend/integrations/opgg/`. SignalR hai máy, ZaloPay sandbox và ML theo kế hoạch; chưa được coi hoàn thành từ việc có schema.
+
+## Thử ZaloPay — SCRUM-23
+
+Luồng ZaloPay **SCRUM-23** có [contract và cách chạy](Backend/docs/008-zalopay-wallet-order-integration.md).
+Demo riêng cổng **5177**, khách `0900000023` / `SandboxCustomer-2026!`, API 5099, callback-only 5100.
+Build backend/cài dependencies frontend trước khi chạy `scripts/start-zalopay-integration.ps1`;
+cần secret server và callback HTTPS còn hiệu lực. Nạp tại quầy bên dưới giữ cổng/tài khoản riêng.
 
 ## Thử nạp tại quầy — SCRUM-21
 

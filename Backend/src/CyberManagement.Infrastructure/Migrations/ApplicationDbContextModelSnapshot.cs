@@ -954,6 +954,9 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("GatewayReservationExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("GatewayTransactionId")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1015,6 +1018,9 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<int?>("WalletTransactionId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ZaloPayIntentId")
+                        .HasColumnType("int");
+
                     b.HasKey("PaymentId");
 
                     b.HasIndex("InvoiceId");
@@ -1031,6 +1037,10 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.HasIndex("WalletTransactionId")
                         .IsUnique()
                         .HasFilter("[WalletTransactionId] IS NOT NULL");
+
+                    b.HasIndex("ZaloPayIntentId")
+                        .IsUnique()
+                        .HasFilter("[ZaloPayIntentId] IS NOT NULL");
 
                     b.HasIndex("Method", "GatewayTransactionId")
                         .IsUnique()
@@ -1053,6 +1063,8 @@ namespace CyberManagement.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_Payments_Type", "([Type] = 'Payment' AND [RefundOfPaymentId] IS NULL AND [OrderDetailId] IS NULL) OR ([Type] = 'Refund' AND [RefundOfPaymentId] IS NOT NULL AND [RefundOfPaymentId] <> [PaymentId] AND [Reason] IS NOT NULL AND LEN(LTRIM(RTRIM([Reason]))) > 0 AND [Status] <> 'Expired')");
 
                             t.HasCheckConstraint("CK_Payments_Values", "[Amount] > 0 AND [Method] IN ('Wallet','Cash','ZaloPay') AND [Status] IN ('Pending','Succeeded','Failed','Expired') AND LEN(LTRIM(RTRIM([OperationKey]))) > 0");
+
+                            t.HasCheckConstraint("CK_Payments_ZaloPayIntent", "([ZaloPayIntentId] IS NULL AND [GatewayReservationExpiresAtUtc] IS NULL) OR ([ZaloPayIntentId] IS NOT NULL AND [GatewayReservationExpiresAtUtc] IS NOT NULL AND [Method] = 'ZaloPay' AND [Type] = 'Payment' AND [OrderId] IS NOT NULL AND [SessionChargeId] IS NULL)");
                         });
                 });
 
@@ -1772,6 +1784,156 @@ namespace CyberManagement.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CyberManagement.Domain.Entities.ZaloPayIntent", b =>
+                {
+                    b.Property<int>("IntentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IntentId"));
+
+                    b.Property<DateTimeOffset?>("AppliedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("ExpectedAmountVnd")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTimeOffset?>("LastQueryAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("MerchantTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateTimeOffset?>("NextQueryAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OperationKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<int?>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PaymentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PaymentUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<decimal?>("ProviderAmountVnd")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
+                    b.Property<int>("ProviderAppId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ProviderOccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(19)
+                        .HasColumnType("nvarchar(19)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<Guid?>("QueryLeaseToken")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("QueryLeaseUntilUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("RequiresReconciliation")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SettlementFailureReason")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateTimeOffset?>("VerifiedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int?>("WalletTransactionId")
+                        .HasColumnType("int");
+
+                    b.HasKey("IntentId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("MerchantTransactionId")
+                        .IsUnique();
+
+                    b.HasIndex("OperationKey")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasFilter("[OrderId] IS NOT NULL");
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique()
+                        .HasFilter("[PaymentId] IS NOT NULL");
+
+                    b.HasIndex("WalletTransactionId")
+                        .IsUnique()
+                        .HasFilter("[WalletTransactionId] IS NOT NULL");
+
+                    b.HasIndex("ProviderAppId", "ProviderTransactionId")
+                        .IsUnique()
+                        .HasFilter("[ProviderTransactionId] IS NOT NULL");
+
+                    b.HasIndex("Status", "AppliedAtUtc");
+
+                    b.HasIndex("Status", "NextQueryAtUtc");
+
+                    b.ToTable("ZaloPayIntents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ZaloPayIntents_Applied", "([AppliedAtUtc] IS NULL AND [WalletTransactionId] IS NULL AND [PaymentId] IS NULL) OR ([AppliedAtUtc] IS NOT NULL AND [VerifiedAtUtc] IS NOT NULL AND [AppliedAtUtc] >= [VerifiedAtUtc] AND [Status] = N'Succeeded' AND [ProviderAmountVnd] IS NOT NULL AND [ProviderAmountVnd] = [ExpectedAmountVnd] AND (([Purpose] = N'TopUp' AND [WalletTransactionId] IS NOT NULL AND [PaymentId] IS NULL) OR ([Purpose] = N'Order' AND [PaymentId] IS NOT NULL AND [WalletTransactionId] IS NULL)))");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_ConfirmedAmount", "[Status] <> N'Succeeded' OR ([ProviderAmountVnd] IS NOT NULL AND [ProviderAmountVnd] = [ExpectedAmountVnd])");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_MerchantId", "LEN([MerchantTransactionId]) = 39 AND SUBSTRING([MerchantTransactionId],1,6) NOT LIKE '%[^0-9]%' AND SUBSTRING([MerchantTransactionId],7,1) = '_' AND SUBSTRING([MerchantTransactionId],8,32) NOT LIKE '%[^0-9a-f]%'");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_QueryLease", "([QueryLeaseToken] IS NULL AND [QueryLeaseUntilUtc] IS NULL) OR ([QueryLeaseToken] IS NOT NULL AND [QueryLeaseUntilUtc] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_Receipt", "([ProviderTransactionId] IS NULL AND [ProviderAmountVnd] IS NULL AND [ProviderOccurredAtUtc] IS NULL AND [VerifiedAtUtc] IS NULL AND [Status] <> N'Succeeded') OR ([ProviderTransactionId] IS NOT NULL AND TRY_CONVERT(bigint,[ProviderTransactionId]) IS NOT NULL AND TRY_CONVERT(bigint,[ProviderTransactionId]) > 0 AND CONVERT(varchar(19),TRY_CONVERT(bigint,[ProviderTransactionId])) = [ProviderTransactionId] AND [ProviderTransactionId] NOT LIKE '%[^0-9]%' AND [ProviderAmountVnd] IS NOT NULL AND [ProviderAmountVnd] > 0 AND [VerifiedAtUtc] IS NOT NULL AND ([Status] = N'Succeeded' OR [RequiresReconciliation] = 1))");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_Source", "([Purpose] = N'TopUp' AND [OrderId] IS NULL) OR ([Purpose] = N'Order' AND [OrderId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_Values", "[CustomerId] > 0 AND [ProviderAppId] > 0 AND [ExpectedAmountVnd] BETWEEN 1 AND 999999999 AND [Status] IN (N'Pending',N'Succeeded',N'Failed',N'Expired') AND LEN([OperationKey]) > 0 AND [ExpiresAtUtc] > [CreatedAtUtc]");
+                        });
+                });
+
             modelBuilder.Entity("CyberManagement.Domain.Entities.AuditLog", b =>
                 {
                     b.HasOne("CyberManagement.Domain.Entities.Employee", "Employee")
@@ -2127,6 +2289,11 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasForeignKey("WalletTransactionId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("CyberManagement.Domain.Entities.ZaloPayIntent", "ZaloPayIntent")
+                        .WithMany()
+                        .HasForeignKey("ZaloPayIntentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.Navigation("Invoice");
 
                     b.Navigation("Order");
@@ -2138,6 +2305,8 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Navigation("SessionCharge");
 
                     b.Navigation("WalletTransaction");
+
+                    b.Navigation("ZaloPayIntent");
                 });
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.Product", b =>
@@ -2389,6 +2558,38 @@ namespace CyberManagement.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("CyberManagement.Domain.Entities.ZaloPayIntent", b =>
+                {
+                    b.HasOne("CyberManagement.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CyberManagement.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CyberManagement.Domain.Entities.Payment", "Payment")
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("CyberManagement.Domain.Entities.WalletTransaction", "WalletTransaction")
+                        .WithMany()
+                        .HasForeignKey("WalletTransactionId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Payment");
+
+                    b.Navigation("WalletTransaction");
                 });
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.Category", b =>

@@ -10,6 +10,8 @@ public class Payment
     public int? OrderDetailId { get; set; }
     public int? WalletTransactionId { get; set; }
     public int? RefundOfPaymentId { get; set; }
+    public int? ZaloPayIntentId { get; set; }
+    public DateTimeOffset? GatewayReservationExpiresAtUtc { get; set; }
     public string Type { get; set; } = "Payment";
     public decimal Amount { get; set; }
     public string Method { get; set; } = null!;
@@ -29,4 +31,5 @@ public class Payment
     public OrderDetail? OrderDetail { get; set; }
     public WalletTransaction? WalletTransaction { get; set; }
     public Payment? RefundOfPayment { get; set; }
+    public ZaloPayIntent? ZaloPayIntent { get; set; }
 }

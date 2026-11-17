@@ -6,6 +6,7 @@ using CyberManagement.API.Controller;
 using CyberManagement.API.Realtime;
 using CyberManagement.Application;
 using CyberManagement.Application.DTOs.Identity;
+using CyberManagement.Application.Services;
 using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Security;
@@ -15,6 +16,7 @@ using CyberManagement.Application.Wallets;
 using CyberManagement.Infrastructure.Wallets;
 using CyberManagement.Infrastructure.Security;
 using CyberManagement.Infrastructure.Persistance;
+using CyberManagement.Infrastructure.Payments;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
@@ -22,6 +24,24 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+
+if (args.Contains("--zalopay-integration-host") || args.Contains("--zalopay-integration-prepare-order"))
+{
+    await ZaloPayIntegrationDemo.RunAsync(args.Contains("--zalopay-integration-prepare-order"));
+    return;
+}
+
+if (args.Contains("--zalopay-live-checks"))
+{
+    await ZaloPayLiveChecks.RunAsync();
+    return;
+}
+
+if (args.Contains("--zalopay-gateway-checks"))
+{
+    Console.WriteLine($"{ZaloPayContractChecks.Run()} configuration/signature fixtures and {await ZaloPayGatewayChecks.RunAsync()} gateway protocol fixtures passed (no provider call).");
+    return;
+}
 
 if (args.Contains("--voucher-only"))
 {
@@ -87,10 +107,12 @@ if (args.Contains("--catalog-browser-host"))
 var catalogOnly = args.Contains("--catalog-only");
 var customerOnly = args.Contains("--customer-only");
 var walletOnly = args.Contains("--wallet-only");
-if (new[] { catalogOnly, customerOnly, walletOnly }.Count(value => value) > 1)
-    throw new ArgumentException("Select one of --catalog-only, --customer-only or --wallet-only.");
-if (walletOnly && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION")))
-    throw new ArgumentException("--wallet-only requires AUTH_CHECKS_SQL_CONNECTION; wallet writers are verified on SQL Server.");
+var gatewayOnly = args.Contains("--gateway-only");
+var settlementOnly = args.Contains("--settlement-only");
+if (new[] { catalogOnly, customerOnly, walletOnly, gatewayOnly, settlementOnly }.Count(value => value) > 1)
+    throw new ArgumentException("Select one focused check mode at a time.");
+if ((walletOnly || gatewayOnly || settlementOnly) && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION")))
+    throw new ArgumentException("Wallet/gateway persistence checks require AUTH_CHECKS_SQL_CONNECTION.");
 
 var databaseFixture = new AuthCheckDatabase(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"));
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -137,13 +159,19 @@ builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementReposi
 builder.Services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
 builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
 builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<GatewayChecksGateway>();
+builder.Services.AddSingleton<IZaloPayGateway>(provider => provider.GetRequiredService<GatewayChecksGateway>());
+builder.Services.AddScoped<IZaloPayIntentRepository, ZaloPayIntentRepository>();
+builder.Services.AddScoped<IZaloPayPaymentService, ZaloPayPaymentService>();
+builder.Services.AddZaloPaySettlements();
 builder.Services
     .AddControllers()
     .AddApplicationPart(typeof(AuthController).Assembly);
 
 await using var app = builder.Build();
 HttpClient client = null!;
-var checks = ZaloPayContractChecks.Run();
+var checks = ZaloPayContractChecks.Run() + await ZaloPayGatewayChecks.RunAsync();
 var started = false;
 try
 {
@@ -281,21 +309,25 @@ try
             await SendWithToken(HttpMethod.Get, "/api/admin/roles", login.AccessToken));
     }
 
-    if (!catalogOnly && !customerOnly && !walletOnly)
+    if (!catalogOnly && !customerOnly && !walletOnly && !gatewayOnly && !settlementOnly)
     {
         checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
         checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
         checks += await TournamentChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
     }
-    if (!customerOnly && !walletOnly)
+    if (!customerOnly && !walletOnly && !gatewayOnly && !settlementOnly)
         checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
-    if (!catalogOnly && !walletOnly)
+    if (!catalogOnly && !walletOnly && !gatewayOnly && !settlementOnly)
         checks += await CustomerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
-    if (!catalogOnly && !customerOnly && databaseFixture.Provider == "SQL Server")
+    if (!catalogOnly && !customerOnly && !gatewayOnly && !settlementOnly && databaseFixture.Provider == "SQL Server")
     {
         checks += await CounterTopUpChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
         checks += await WalletLedgerChecks.RunAsync(app.Services);
     }
+    if (!catalogOnly && !customerOnly && !walletOnly && !settlementOnly && databaseFixture.Provider == "SQL Server")
+        checks += await ZaloPayPaymentChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+    if (!catalogOnly && !customerOnly && !walletOnly && !gatewayOnly && databaseFixture.Provider == "SQL Server")
+        checks += await ZaloPaySettlementChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
 
     await CheckStatus("Expired token is rejected", HttpStatusCode.Unauthorized,
         await SendWithToken(HttpMethod.Get, "/api/auth/me",

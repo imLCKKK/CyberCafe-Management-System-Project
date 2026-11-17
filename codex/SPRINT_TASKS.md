@@ -463,6 +463,9 @@ Jira: **SCRUM-21**. Contract/API/migration và cách kiểm tra: [hợp đồng 
 
 #### S2-M-2 — Implement-ZaloPay-Gateway-Callbacks
 
+Jira: **SCRUM-22**. API/cấu hình/receipt và cách kiểm tra: [hợp đồng gateway](../Backend/docs/007-zalopay-gateway-callbacks.md).
+Task này ghi nhận receipt đã xác minh cho TopUp/Order; cộng ví/ledger và hoàn tất nguồn nghiệp vụ thuộc S2-M-3.
+
 **Description:**
 
 - Xây adapter tạo giao dịch ZaloPay sandbox cho TopUp/Order; số tiền và trạng thái dự kiến do server quản lý, secret qua cấu hình server.
@@ -479,6 +482,11 @@ Jira: **SCRUM-21**. Contract/API/migration và cách kiểm tra: [hợp đồng 
 **Gom từ mã cũ:** `S2-M-03`, `S2-M-04`. Đây là mã tra cứu, không tạo lại các thẻ cũ.
 
 #### S2-M-3 — Integrate-ZaloPay-Topups-Checkout
+
+Jira: **SCRUM-23**. Điểm nối Order, atomic ví/ledger, migration và kiểm tra:
+[hợp đồng tích hợp](../Backend/docs/008-zalopay-wallet-order-integration.md).
+Khang chưa có S2-K-2: người dùng chốt cung cấp bridge đăng ký/xác nhận Payment trước;
+không coi fixture Order là checkout hoàn chỉnh. Còn chờ thanh toán Sandbox lại trên S23 và đối chiếu SQL.
 
 **Description:**
 

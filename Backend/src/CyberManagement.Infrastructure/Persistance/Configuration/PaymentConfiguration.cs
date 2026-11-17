@@ -15,6 +15,7 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
             t.HasCheckConstraint("CK_Payments_Type", "([Type] = 'Payment' AND [RefundOfPaymentId] IS NULL AND [OrderDetailId] IS NULL) OR ([Type] = 'Refund' AND [RefundOfPaymentId] IS NOT NULL AND [RefundOfPaymentId] <> [PaymentId] AND [Reason] IS NOT NULL AND LEN(LTRIM(RTRIM([Reason]))) > 0 AND [Status] <> 'Expired')");
             t.HasCheckConstraint("CK_Payments_Time", "([Status] = 'Succeeded' AND [PaymentTime] IS NOT NULL AND [ConfirmedAt] IS NOT NULL AND [PaymentTimeBasis] IS NOT NULL AND ([PaymentTimeBasis] = 'Source' OR ([PaymentTimeBasis] = 'Confirmation' AND [PaymentTime] = [ConfirmedAt]))) OR ([Status] <> 'Succeeded' AND [PaymentTime] IS NULL AND [ConfirmedAt] IS NULL AND [PaymentTimeBasis] IS NULL)");
             t.HasCheckConstraint("CK_Payments_Method", "([Method] <> 'Wallet' OR [Status] <> 'Succeeded' OR [WalletTransactionId] IS NOT NULL) AND ([Method] <> 'ZaloPay' OR [Type] <> 'Payment' OR ([MerchantTransactionId] IS NOT NULL AND LEN(LTRIM(RTRIM([MerchantTransactionId]))) > 0 AND ([Status] <> 'Succeeded' OR ([GatewayTransactionId] IS NOT NULL AND LEN(LTRIM(RTRIM([GatewayTransactionId]))) > 0))))");
+            t.HasCheckConstraint("CK_Payments_ZaloPayIntent", "([ZaloPayIntentId] IS NULL AND [GatewayReservationExpiresAtUtc] IS NULL) OR ([ZaloPayIntentId] IS NOT NULL AND [GatewayReservationExpiresAtUtc] IS NOT NULL AND [Method] = 'ZaloPay' AND [Type] = 'Payment' AND [OrderId] IS NOT NULL AND [SessionChargeId] IS NULL)");
         });
         builder.HasKey(x => x.PaymentId);
         builder.Property(x => x.Amount).HasPrecision(18, 0);
@@ -28,6 +29,7 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(x => x.Reason).HasMaxLength(250);
         builder.HasIndex(x => x.OperationKey).IsUnique();
         builder.HasIndex(x => x.WalletTransactionId).IsUnique().HasFilter("[WalletTransactionId] IS NOT NULL");
+        builder.HasIndex(x => x.ZaloPayIntentId).IsUnique().HasFilter("[ZaloPayIntentId] IS NOT NULL");
         builder.HasIndex(x => new { x.Method, x.MerchantTransactionId }).IsUnique().HasFilter("[MerchantTransactionId] IS NOT NULL AND [Type] = 'Payment'");
         builder.HasIndex(x => new { x.Method, x.GatewayTransactionId }).IsUnique().HasFilter("[GatewayTransactionId] IS NOT NULL AND [Type] = 'Payment'");
         builder.HasIndex(x => new { x.RefundOfPaymentId, x.Status });
@@ -37,5 +39,6 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.HasOne(x => x.OrderDetail).WithMany().HasForeignKey(x => x.OrderDetailId).OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(x => x.WalletTransaction).WithMany().HasForeignKey(x => x.WalletTransactionId).OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(x => x.RefundOfPayment).WithMany().HasForeignKey(x => x.RefundOfPaymentId).OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(x => x.ZaloPayIntent).WithMany().HasForeignKey(x => x.ZaloPayIntentId).OnDelete(DeleteBehavior.NoAction);
     }
 }

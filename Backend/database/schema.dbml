@@ -280,6 +280,7 @@ Table dbo.Payments {
   Amount decimal(18,0) [not null]
   ConfirmedAt datetimeoffset [null]
   CreatedAt datetimeoffset [not null]
+  GatewayReservationExpiresAtUtc datetimeoffset [null]
   GatewayTransactionId nvarchar(50) [null]
   InvoiceId int [null]
   MerchantTransactionId nvarchar(40) [null]
@@ -296,6 +297,7 @@ Table dbo.Payments {
   Status nvarchar(10) [not null]
   Type nvarchar(10) [not null]
   WalletTransactionId int [null]
+  ZaloPayIntentId int [null]
   indexes {
     (InvoiceId) [name: 'IX_Payments_InvoiceId']
     (Method, GatewayTransactionId) [name: 'IX_Payments_Method_GatewayTransactionId', unique]
@@ -306,6 +308,7 @@ Table dbo.Payments {
     (RefundOfPaymentId, Status) [name: 'IX_Payments_RefundOfPaymentId_Status']
     (SessionChargeId) [name: 'IX_Payments_SessionChargeId']
     (WalletTransactionId) [name: 'IX_Payments_WalletTransactionId', unique]
+    (ZaloPayIntentId) [name: 'IX_Payments_ZaloPayIntentId', unique]
   }
 }
 Table dbo.Permissions {
@@ -534,6 +537,45 @@ Table dbo.WalletTransactions {
     (SourceType, SourceId, Type) [name: 'IX_WalletTransactions_SourceType_SourceId_Type', unique]
   }
 }
+Table dbo.ZaloPayIntents {
+  IntentId int [not null, pk, increment]
+  AppliedAtUtc datetimeoffset [null]
+  CreatedAtUtc datetimeoffset [not null]
+  CustomerId int [not null]
+  ExpectedAmountVnd decimal(18,0) [not null]
+  ExpiresAtUtc datetimeoffset [not null]
+  FailureReason nvarchar(80) [null]
+  LastQueryAtUtc datetimeoffset [null]
+  MerchantTransactionId nvarchar(40) [not null]
+  NextQueryAtUtc datetimeoffset [null]
+  OperationKey nvarchar(100) [not null]
+  OrderId int [null]
+  PaymentId int [null]
+  PaymentUrl nvarchar(2048) [null]
+  ProviderAmountVnd decimal(18,0) [null]
+  ProviderAppId int [not null]
+  ProviderOccurredAtUtc datetimeoffset [null]
+  ProviderTransactionId nvarchar(19) [null]
+  Purpose nvarchar(10) [not null]
+  QueryLeaseToken uniqueidentifier [null]
+  QueryLeaseUntilUtc datetimeoffset [null]
+  RequiresReconciliation bit [not null]
+  SettlementFailureReason nvarchar(80) [null]
+  Status nvarchar(10) [not null]
+  VerifiedAtUtc datetimeoffset [null]
+  WalletTransactionId int [null]
+  indexes {
+    (CustomerId) [name: 'IX_ZaloPayIntents_CustomerId']
+    (MerchantTransactionId) [name: 'IX_ZaloPayIntents_MerchantTransactionId', unique]
+    (OperationKey) [name: 'IX_ZaloPayIntents_OperationKey', unique]
+    (OrderId) [name: 'IX_ZaloPayIntents_OrderId', unique]
+    (PaymentId) [name: 'IX_ZaloPayIntents_PaymentId', unique]
+    (ProviderAppId, ProviderTransactionId) [name: 'IX_ZaloPayIntents_ProviderAppId_ProviderTransactionId', unique]
+    (Status, AppliedAtUtc) [name: 'IX_ZaloPayIntents_Status_AppliedAtUtc']
+    (Status, NextQueryAtUtc) [name: 'IX_ZaloPayIntents_Status_NextQueryAtUtc']
+    (WalletTransactionId) [name: 'IX_ZaloPayIntents_WalletTransactionId', unique]
+  }
+}
 Ref: dbo.AuditLogs.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.ComputerMaintenance.(ComputerId) > dbo.Computers.(ComputerId)
 Ref: dbo.ComputerMaintenance.(EmployeeId) > dbo.Employees.(EmployeeId)
@@ -576,6 +618,7 @@ Ref: dbo.Payments.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.Payments.(RefundOfPaymentId) > dbo.Payments.(PaymentId)
 Ref: dbo.Payments.(SessionChargeId) > dbo.SessionCharges.(ChargeId)
 Ref: dbo.Payments.(WalletTransactionId) > dbo.WalletTransactions.(TransactionId)
+Ref: dbo.Payments.(ZaloPayIntentId) > dbo.ZaloPayIntents.(IntentId)
 Ref: dbo.Products.(CategoryId) > dbo.Categories.(CategoryId)
 Ref: dbo.PromotionUsages.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.PromotionUsages.(OrderId) > dbo.Orders.(OrderId)
@@ -603,3 +646,7 @@ Ref: dbo.TournamentTransitions.(TournamentId) > dbo.Tournaments.(TournamentId)
 Ref: dbo.WalletTransactions.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.WalletTransactions.(ActorEmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.WalletTransactions.(OriginalDebitId) > dbo.WalletTransactions.(TransactionId)
+Ref: dbo.ZaloPayIntents.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.ZaloPayIntents.(OrderId) > dbo.Orders.(OrderId)
+Ref: dbo.ZaloPayIntents.(PaymentId) > dbo.Payments.(PaymentId)
+Ref: dbo.ZaloPayIntents.(WalletTransactionId) > dbo.WalletTransactions.(TransactionId)
