@@ -17,6 +17,11 @@ public class InvoiceDetailConfiguration : IEntityTypeConfiguration<InvoiceDetail
         builder.HasOne(x => x.SessionCharge).WithMany().HasForeignKey(x => x.SessionChargeId).OnDelete(DeleteBehavior.NoAction);
         builder.HasIndex(x => x.OrderDetailId).IsUnique().HasFilter("[OrderDetailId] IS NOT NULL");
         builder.HasIndex(x => x.SessionChargeId).IsUnique().HasFilter("[SessionChargeId] IS NOT NULL");
+        builder.ToTable("InvoiceDetails", t => t.HasCheckConstraint("CK_InvoiceDetails_Cancelled", "[CancelledAmount] >= 0 AND [CancelledAmount] <= [Amount]"));
+        builder.Property(x => x.CancelledAmount).HasPrecision(18, 0).HasDefaultValue(0m);
+        builder.Property(x => x.VoucherCodeSnapshot).HasMaxLength(50);
+        builder.Property(x => x.VoucherDiscountTypeSnapshot).HasMaxLength(10);
+        builder.Property(x => x.VoucherDiscountValueSnapshot).HasPrecision(18, 2);
         builder.HasKey(x => x.InvoiceDetailId);
 
         builder.Property(x => x.ItemType).HasMaxLength(50).IsRequired();

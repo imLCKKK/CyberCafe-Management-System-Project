@@ -179,6 +179,7 @@ Table dbo.InventoryTransactions {
 Table dbo.InvoiceDetails {
   InvoiceDetailId int [not null, pk, increment]
   Amount decimal(18,0) [not null]
+  CancelledAmount decimal(18,0) [not null, default: `0`]
   Description nvarchar(255) [not null]
   InvoiceId int [not null]
   ItemType nvarchar(50) [not null]
@@ -186,6 +187,9 @@ Table dbo.InvoiceDetails {
   Quantity int [not null]
   SessionChargeId int [null]
   UnitPrice decimal(18,0) [not null]
+  VoucherCodeSnapshot nvarchar(50) [null]
+  VoucherDiscountTypeSnapshot nvarchar(10) [null]
+  VoucherDiscountValueSnapshot decimal(18,2) [null]
   indexes {
     (InvoiceId) [name: 'IX_InvoiceDetails_InvoiceId']
     (OrderDetailId) [name: 'IX_InvoiceDetails_OrderDetailId', unique]
@@ -210,9 +214,10 @@ Table dbo.InvoiceOrders {
 }
 Table dbo.Invoices {
   InvoiceId int [not null, pk, increment]
+  ActorType nvarchar(10) [not null, default: `Staff`]
   CustomerId int [not null]
   Discount decimal(18,0) [not null]
-  EmployeeId int [not null]
+  EmployeeId int [null]
   GamingSessionId int [null]
   InvoiceDate datetime2 [not null]
   PromotionId int [null]
@@ -233,6 +238,7 @@ Table dbo.OrderDetails {
   ProductId int [not null]
   ProductNameSnapshot nvarchar(150) [not null]
   Quantity int [not null]
+  Status nvarchar(30) [not null, default: `Pending`]
   UnitPrice decimal(18,0) [not null]
   indexes {
     (OrderId) [name: 'IX_OrderDetails_OrderId']

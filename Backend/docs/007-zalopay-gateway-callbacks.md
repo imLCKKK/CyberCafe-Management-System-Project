@@ -180,3 +180,17 @@ Bằng chứng TopUp đã trả tiền ở thử nghiệm ngày 10/11 thuộc lu
 đã trả tiền/callback thật của SCRUM-22. SCRUM-22 chưa cộng ví, hoàn tất Order hoặc phát event nghiệp vụ.
 Nhánh triển khai từ `c6fd920` chưa commit/push khi ghi bằng chứng này. Trưởng nhóm quyết định nghiệm thu;
 giữ checklist chưa tick cho tới khi review và quyết định duyệt của Trưởng nhóm.
+
+### 5.3. Ghép dev ngày 17/11/2026
+
+Đã giải conflict giữa commit SCRUM-22 `7e5e689` và dev `490303a`: giữ đồng thời các mode
+gateway/invoice/voucher, proxy `payments`/`client` và WebSocket. SQL/DBML được xuất lại từ
+model đã ghép: 41 bảng, 15 migration; không sửa lịch sử migration. Kiểm tra downgrade hóa đơn
+được đặt tại mốc schema của module, giữ assertion bảo vệ metadata/history rồi phục hồi đầy đủ
+các migration đã ghép.
+
+Build .NET (0 warning/0 error) và frontend đạt; 981 checks API/SQL tổng, 314 gateway,
+145 invoice, 143 voucher, 104 inventory, 36 frontend unit và 3 proxy đạt. Các bộ tổng/tập trung
+có kiểm tra trùng nhau, không cộng các con số thành số ca độc lập. `--check-schema` đạt;
+source adapter/service/repository gateway không thay đổi so với `7e5e689`, không gọi lại provider.
+Các giới hạn bằng chứng thanh toán/callback thật tại mục 5.2 vẫn giữ nguyên.
