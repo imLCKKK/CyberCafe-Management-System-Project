@@ -338,9 +338,16 @@ internal static class ZaloPayPaymentChecks
         await using (var unchanged = app.Services.CreateAsyncScope())
         {
             var db = unchanged.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            Check("S2-M-2 does not credit TopUp wallet or invent a ledger", await db.Customers.Where(row => row.CustomerId == owner)
-                .Select(row => row.WalletBalance).SingleAsync() == 0 && !await db.WalletTransactions.AnyAsync(row => row.CustomerId == owner));
-            Check("S2-M-2 does not confirm Order, change stock or create a Payment mirror", await db.Orders.Where(row => row.OrderId == orderId)
+            var expectedCredits = new[] { topUp, racing, rollback, earlyCallback };
+            var applied = await db.Set<ZaloPayIntent>().AsNoTracking().Where(row => row.CustomerId == owner && row.AppliedAtUtc != null).ToListAsync();
+            var ledger = await db.WalletTransactions.AsNoTracking().Where(row => row.CustomerId == owner).ToListAsync();
+            Check("Verified eligible TopUps use the production consumer to credit one ledger each", applied.Select(row => row.IntentId).ToHashSet()
+                .SetEquals(expectedCredits.Select(row => row.Id)) && ledger.Count == expectedCredits.Length
+                && applied.All(row => ledger.Any(entry => entry.TransactionId == row.WalletTransactionId
+                    && entry.Amount == row.ExpectedAmountVnd && entry.SourceType == "ZaloPayTopUp"))
+                && await db.Customers.Where(row => row.CustomerId == owner).Select(row => row.WalletBalance).SingleAsync()
+                    == expectedCredits.Sum(row => row.ExpectedAmountVnd));
+            Check("Unregistered legacy Order stays unpaid while retaining its gateway receipt", await db.Orders.Where(row => row.OrderId == orderId)
                 .Select(row => row.Status).SingleAsync() == "Pending" && !await db.Payments.AnyAsync(row => row.OrderId == orderId));
             Check("Late gateway money never resurrects a cancelled Order", await db.Orders.Where(row => row.OrderId == closedOrderId)
                 .Select(row => row.Status).SingleAsync() == "Cancelled");

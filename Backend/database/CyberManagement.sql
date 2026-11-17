@@ -3004,3 +3004,136 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    ALTER TABLE [ZaloPayIntents] ADD [AppliedAtUtc] datetimeoffset NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    ALTER TABLE [ZaloPayIntents] ADD [PaymentId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    ALTER TABLE [ZaloPayIntents] ADD [SettlementFailureReason] nvarchar(80) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    ALTER TABLE [ZaloPayIntents] ADD [WalletTransactionId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    ALTER TABLE [Payments] ADD [GatewayReservationExpiresAtUtc] datetimeoffset NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    ALTER TABLE [Payments] ADD [ZaloPayIntentId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_ZaloPayIntents_PaymentId] ON [ZaloPayIntents] ([PaymentId]) WHERE [PaymentId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    CREATE INDEX [IX_ZaloPayIntents_Status_AppliedAtUtc] ON [ZaloPayIntents] ([Status], [AppliedAtUtc]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_ZaloPayIntents_WalletTransactionId] ON [ZaloPayIntents] ([WalletTransactionId]) WHERE [WalletTransactionId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [ZaloPayIntents] ADD CONSTRAINT [CK_ZaloPayIntents_Applied] CHECK (([AppliedAtUtc] IS NULL AND [WalletTransactionId] IS NULL AND [PaymentId] IS NULL) OR ([AppliedAtUtc] IS NOT NULL AND [VerifiedAtUtc] IS NOT NULL AND [AppliedAtUtc] >= [VerifiedAtUtc] AND [Status] = N''Succeeded'' AND [ProviderAmountVnd] IS NOT NULL AND [ProviderAmountVnd] = [ExpectedAmountVnd] AND (([Purpose] = N''TopUp'' AND [WalletTransactionId] IS NOT NULL AND [PaymentId] IS NULL) OR ([Purpose] = N''Order'' AND [PaymentId] IS NOT NULL AND [WalletTransactionId] IS NULL))))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Payments_ZaloPayIntentId] ON [Payments] ([ZaloPayIntentId]) WHERE [ZaloPayIntentId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [Payments] ADD CONSTRAINT [CK_Payments_ZaloPayIntent] CHECK (([ZaloPayIntentId] IS NULL AND [GatewayReservationExpiresAtUtc] IS NULL) OR ([ZaloPayIntentId] IS NOT NULL AND [GatewayReservationExpiresAtUtc] IS NOT NULL AND [Method] = ''ZaloPay'' AND [Type] = ''Payment'' AND [OrderId] IS NOT NULL AND [SessionChargeId] IS NULL))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    ALTER TABLE [Payments] ADD CONSTRAINT [FK_Payments_ZaloPayIntents_ZaloPayIntentId] FOREIGN KEY ([ZaloPayIntentId]) REFERENCES [ZaloPayIntents] ([IntentId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    ALTER TABLE [ZaloPayIntents] ADD CONSTRAINT [FK_ZaloPayIntents_Payments_PaymentId] FOREIGN KEY ([PaymentId]) REFERENCES [Payments] ([PaymentId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    ALTER TABLE [ZaloPayIntents] ADD CONSTRAINT [FK_ZaloPayIntents_WalletTransactions_WalletTransactionId] FOREIGN KEY ([WalletTransactionId]) REFERENCES [WalletTransactions] ([TransactionId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117121536_ZaloPayReceiptSettlement'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261117121536_ZaloPayReceiptSettlement', N'10.0.14');
+END;
+
+COMMIT;
+GO

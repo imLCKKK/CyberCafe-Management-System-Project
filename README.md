@@ -24,6 +24,13 @@ Backend đã có auth nhân viên/khách, JWT/permission, seed và health. Front
 
 DB mới tạo từ migrations CyberManagement; không áp InitialCreate mới lên DB 19 bảng cũ. OP.GG vẫn dùng adapter Node tại `Backend/integrations/opgg/`. SignalR hai máy, ZaloPay sandbox và ML theo kế hoạch; chưa được coi hoàn thành từ việc có schema.
 
+## Thử ZaloPay — SCRUM-23
+
+Luồng ZaloPay **SCRUM-23** có [contract và cách chạy](Backend/docs/008-zalopay-wallet-order-integration.md).
+Demo riêng cổng **5177**, khách `0900000023` / `SandboxCustomer-2026!`, API 5099, callback-only 5100.
+Build backend/cài dependencies frontend trước khi chạy `scripts/start-zalopay-integration.ps1`;
+cần secret server và callback HTTPS còn hiệu lực. Nạp tại quầy bên dưới giữ cổng/tài khoản riêng.
+
 ## Thử nạp tại quầy — SCRUM-21
 
 Từ root của checkout này, có SQL Server Express cục bộ:

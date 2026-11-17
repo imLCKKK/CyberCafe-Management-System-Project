@@ -6,12 +6,15 @@ import { useCustomerQuery } from '../../shared/useCustomerQuery.js';
 import { WalletHistory } from '../../shared/WalletHistory';
 import { PageHeading } from '../shared/ClientUI';
 import { CounterTopUpPanel } from './CounterTopUpPanel';
+import { ZaloPayTopUpPanel } from './ZaloPayTopUpPanel';
 import { useRealtime } from '../../shared/realtime/useRealtime';
 
-const walletEvents = ['WalletChanged'];
+const walletEvents = ['WalletChanged', 'ZaloPayPaymentChanged'];
 
 export function WalletPage() {
   const { principal, accessToken } = useAuth();
+  const customerId = Number(principal?.customerId);
+  const isCustomer = principal?.type === 'customer' && Number.isSafeInteger(customerId) && customerId > 0;
   const [page, setPage] = useState(1);
   const load = useCallback((signal) => getCustomerWallet({ page, signal }), [page]);
   const { data: wallet, loading, error, reload } = useCustomerQuery(`own-wallet:${principal?.customerId}:${page}`, load, principal?.type === 'customer');
@@ -25,10 +28,13 @@ export function WalletPage() {
         : wallet && <>
           <section className="home-panel wallet-hero" aria-label="Số dư ví"><div className="wallet-hero-top"><span><WalletCards size={20}/> VÍ #{wallet.customerId}</span></div>
             <span>Số dư khả dụng</span><div className="home-balance">{walletMoney(wallet.balance)}</div><p>{principal.fullName}</p>
-            <p className="home-fine-print">Gửi yêu cầu nạp bên dưới, sau đó mang tiền mặt tới quầy để nhân viên xác nhận.</p>
+            <p className="home-fine-print">Chọn nạp tiền tại quầy hoặc thanh toán bằng ZaloPay Sandbox bên dưới.</p>
           </section>
-          <CounterTopUpPanel key={wallet.customerId} customerId={wallet.customerId} onChanged={reload}/>
-          <div className="home-section-heading"><h2>Lịch sử ví</h2></div><section className="home-panel"><WalletHistory wallet={wallet} onPage={setPage}/></section>
         </>}
+    {isCustomer && <>
+      <ZaloPayTopUpPanel key={`zalopay:${customerId}`} customerId={customerId} onChanged={reload}/>
+      <CounterTopUpPanel key={`counter:${customerId}`} customerId={customerId} onChanged={reload}/>
+    </>}
+    {wallet && !loading && !error && <><div className="home-section-heading"><h2>Lịch sử ví</h2></div><section className="home-panel"><WalletHistory wallet={wallet} onPage={setPage}/></section></>}
   </div>;
 }

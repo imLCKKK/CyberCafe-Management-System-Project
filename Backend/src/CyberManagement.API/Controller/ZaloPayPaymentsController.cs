@@ -13,6 +13,20 @@ namespace CyberManagement.API.Controller;
 public sealed class ZaloPayPaymentsController(IZaloPayPaymentService payments, ILogger<ZaloPayPaymentsController> logger) : ControllerBase
 {
     [Authorize(Roles = "Customer")]
+    [HttpGet("customers/me/payments/zalopay/config")]
+    public async Task<IActionResult> GetConfiguration(CancellationToken cancellationToken)
+    {
+        // This read also enforces current customer status; no secrets are exposed.
+        _ = await payments.GetOwnPageAsync(OwnCustomerId(), 1, 1, "TopUp", cancellationToken);
+        return Ok(payments.GetConfiguration());
+    }
+
+    [Authorize(Roles = "Customer")]
+    [HttpGet("customers/me/payments/zalopay")]
+    public async Task<IActionResult> GetOwnPage(CancellationToken cancellationToken, int page = 1, int pageSize = 20, string? purpose = null) =>
+        Ok(await payments.GetOwnPageAsync(OwnCustomerId(), page, pageSize, purpose, cancellationToken));
+
+    [Authorize(Roles = "Customer")]
     [HttpPost("customers/me/payments/zalopay/topups")]
     public async Task<IActionResult> CreateTopUp([FromBody] CreateZaloPayTopUpCommand command, CancellationToken cancellationToken) =>
         Ok(await payments.CreateTopUpAsync(OwnCustomerId(), command.AmountVnd, RequestKey(), cancellationToken));

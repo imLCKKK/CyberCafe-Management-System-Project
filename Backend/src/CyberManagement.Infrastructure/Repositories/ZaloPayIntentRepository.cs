@@ -45,7 +45,7 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
             if (order.CustomerId != customerId) throw new EntityNotFoundException("Không tìm thấy đơn hàng của tài khoản.");
             if (await Intents.AnyAsync(row => row.OrderId == orderId, cancellationToken))
                 throw new BusinessRuleException("Đơn hàng đã có ý định thanh toán. Hãy kiểm tra giao dịch đã lưu.");
-            if (order.Status != "Pending") throw new BusinessRuleException("Đơn hàng không còn chờ thanh toán.");
+            if (order.Status is not ("Pending" or "AwaitingPayment")) throw new BusinessRuleException("Đơn hàng không còn chờ thanh toán.");
             var orderCreatedAt = new DateTimeOffset(DateTime.SpecifyKind(order.OrderTime, DateTimeKind.Utc));
             if (orderCreatedAt > now.AddMinutes(5))
                 throw new BusinessRuleException("Mốc thời gian đơn hàng không hợp lệ.");
@@ -83,6 +83,21 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
 
     public Task<ZaloPayIntent?> FindByMerchantAsync(string merchantId, CancellationToken cancellationToken) =>
         Intents.AsNoTracking().SingleOrDefaultAsync(row => row.MerchantTransactionId == merchantId, cancellationToken);
+
+    public async Task<(IReadOnlyList<ZaloPayIntent> Items, int TotalCount)> GetOwnPageAsync(int customerId,
+        int page, int pageSize, string? purpose, CancellationToken cancellationToken)
+    {
+        var customer = await database.Customers.AsNoTracking().SingleOrDefaultAsync(row => row.CustomerId == customerId, cancellationToken)
+            ?? throw new EntityNotFoundException("Không tìm thấy khách hàng.");
+        RequireActive(customer);
+        var query = Intents.AsNoTracking().Where(row => row.CustomerId == customerId
+            && (row.Purpose != "Order" || database.Payments.Any(payment => payment.ZaloPayIntentId == row.IntentId)));
+        if (purpose is not null) query = query.Where(row => row.Purpose == purpose);
+        var total = await query.CountAsync(cancellationToken);
+        var rows = await query.OrderByDescending(row => row.CreatedAtUtc).ThenByDescending(row => row.IntentId)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+        return (rows, total);
+    }
 
     public async Task<ZaloPayIntent> SaveCreateResultAsync(int intentId, GatewayCreateResult result, CancellationToken cancellationToken)
     {
@@ -257,7 +272,7 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
             if (row.OrderId is int orderId)
             {
                 var order = await database.Orders.AsNoTracking().SingleAsync(item => item.OrderId == orderId, cancellationToken);
-                if (order.Status != "Pending") row.FailureReason ??= "OrderClosed";
+                if (order.Status is not ("Pending" or "AwaitingPayment")) row.FailureReason ??= "OrderClosed";
                 else if (order.TotalAmount != row.ExpectedAmountVnd) row.FailureReason ??= "OrderAmountChanged";
                 if (await database.Payments.AnyAsync(payment => payment.OrderId == orderId && payment.Type == "Payment"
                         && payment.Status == "Succeeded" && (payment.Method != "ZaloPay"

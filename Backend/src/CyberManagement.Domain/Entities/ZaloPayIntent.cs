@@ -25,6 +25,12 @@ public sealed class ZaloPayIntent
     public DateTimeOffset? QueryLeaseUntilUtc { get; set; }
     public DateTimeOffset? NextQueryAtUtc { get; set; }
     public DateTimeOffset? LastQueryAtUtc { get; set; }
+    public DateTimeOffset? AppliedAtUtc { get; set; }
+    public int? WalletTransactionId { get; set; }
+    public int? PaymentId { get; set; }
+    public string? SettlementFailureReason { get; set; }
     public Customer Customer { get; set; } = null!;
     public Order? Order { get; set; }
+    public WalletTransaction? WalletTransaction { get; set; }
+    public Payment? Payment { get; set; }
 }

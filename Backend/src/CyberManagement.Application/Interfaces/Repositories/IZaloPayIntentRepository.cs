@@ -8,6 +8,8 @@ public interface IZaloPayIntentRepository
     Task<GatewayIntentCreation> CreateAsync(int customerId, string purpose, int? orderId,
         decimal? topUpAmount, Guid requestKey, int appId, DateTimeOffset now, CancellationToken cancellationToken);
     Task<ZaloPayIntent> GetOwnAsync(int customerId, int intentId, CancellationToken cancellationToken);
+    Task<(IReadOnlyList<ZaloPayIntent> Items, int TotalCount)> GetOwnPageAsync(int customerId, int page,
+        int pageSize, string? purpose, CancellationToken cancellationToken);
     Task<ZaloPayIntent?> FindByMerchantAsync(string merchantId, CancellationToken cancellationToken);
     Task<ZaloPayIntent> SaveCreateResultAsync(int intentId, GatewayCreateResult result, CancellationToken cancellationToken);
     Task<GatewayQueryLease> AcquireQueryAsync(int intentId, DateTimeOffset now, CancellationToken cancellationToken);

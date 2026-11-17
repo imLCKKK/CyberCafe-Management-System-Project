@@ -17,6 +17,7 @@ public static class ZaloPayGatewayRegistration
     {
         services.AddZaloPaySandboxConfiguration(configuration, environmentName);
         services.TryAddSingleton(TimeProvider.System);
+        services.AddZaloPaySettlements();
         services.AddScoped<IZaloPayIntentRepository, ZaloPayIntentRepository>();
         services.AddScoped<IZaloPayPaymentService, ZaloPayPaymentService>();
         services.AddHttpClient<IZaloPayGateway, ZaloPaySandboxGateway>(client => client.Timeout = TimeSpan.FromSeconds(10))
@@ -26,6 +27,15 @@ public static class ZaloPayGatewayRegistration
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5)
             });
         if (enableWorker) services.AddHostedService<ZaloPayIntentQueryWorker>();
+        return services;
+    }
+
+    public static IServiceCollection AddZaloPaySettlements(this IServiceCollection services)
+    {
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IZaloPayOrderPaymentBridge, ZaloPayOrderPaymentBridge>();
+        services.AddScoped<IZaloPaySettlementRepository, ZaloPaySettlementRepository>();
+        services.AddScoped<IZaloPaySettlementService, ZaloPaySettlementService>();
         return services;
     }
 }

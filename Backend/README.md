@@ -246,6 +246,13 @@ Ngày 09/11/2026 Query sandbox bằng AppId 554/Key1 dùng thử đã đạt con
 (`2/-101` và `2/-402`), gỡ blocker kết nối trước đó. Xem phạm vi và bằng chứng trong contract;
 Create, callback từ khoản thanh toán thật và ghi tiền vẫn thuộc luồng tích hợp S2.
 
+## Tích hợp ZaloPay SCRUM-23
+
+[Atomic ví/ledger, bridge Order, API, migration và cách kiểm tra](docs/008-zalopay-wallet-order-integration.md).
+Chạy `--settlement-only` với AUTH_CHECKS_SQL_CONNECTION để kiểm tra SQL/realtime tập trung;
+không truyền flag vẫn chạy suite tổng. Provider trong SQL checks là fixture nội bộ.
+Demo Sandbox riêng dùng `scripts/start-zalopay-integration.ps1`; còn chờ thanh toán lại trên bản S23.
+
 ## Hóa đơn SCRUM-31
 
 [API, phát hành/in và điểm gọi transaction](docs/invoice-api.md).

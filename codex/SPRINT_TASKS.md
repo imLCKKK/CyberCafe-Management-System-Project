@@ -483,6 +483,11 @@ Task này ghi nhận receipt đã xác minh cho TopUp/Order; cộng ví/ledger v
 
 #### S2-M-3 — Integrate-ZaloPay-Topups-Checkout
 
+Jira: **SCRUM-23**. Điểm nối Order, atomic ví/ledger, migration và kiểm tra:
+[hợp đồng tích hợp](../Backend/docs/008-zalopay-wallet-order-integration.md).
+Khang chưa có S2-K-2: người dùng chốt cung cấp bridge đăng ký/xác nhận Payment trước;
+không coi fixture Order là checkout hoàn chỉnh. Còn chờ thanh toán Sandbox lại trên S23 và đối chiếu SQL.
+
 **Description:**
 
 - Nối giao dịch ZaloPay thành công vào ví/ledger và điểm xác nhận Order cho Khang, phát cập nhật sau commit.
