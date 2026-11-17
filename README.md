@@ -3,6 +3,17 @@
 **SCRUM-21 / S2-M-1** bổ sung shared credit/debit/refund và nạp tiền mặt tại quầy; xem
 [hợp đồng ví](Backend/docs/003-customer-wallet-contract.md) để biết API, tiền tặng, migration và cách kiểm tra.
 
+**SCRUM-22 / S2-M-2** thêm adapter ZaloPay sandbox chung TopUp/Order, lưu intent/receipt và xử lý callback/Query.
+Xem [API, cấu hình và kiểm tra gateway](Backend/docs/007-zalopay-gateway-callbacks.md).
+Task này chưa cộng ví hoặc hoàn tất Order; consumer nghiệp vụ thuộc S2-M-3.
+Create/Query sandbox chính thức cho cả hai purpose đã được kiểm tra ngày 16/11/2026;
+cả hai còn Pending, chưa phải bằng chứng đã trả tiền. Cách chạy helper thật và giới hạn callback ở hợp đồng.
+
+```powershell
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --zalopay-gateway-checks
+# SQL riêng: đặt AUTH_CHECKS_SQL_CONNECTION rồi chạy cùng project với --gateway-only.
+```
+
 Đồ án .NET quản lý phòng máy: máy/phiên, khách hàng, nhân viên, ví, món/đơn, kho, hóa đơn/báo cáo, giải đấu và khuyến mãi. Nhận diện NEXORA CYBER; React/Vite + ASP.NET Core .NET 10 + EF Core + SQL Server.
 
 ## Nền được chọn

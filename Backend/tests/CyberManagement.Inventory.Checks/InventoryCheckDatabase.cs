@@ -33,8 +33,8 @@ internal sealed class InventoryCheckDatabase(string? serverConnection)
         await command.ExecuteNonQueryAsync();
         created = true;
         await database.GetService<IMigrator>().MigrateAsync(baselineOnly ? BaselineMigration : null);
-        var expectedMigrations = baselineOnly ? 4 : 8;
-        var expectedTables = baselineOnly ? 35 : 39;
+        var expectedMigrations = baselineOnly ? 4 : database.Database.GetMigrations().Count();
+        var expectedTables = baselineOnly ? 35 : 41;
         if ((await database.Database.GetAppliedMigrationsAsync()).Count() != expectedMigrations)
             throw new InvalidOperationException("Unexpected migration count; review integration order.");
         await using var count = connection.CreateCommand();
