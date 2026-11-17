@@ -1,4 +1,4 @@
-# Backend CyberManagement — 35 bảng
+# Backend CyberManagement
 
 Quyết định của Trưởng nhóm ngày 02/11/2026: dùng **database SQL Server mới 35 bảng** và backend CyberManagement làm nền chung. Mở [CyberManagement.slnx](CyberManagement.slnx). `src/CyberManagement.API` là HTTP host duy nhất; adapter [OP.GG](integrations/opgg/README.md) vẫn chạy Node/Vite riêng.
 
@@ -12,6 +12,63 @@ Quyết định của Trưởng nhóm ngày 02/11/2026: dùng **database SQL Ser
 | `tests/CyberManagement.API.Checks/` | Auth/seed regression, chế độ InMemory hoặc SQL thử riêng |
 
 Owner triển khai module xuyên các tầng và UI. Application/Domain không dùng DbContext/HttpContext; interface được implementation ở tầng ngoài. [Hợp đồng identity](docs/001-monorepo.md) quy định EmployeeId/CustomerId kiểu int, năm role nhân viên và customer principal. Frontend còn demo; nối login và nghiệp vụ khác theo [55 task](../codex/SPRINT_TASKS.md).
+
+SCRUM-5 đã nối tạo/đọc khách và đọc hồ sơ/ví chính chủ qua API/SQL; xem
+[contract hồ sơ và ví](docs/003-customer-wallet-contract.md). Task này không thêm hoặc sửa schema/migration đã có trong base.
+SCRUM-21 / S2-M-1 triển khai shared credit/debit/refund và nạp tại quầy qua transaction SQL chung;
+writer không tự SaveChanges/commit. Hai migration bổ sung giữ ledger/Approved lịch sử, tính tiền tặng
+cho Pending và tạo model 39 bảng/bảy migration trên base SCRUM-13. Bảng dự án bên trên mô tả nền gốc.
+Quyết định phiên/đơn ngày 14/11 giữ nguyên; worker phiên đã triển khai tại SCRUM-24.
+
+## SCRUM-24: máy, phiên, tiền giờ và Home API
+
+Giữ API CRUD/bảo trì hiện có, gồm GET/POST `computers/{id}/maintenances`, PUT theo maintenanceId và POST `.../{maintenanceId}/complete`. Catalog dùng transaction ReadCommitted với application lock thống nhất để tránh deadlock khi tạo máy đồng thời ở các phòng/loại khác nhau.
+
+`GET/POST /api/admin/sessions` đọc phiên chưa đóng/mở phiên; `POST /api/admin/sessions/{id}/close` đóng phiên với body `{}`. Mở/đóng dùng header `Idempotency-Key`; quyền tương ứng `session.view/start/end`, đóng cần thêm `invoice.create`. Server lấy actor từ JWT, từ chối giá, thời lượng, số tiền hoặc actor do browser tự gửi. `GET /api/client/home` chỉ đọc máy/loại/cấu hình, snapshot, phí và số dư của khách đăng nhập.
+
+Server tính tổng phí `ceil(priceSnapshot * floor(elapsedSeconds) / 3600)`, thu chênh lệch theo khóa Customer → Computer → GamingSession. SessionCharge, ledger GamingCharge, Payment, số dư và mốc thu cùng transaction; đóng liên kết các khoản thu với hóa đơn tiền giờ riêng và giải phóng máy trong cùng transaction. Retry giữ kết quả đã lưu, không thu/phát hành lặp.
+
+Worker chạy khi khởi động và mỗi 10 giây, dùng cùng quyết toán trước debit ví khác. Không đủ trả giây tiếp theo thì chốt tại mốc đủ ngân sách và ghi System, độc lập người mở. Event SessionChanged/WalletChanged/ComputerChanged chỉ phát sau commit, kể cả khi caller ví quyết toán phiên. Rollback không phát event.
+
+Migration PrepareSessionBilling được giữ nguyên. Migration `20261118090000_ComputerSessionsBilling` chỉ bổ sung actor/kết quả đóng và unique hồ sơ bảo trì đang mở; không xóa snapshot, computed open slot hoặc metadata cũ. Phiên mới lưu cả snapshot tương thích cũ và PricePerHourSnapshot, khoản thu lưu OperationKey/liên kết ledger. Model hiện có 40 bảng, 16 migrations. Không tự áp migration lên DB ứng dụng.
+
+Kiểm tra từ repository root:
+
+```powershell
+dotnet run --project Backend/tests/CyberManagement.API.Checks -- --sessions-only
+dotnet run --project Backend/tests/CyberManagement.API.Checks -- --session-schema
+node --test frontend/tests/session-api.test.mjs frontend/tests/computer-api.test.mjs
+node frontend/tests/run.mjs computers-management sessions-billing realtime
+```
+
+SQL suite dùng `AUTH_CHECKS_SQL_CONNECTION`, luôn tạo/dọn DB thử riêng; gồm 32 tạo máy đồng thời, retry, rollback giữa debit và hóa đơn, nhiều worker/System, outer rollback không event và hai kết nối SignalR. Browser dùng HTTP/SDK fixtures; chưa thay thế kiểm chứng hai máy LAN thật.
+
+## SCRUM-21: nạp tiền mặt và tiền tặng
+
+Khách chọn tám mức nạp tại `/client/wallet`; admin có `wallet.topup` thu đủ tiền mặt rồi duyệt tại
+`/admin/topups`. Server lưu riêng Amount/BonusAmount/TotalAmount, cộng tổng bằng một ledger.
+Mỗi khách chỉ có một Pending, key/retry/duyệt đồng thời không cộng ví lần nữa. Chi tiết API, bảng tiền tặng,
+source/actor/refund, migration và điểm nối các module: [hợp đồng ví](docs/003-customer-wallet-contract.md).
+
+Từ repository root:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-counter-topup.ps1
+```
+
+Script dùng DB riêng, API 5094/frontend 5176 và giữ dữ liệu demo. Tài khoản fixture và thao tác thử ở
+[mục 7 hợp đồng ví](docs/003-customer-wallet-contract.md#71-demo-nạp-tiền-mặt-trên-db-riêng).
+Kiểm tra SQL không thay DB demo; mỗi runner tạo và dọn DB ngẫu nhiên riêng:
+
+```powershell
+$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=127.0.0.1\SQLEXPRESS;Integrated Security=True;TrustServerCertificate=True'
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --wallet-only
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --wallet-migration-checks
+Remove-Item Env:AUTH_CHECKS_SQL_CONNECTION
+```
+
+Writer/money checks yêu cầu SQL thật; InMemory bỏ qua ca ghi tiền. Đây là hướng dẫn chạy, không phải
+kết quả pass. Realtime hai máy LAN và quyết định duyệt/Done cần bằng chứng và Trưởng nhóm xác nhận.
 
 
 
@@ -100,7 +157,7 @@ Hướng dẫn DB thử, seed, đăng nhập, màn hình và kiểm thử: [SCRU
 
 ## SCRUM-24 bước 2: schema phiên và khóa quyết toán
 
-`20261114104346_PrepareSessionBilling` bổ sung snapshot giá/actor, khóa mở/đóng/thu, liên kết ledger và unique slot phiên chưa đóng theo máy/khách; giữ 38 bảng hiện có. Metadata lịch sử giữ null, không backfill giá hoặc nhân viên giả. Migration dừng nếu có phiên chưa đóng trùng hoặc khoản thu trùng mốc; downgrade dừng khi đã có metadata tiền mới. Chưa triển khai API phiên/thu tiền hoặc tự động áp migration lên DB chung.
+`20261114104346_PrepareSessionBilling` bổ sung snapshot giá/actor, khóa mở/đóng/thu, liên kết ledger và unique slot phiên chưa đóng theo máy/khách; giữ 38 bảng tại baseline bước 2. Metadata lịch sử giữ null, không backfill giá hoặc nhân viên giả. Migration dừng nếu có phiên chưa đóng trùng hoặc khoản thu trùng mốc; downgrade dừng khi đã có metadata tiền mới. API phiên/thu tiền hiện đã triển khai ở mục SCRUM-24 phía trên; không tự áp migration lên DB chung.
 
 Kiểm tra schema offline, không cần connection string và không mở kết nối SQL:
 
@@ -164,3 +221,56 @@ Remove-Item Env:AUTH_CHECKS_SQL_CONNECTION
 `--catalog-only` chạy auth/seed + catalog, tách các ca máy tính ngoài phạm vi task. Không có flag này,
 API.Checks vẫn chạy cả máy tính. Browser SQL suite cần Chrome/Edge, có thể cấu hình `CHROME_PATH`;
 CRUD/auth/menu dùng host SQL thật, riêng loading/empty/error được tiêm response để kiểm tra giao diện.
+
+## SCRUM-5: kiểm tra khách hàng và ví
+
+Chạy riêng auth/seed và hồ sơ/ví khách trên cùng cơ chế DB thử:
+
+```powershell
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --customer-only
+```
+
+`--customer-only` tách các ca khách hàng khỏi máy tính/realtime/catalog; `--catalog-only` giữ phạm vi auth/seed
+và catalog như trước. Không truyền flag thì chạy máy tính, realtime, catalog và khách hàng; lỗi của suite đầy đủ
+vẫn được trả về, không được coi kết quả focused là toàn bộ suite pass. Dùng `AUTH_CHECKS_SQL_CONNECTION`
+như hướng dẫn trên để chạy lại cùng các ca khách hàng với SQL Server thử riêng.
+
+## S1-M-2: ZaloPay sandbox
+
+S1-M-2 có [contract ZaloPay sandbox](docs/005-zalopay-sandbox-contract.md), validation cấu hình server và
+HMAC create/query/callback. Khóa dùng User Secrets/environment; tham khảo tên biến tại
+[zalopay-sandbox.env.example](zalopay-sandbox.env.example), file này không tự được .NET nạp.
+
+Để chạy riêng 77 kiểm tra fixture, từ repository root:
+
+```powershell
+.\scripts\dotnet-local.cmd build Backend\tests\CyberManagement.API.Checks --artifacts-path .tools\scrum6\artifacts
+.\scripts\dotnet-local.cmd .tools\scrum6\artifacts\bin\CyberManagement.API.Checks\debug\CyberManagement.API.Checks.dll --zalopay-checks
+```
+
+Probe HTTPS S1 cần `cloudflared` từ [nguồn chính thức](https://developers.cloudflare.com/tunnel/downloads/),
+trên PATH hoặc ở `.tools/scrum6/cloudflared.exe`. Sau đó:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-zalopay-demo.ps1 -UseOfficialDemo
+# Dừng đúng listener/tunnel S1 đã ghi nhận:
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-zalopay-demo.ps1
+```
+
+Khi chạy lại, dừng probe/tunnel cũ trước rồi mới start. Quick tunnel có thể hết hiệu lực;
+start script sẽ cấp URL HTTPS mới, cập nhật User Secrets và kiểm tra lại Query/4 fixture HTTPS.
+
+Script đọc merchant dùng thử đang được ZaloPay công bố, không hard-code keys; lưu vào User Secrets
+API và ghi bằng chứng không chứa khóa tại `.tools/scrum6/`. Chạy bằng bộ merchant riêng thì cấu hình
+các trường trong contract bằng User Secrets, bật `Enabled=true`, rồi chạy start script không có
+`-UseOfficialDemo`. Script chỉ cập nhật CallbackUrl theo tunnel vừa được cấp, giữ nguyên keys của bạn;
+nếu cấu hình chưa bật hoặc không hợp lệ thì dừng và không báo HTTPS đã được xác minh.
+Probe chỉ kiểm tra HTTPS/chữ ký, không có SQL/ghi tiền hoặc acknowledgment thanh toán thành công.
+`Enabled=true` chỉ là cờ cấu hình, không xác nhận provider đã chấp nhận khóa.
+Ngày 09/11/2026 Query sandbox bằng AppId 554/Key1 dùng thử đã đạt controls chữ ký đúng/sai
+(`2/-101` và `2/-402`), gỡ blocker kết nối trước đó. Xem phạm vi và bằng chứng trong contract;
+Create, callback từ khoản thanh toán thật và ghi tiền vẫn thuộc luồng tích hợp S2.
+
+## Hóa đơn SCRUM-31
+
+[API, phát hành/in và điểm gọi transaction](docs/invoice-api.md).

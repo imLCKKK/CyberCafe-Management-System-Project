@@ -127,7 +127,11 @@ internal static class SchemaContractChecks
         check("No model changes are missing a migration", !db.Database.HasPendingModelChanges());
         try { await db.GetService<IMigrator>().MigrateAsync(InventoryCheckDatabase.BaselineMigration); throw new InvalidOperationException("Downgrade discarded contract data."); }
         catch (SqlException ex) when (ex.Number == 51003) { check("Downgrade refuses to discard contract data", true); }
-        check("Refused downgrade preserves issue keys and current migration", await db.InvoiceIssueRequests.CountAsync() == 2 && (await db.Database.GetAppliedMigrationsAsync()).Count() == 5);
+        check("Refused downgrade preserves issue keys and the contract migration", await db.InvoiceIssueRequests.CountAsync() == 2 && (await db.Database.GetAppliedMigrationsAsync()).Count() == 5);
+        // Các migration kho/ví đã hạ cấp trước khi guard của migration chứng từ từ chối.
+        // Khôi phục schema mới nhất để các test service phía sau có cột OperationKey.
+        await db.Database.MigrateAsync();
+        check("Latest integrated migrations are restored after the downgrade guard check", (await db.Database.GetAppliedMigrationsAsync()).Count() == 14);
 
         async Task Reject<T>(string name, T entity, string constraint) where T : class
         {

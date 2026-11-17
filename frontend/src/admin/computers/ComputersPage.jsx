@@ -6,6 +6,7 @@ import { PageHeading, StatCard, Station, StatusBadge, Modal } from './components
 import { updateComputerStatus } from './computerApi';
 import { useComputerData } from './useComputerData';
 import { ComputerEditor, ComputerTypesDialog, MaintenancePanel } from './ComputerManagement';
+import { SessionOperations } from './SessionOperations';
 import { getAccessToken } from '../../shared/auth/api';
 import '../shared/cafe.css';
 
@@ -152,7 +153,7 @@ export function ComputersPage() {
             {filtered.map((pc) => <Station key={pc.ComputerId} computer={pc}
               room={roomById.get(pc.RoomId).RoomName} type={typeById.get(pc.ComputerTypeId).TypeName}
               onClick={() => { if (!saving) { setActionError(''); select(pc); } }} />)}
-          </div> : <div className="cafe-table-wrap"><table className="cafe-table">
+          </div> : <div className="cafe-table-wrap" tabIndex={0} role="region" aria-label="Danh sách máy tính"><table className="cafe-table">
             <thead><tr><th>Tên máy</th><th>Phòng</th><th>Loại máy</th><th>Giá / giờ</th><th>Trạng thái</th><th /></tr></thead>
             <tbody>{filtered.map((pc) => <tr key={pc.ComputerId}>
               <td><strong>{pc.ComputerName}</strong></td><td>{roomById.get(pc.RoomId).RoomName}</td>
@@ -190,6 +191,8 @@ export function ComputersPage() {
               <Wrench size={15} />{saving ? 'Đang lưu...' : selected.Status === 'Maintenance' ? 'Đưa máy vào sử dụng' : 'Chuyển bảo trì'}
             </button></div>}
             <MaintenancePanel computer={selected} permissions={permissions} onSaved={onManaged} />
+            <SessionOperations computer={selected} permissions={permissions}
+              onSaved={(message) => { select(null); onManaged(message); }} />
           </div>
         </Modal>}
         {canManage && editor?.kind === 'computer' && <ComputerEditor computer={editor.computer} rooms={rooms} types={types}

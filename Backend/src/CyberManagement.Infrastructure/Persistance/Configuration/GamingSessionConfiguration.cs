@@ -14,9 +14,11 @@ public class GamingSessionConfiguration : IEntityTypeConfiguration<GamingSession
             table.HasCheckConstraint("CK_GamingSessions_OperationKeys",
                 "([OpenOperationKey] IS NULL OR LEN(LTRIM(RTRIM([OpenOperationKey]))) > 0) AND ([CloseOperationKey] IS NULL OR LEN(LTRIM(RTRIM([CloseOperationKey]))) > 0)");
         });
+        builder.Property(x => x.ClosedByActorType).HasMaxLength(20);
         builder.HasKey(x => x.GamingSessionId);
 
         builder.Property(x => x.TotalCost).HasPrecision(18, 0);
+        builder.Property(x => x.PricePerHourSnapshot).HasPrecision(18, 0);
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();
         builder.Property(x => x.HourlyRateSnapshot).HasPrecision(18, 0);
         builder.Property(x => x.CloseReason).HasMaxLength(250);

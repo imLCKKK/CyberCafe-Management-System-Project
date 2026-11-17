@@ -21,9 +21,10 @@ import { InvoicesPage as AdminInvoicesPage } from '../admin/invoices/InvoicesPag
 import { TournamentsPage as AdminTournamentsPage } from '../admin/tournaments/TournamentsPage';
 import { StaffPage } from '../admin/staff/StaffPage';
 import { ReportsPage } from '../admin/reports/ReportsPage';
+import { TopUpsPage } from '../admin/topups/TopUpsPage';
 
 const admin={
-  dashboard:['Tổng quan','C'],computers:['Máy','C'],customers:['Khách hàng','B'],orders:['Order','D'],products:['Sản phẩm','D'],inventory:['Kho','E'],invoices:['Hóa đơn & thanh toán','E'],tournaments:['Giải đấu','B'],staff:['Nhân viên','A'],reports:['Báo cáo','E']
+  dashboard:['Tổng quan','C'],computers:['Máy','C'],customers:['Khách hàng','B'],topups:['Nạp tại quầy','M'],orders:['Order','D'],products:['Sản phẩm','D'],inventory:['Kho','E'],invoices:['Hóa đơn & thanh toán','E'],tournaments:['Giải đấu','B'],staff:['Nhân viên','A'],reports:['Báo cáo','E']
 };
 
 const clientPages={
@@ -35,11 +36,12 @@ const clientPages={
 };
 
 const clientComponents = { tournaments: TournamentsPage, ordering: OrderingPage, wallet: WalletPage, invoices: InvoicesPage, account: AccountPage };
-const adminComponents = { dashboard: DashboardPage, computers: ComputersPage, customers: CustomersPage, orders: OrdersPage, products: ProductsPage, inventory: InventoryPage, invoices: AdminInvoicesPage, tournaments: AdminTournamentsPage, staff: StaffPage, reports: ReportsPage };
+const adminComponents = { dashboard: DashboardPage, computers: ComputersPage, customers: CustomersPage, topups: TopUpsPage, orders: OrdersPage, products: ProductsPage, inventory: InventoryPage, invoices: AdminInvoicesPage, tournaments: AdminTournamentsPage, staff: StaffPage, reports: ReportsPage };
 const adminPermissions = {
   computers: 'computer.view', customers: 'customer.view', orders: 'order.view', products: 'product.view',
   inventory: 'stockreceipt.view', invoices: 'invoice.view', tournaments: 'tournament.view',
   staff: 'employee.view', reports: 'report.view',
+  topups: 'wallet.topup',
 };
 
 const adminPage=(title,owner)=><div className="page"><div className="placeholder"><h2>{title}</h2><p>Module của thành viên {owner}. Hãy triển khai tại thư mục tương ứng.</p><span>CHƯA TRIỂN KHAI</span></div></div>;

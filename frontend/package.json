@@ -10,6 +10,9 @@
     "test:auth": "node --test src/shared/auth/api.test.js",
     "test:catalog": "node --test src/shared/catalog/catalog.test.js",
     "test:catalog:sql": "node tests/catalog-sql-runner.mjs",
+    "test:customer-wallet": "node --test src/shared/customerWalletApi.test.js",
+    "test:counter-topups": "node --test src/shared/counterTopUpApi.test.js",
+    "test:counter-topups:render": "node tests/counter-topups-render.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -18,10 +21,12 @@
     "test:client": "node --test src/client/shared/demoModel.test.js src/client/ordering/recommendation.test.js src/client/invoices/invoiceModel.test.js",
     "test:admin": "node --test src/admin/shared/adminModel.test.js",
     "test:admin:render": "node src/admin/shared/render-smoke.mjs",
-    "test:inventory:sql": "node tests/run.mjs inventory-sql"
+    "test:inventory:sql": "node tests/run.mjs inventory-sql",
+    "test:invoices:sql": "node tests/run-invoices-live.mjs",
+    "test:invoices": "node --test src/shared/invoices/invoiceApi.test.js"
   },
   "dependencies": {
-    "@microsoft/signalr": "10.0.11",
+    "@microsoft/signalr": "^10.0.11",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -10,6 +10,7 @@ globalThis.localStorage = { getItem: () => null };
 const server = await createServer({
   root: fileURLToPath(new URL('../../../', import.meta.url)),
   optimizeDeps: { noDiscovery: true },
+  resolve: { alias: [{ find: /^(?:\.\.\/)+shared\/auth\/AuthContext(?:\.jsx)?$|^\.\/AuthContext(?:\.jsx)?$/, replacement: fileURLToPath(new URL('../../../tests/auth-render-context.jsx', import.meta.url)) }] },
   server: { middlewareMode: true },
   appType: 'custom',
   ssr: {
@@ -19,13 +20,15 @@ const server = await createServer({
 });
 try {
   const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
+  const { AuthProvider } = await server.ssrLoadModule('/tests/auth-render-context.jsx');
   const { default: HomePage } = await server.ssrLoadModule('/src/client/home/HomePage.jsx');
   const { ClientDemoProvider } = await server.ssrLoadModule('/src/client/shared/ClientDemoContext.jsx');
-  const html = renderToString(React.createElement(MemoryRouter, { initialEntries: ['/client/home'] }, React.createElement(ClientDemoProvider, null, React.createElement(HomePage)))).replace(/<!-- -->/g, '');
-  for (const text of ['Chào Minh Anh', '2 giờ 15 phút', 'Nạp tiền vào ví', 'Đang tải thực đơn…', 'Đấu trường cuối tuần', 'Hoạt động gần đây']) {
+  const html = renderToString(React.createElement(MemoryRouter, { initialEntries: ['/client/home'] }, React.createElement(AuthProvider, null, React.createElement(ClientDemoProvider, null, React.createElement(HomePage))))).replace(/<!-- -->/g, '');
+  for (const text of ['Chào Minh Anh', 'Đang tải máy, phiên và ví…', 'Đang tải thực đơn…', 'Hẹn bạn ở giải đấu tới', 'Hoạt động gần đây']) {
     assert.ok(html.includes(text), `Missing rendered content: ${text}`);
   }
   assert.ok(!html.includes('NaN'));
+  assert.ok(!html.includes('2 giờ 15 phút'), 'Home must not render the demo session');
   console.log('HomePage render smoke test passed: all dashboard sections rendered without runtime errors.');
 } finally {
   await server.close();

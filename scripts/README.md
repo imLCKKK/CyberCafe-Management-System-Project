@@ -19,3 +19,7 @@ Từ repository root:
 ```
 
 `start.cmd` không chạy API .NET/SQL hoặc thiết lập LAN. Cấu hình DB mới 35 bảng/JWT/seed theo [Backend README](../Backend/README.md); quy trình nhận task/review theo [hướng dẫn nhóm](../planning/team-workflow.md).
+
+S1-M-2 bổ sung `configure-zalopay-sandbox.ps1`, `start-zalopay-demo.ps1`, `stop-zalopay-demo.ps1`:
+cấu hình User Secrets và chạy/dừng listener kiểm tra chữ ký qua HTTPS riêng. Cách dùng và giới hạn
+tại [Backend README](../Backend/README.md) và [contract ZaloPay](../Backend/docs/005-zalopay-sandbox-contract.md).

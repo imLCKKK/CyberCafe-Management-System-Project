@@ -9,10 +9,10 @@ export class ApiError extends Error {
 }
 
 // Preserve the computer module's JSON/error contract; S1-D-2 owns the session and HTTP request.
-export async function apiRequest(path, { method = 'GET', body, signal } = {}) {
+export async function apiRequest(path, { method = 'GET', body, signal, headers } = {}) {
   try {
     const result = await authenticatedRequest(path, {
-      method, signal,
+      method, signal, headers,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
     if (typeof result === 'string') throw new ApiError('Dữ liệu máy chủ trả về không hợp lệ.', 200);

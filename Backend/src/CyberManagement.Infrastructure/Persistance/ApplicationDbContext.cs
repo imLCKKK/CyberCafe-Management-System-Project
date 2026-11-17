@@ -23,6 +23,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerStatusHistory> CustomerStatusHistories => Set<CustomerStatusHistory>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
+    public DbSet<CounterTopUpRequest> CounterTopUpRequests => Set<CounterTopUpRequest>();
 
     // Computers
     public DbSet<ComputerRoom> ComputerRooms => Set<ComputerRoom>();
@@ -57,6 +58,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Game> Games => Set<Game>();
     public DbSet<GameRank> GameRanks => Set<GameRank>();
     public DbSet<Tournament> Tournaments => Set<Tournament>();
+    public DbSet<TournamentTransition> TournamentTransitions => Set<TournamentTransition>();
     public DbSet<TournamentRegistration> TournamentRegistrations => Set<TournamentRegistration>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();

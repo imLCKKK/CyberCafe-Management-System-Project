@@ -21,5 +21,11 @@ public class InvoiceDetail
 
     public decimal Amount { get; set; }
 
+    // Snapshot voucher và phần hủy giữ riêng với khoản tiền thực hoàn.
+    public string? VoucherCodeSnapshot { get; set; }
+    public string? VoucherDiscountTypeSnapshot { get; set; }
+    public decimal? VoucherDiscountValueSnapshot { get; set; }
+    public decimal CancelledAmount { get; set; }
+
     public Invoice Invoice { get; set; } = null!;
 }

@@ -11,6 +11,8 @@ using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Security;
 using CyberManagement.Domain.Entities;
 using CyberManagement.Infrastructure.Repositories;
+using CyberManagement.Application.Wallets;
+using CyberManagement.Infrastructure.Wallets;
 using CyberManagement.Infrastructure.Security;
 using CyberManagement.Infrastructure.Persistance;
 using Microsoft.AspNetCore.Builder;
@@ -21,15 +23,58 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
-if (args.Contains("--realtime-host", StringComparer.Ordinal))
+if (args.Contains("--sessions-only"))
 {
-    await RealtimeIntegrationHost.RunAsync();
+    Console.WriteLine($"{await SessionBillingChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} session SQL/API checks passed.");
     return;
 }
 
-if (args.Contains("--session-schema", StringComparer.Ordinal))
+if (args.Contains("--session-schema"))
 {
     SessionSchemaChecks.RunModel();
+    return;
+}
+
+if (args.Contains("--voucher-only"))
+{
+    Console.WriteLine($"{await VoucherChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} voucher SQL/API checks passed.");
+    return;
+}
+
+if (args.Contains("--invoice-only") || args.Contains("--invoice-browser-host"))
+{
+    Console.WriteLine($"{await InvoiceChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"), args.Contains("--invoice-browser-host"))} invoice SQL/API checks passed.");
+    return;
+}
+if (args.Contains("--counter-demo-seed"))
+{
+    await CounterDemoSeed.RunAsync();
+    return;
+}
+
+if (args.Contains("--wallet-migration-checks"))
+{
+    var connection = Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION");
+    if (string.IsNullOrWhiteSpace(connection)) throw new ArgumentException("AUTH_CHECKS_SQL_CONNECTION is required.");
+    Console.WriteLine($"{await CounterTopUpMigrationChecks.RunAsync(connection)} counter top-up migration SQL checks passed.");
+    return;
+}
+
+if (args.Contains("--zalopay-checks"))
+{
+    Console.WriteLine($"{ZaloPayContractChecks.Run()} ZaloPay configuration and signature fixture checks passed (no provider call).");
+    return;
+}
+
+if (args.Contains("--zalopay-probe-host"))
+{
+    await ZaloPayCallbackProbeHost.RunAsync();
+    return;
+}
+
+if (args.Contains("--realtime-host", StringComparer.Ordinal))
+{
+    await RealtimeIntegrationHost.RunAsync();
     return;
 }
 
@@ -39,11 +84,25 @@ if (args.Contains("--computer-browser-host"))
     return;
 }
 
+if (args.Contains("--customer-browser-host"))
+{
+    await CustomerBrowserHost.RunAsync();
+    return;
+}
+
 if (args.Contains("--catalog-browser-host"))
 {
     await ComputerBrowserHost.RunAsync(catalog: true);
     return;
 }
+
+var catalogOnly = args.Contains("--catalog-only");
+var customerOnly = args.Contains("--customer-only");
+var walletOnly = args.Contains("--wallet-only");
+if (new[] { catalogOnly, customerOnly, walletOnly }.Count(value => value) > 1)
+    throw new ArgumentException("Select one of --catalog-only, --customer-only or --wallet-only.");
+if (walletOnly && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION")))
+    throw new ArgumentException("--wallet-only requires AUTH_CHECKS_SQL_CONNECTION; wallet writers are verified on SQL Server.");
 
 var databaseFixture = new AuthCheckDatabase(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"));
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -63,17 +122,34 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     ["SeedAccounts:Technician:Password"] = "Technician-check-password-2026!"
 });
 var realtimeSaveFailure = new RealtimeSaveFailure();
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+builder.Services.AddScoped<SessionCommitEvents>();
+builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+builder.Services.AddDbContext<ApplicationDbContext>((provider, options) =>
 {
     databaseFixture.Configure(options);
     options.AddInterceptors(realtimeSaveFailure);
+    options.AddInterceptors(provider.GetRequiredService<SessionCommitEvents>());
 });
 builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
+builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
+builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
+builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
+builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
+builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
+builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
+builder.Services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
+builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+builder.Services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
+builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
+builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
+builder.Services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
 builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
 builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
 builder.Services
@@ -82,7 +158,7 @@ builder.Services
 
 await using var app = builder.Build();
 HttpClient client = null!;
-var checks = 0;
+var checks = ZaloPayContractChecks.Run();
 var started = false;
 try
 {
@@ -220,7 +296,7 @@ try
             await SendWithToken(HttpMethod.Get, "/api/admin/roles", login.AccessToken));
     }
 
-    if (!args.Contains("--catalog-only"))
+    if (!catalogOnly && !customerOnly && !walletOnly)
     {
         checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
         checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
@@ -228,8 +304,17 @@ try
         checks += SessionSchemaChecks.RunModel();
         await using var sessionSchemaScope = app.Services.CreateAsyncScope();
         checks += await SessionSchemaChecks.RunSqlAsync(sessionSchemaScope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
+        checks += await TournamentChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
     }
-    checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
+    if (!customerOnly && !walletOnly)
+        checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
+    if (!catalogOnly && !walletOnly)
+        checks += await CustomerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
+    if (!catalogOnly && !customerOnly && databaseFixture.Provider == "SQL Server")
+    {
+        checks += await CounterTopUpChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+        checks += await WalletLedgerChecks.RunAsync(app.Services);
+    }
 
     await CheckStatus("Expired token is rejected", HttpStatusCode.Unauthorized,
         await SendWithToken(HttpMethod.Get, "/api/auth/me",
@@ -253,7 +338,7 @@ try
     await CheckStatus("Disabled employee cannot log in", HttpStatusCode.Forbidden,
         await SendLogin("tech01", "Technician-check-password-2026!"));
 
-    Console.WriteLine($"{checks} HTTP and persistence checks passed ({databaseFixture.Provider}).");
+    Console.WriteLine($"{checks} HTTP, persistence and contract checks passed ({databaseFixture.Provider}).");
 }
 finally
 {

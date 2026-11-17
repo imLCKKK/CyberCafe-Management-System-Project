@@ -5,7 +5,9 @@ using CyberManagement.Application.DTOs.Identity;
 using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Security;
 using CyberManagement.API.Realtime;
+using CyberManagement.Infrastructure.Payments;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 
 namespace CyberManagement.API
 {
@@ -18,6 +20,8 @@ namespace CyberManagement.API
             builder.Services.AddApplicationServices();
             builder.Services.AddApiServices(builder.Configuration);
             builder.Services.AddInfrastructureServices(builder.Configuration);
+            builder.Services.AddHostedService<CyberManagement.API.Services.SessionBillingWorker>();
+            builder.Services.AddZaloPaySandboxConfiguration(builder.Configuration, builder.Environment.EnvironmentName);
 
             // Add services to the container.
 
@@ -27,7 +31,23 @@ namespace CyberManagement.API
 
             // Swagger
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+
+            builder.Services.AddSwaggerGen(options =>
+            {
+                options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    Description = "Dán accessToken nhận được sau khi đăng nhập."
+                });
+
+                options.AddSecurityRequirement(document =>
+                    new OpenApiSecurityRequirement
+                    {
+                        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+                    });
+            });
 
             var app = builder.Build();
 

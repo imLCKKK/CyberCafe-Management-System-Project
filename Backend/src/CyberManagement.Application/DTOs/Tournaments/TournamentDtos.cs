@@ -1,0 +1,81 @@
+using System.Text.Json.Serialization;
+
+namespace CyberManagement.Application.DTOs.Tournaments;
+
+public sealed record GameDto(int GameId, string GameName, int TeamSize, bool IsActive);
+
+public sealed record GameRankDto(int RankId, int GameId, string RankName, int RankOrder);
+
+public sealed record TournamentDto(
+    int Id,
+    int GameId,
+    string GameName,
+    int TeamSize,
+    string Name,
+    DateTime RegistrationStartUtc,
+    DateTime RegistrationEndUtc,
+    DateTime StartTimeUtc,
+    decimal EntryFee,
+    int RegisteredCount,
+    string Status,
+    int CreatedByEmployeeId,
+    string Version);
+
+public sealed record CreateTournamentResult(TournamentDto Tournament, bool Replayed);
+
+public sealed record TransitionTournamentRequest(string ToStatus, string ExpectedVersion);
+
+public sealed record TransitionTournamentResult(TournamentDto Tournament, bool Replayed);
+
+public sealed record CreateTournamentRequest(
+    int GameId,
+    string Name,
+    DateTime RegistrationStartUtc,
+    DateTime RegistrationEndUtc,
+    DateTime StartTimeUtc,
+    decimal EntryFee);
+
+public sealed record UpdateTournamentRequest(
+    int GameId,
+    string Name,
+    DateTime RegistrationStartUtc,
+    DateTime RegistrationEndUtc,
+    DateTime StartTimeUtc,
+    decimal EntryFee,
+    string ExpectedVersion);
+
+public sealed record TournamentRegistrationRequest(
+    string RiotId,
+    int RankId,
+    string? PreferredRole,
+    decimal? WinRate,
+    int? HoursPlayed,
+    string? ExpectedVersion = null);
+
+public sealed record TournamentRegistrationDto(
+    int Id,
+    int TournamentId,
+    int CustomerId,
+    string CustomerName,
+    string? RiotId,
+    int RankId,
+    string RankName,
+    string? PreferredRole,
+    decimal WinRate,
+    int HoursPlayed,
+    decimal? SkillScore,
+    string Status,
+    DateTime RegisteredAtUtc,
+    [property: JsonIgnore] decimal? FeeCharged = null);
+
+public sealed record ClientTournamentRegistrationDto(
+    int Id,
+    string CustomerName,
+    string? RiotId,
+    string RankName,
+    string? PreferredRole,
+    decimal WinRate,
+    int HoursPlayed,
+    string Status,
+    DateTime RegisteredAtUtc,
+    bool IsCurrentCustomer);

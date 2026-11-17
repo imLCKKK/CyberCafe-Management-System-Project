@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useRef } from "react";
 import { X, Monitor, Wrench, ShoppingBag } from "lucide-react";
 import { statusLabels } from "../mockData";
+import { trapDialogFocus } from '../../../shared/dialogFocus';
 
 export function PageHeading({ eyebrow, title, description, children }) {
   return (
@@ -96,6 +97,7 @@ export function Modal({ title, children, onClose, className = '' }) {
       ref={dialog}
       className={`cafe-dialog ${className}`}
       aria-labelledby={titleId}
+      onKeyDown={trapDialogFocus}
       onCancel={(event) => { event.preventDefault(); onClose(); }}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();

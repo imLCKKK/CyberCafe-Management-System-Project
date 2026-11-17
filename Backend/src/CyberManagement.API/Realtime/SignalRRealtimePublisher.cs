@@ -10,6 +10,12 @@ public sealed class SignalRRealtimePublisher(
     public Task PublishToPermissionAsync(string permission, RealtimeEvent message, CancellationToken cancellationToken) =>
         PublishAsync(RealtimeGroups.ForPermission(permission), message, cancellationToken);
 
+    public async Task PublishTournamentChangedAsync(RealtimeEvent message, CancellationToken cancellationToken)
+    {
+        await PublishAsync(RealtimeGroups.ForPermission("tournament.view"), message, cancellationToken);
+        await PublishAsync(RealtimeGroups.TournamentPublic, message, cancellationToken);
+    }
+
     public Task PublishToAccountAsync(
         RealtimeAccountType accountType, int accountId, RealtimeEvent message, CancellationToken cancellationToken) =>
         PublishAsync(RealtimeGroups.ForAccount(accountType, accountId), message, cancellationToken);

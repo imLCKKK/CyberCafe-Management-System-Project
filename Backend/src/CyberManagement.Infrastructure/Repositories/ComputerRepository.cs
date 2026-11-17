@@ -271,9 +271,19 @@ public sealed class ComputerRepository(ApplicationDbContext database) : ICompute
             row => row.ComputerId == computerId && row.MaintenanceId == maintenanceId, cancellationToken)
         ?? throw new EntityNotFoundException("Không tìm thấy hồ sơ bảo trì của máy.");
 
-    private async Task<IDbContextTransaction?> BeginTransactionAsync(CancellationToken cancellationToken) =>
-        database.Database.IsRelational()
-            ? await database.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken) : null;
+    private async Task<IDbContextTransaction?> BeginTransactionAsync(CancellationToken cancellationToken)
+    {
+        if (!database.Database.IsRelational()) return null;
+        var transaction = await database.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        try
+        {
+            if (database.Database.IsSqlServer())
+                await database.Database.ExecuteSqlRawAsync(
+                    "DECLARE @r int; EXEC @r = sp_getapplock @Resource=N'ComputerCatalog', @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=10000; IF @r < 0 THROW 51000, 'Computer catalog is busy.', 1;", cancellationToken);
+            return transaction;
+        }
+        catch { await transaction.DisposeAsync(); throw; }
+    }
 
     private async Task SaveAndCommitAsync(IDbContextTransaction? transaction, CancellationToken cancellationToken)
     {

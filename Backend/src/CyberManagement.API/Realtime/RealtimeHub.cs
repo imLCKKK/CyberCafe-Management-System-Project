@@ -14,6 +14,9 @@ public sealed class RealtimeHub : Hub
         var account = RealtimeGroups.FromPrincipal(Context.User)
             ?? throw new HubException("Danh tính kết nối không hợp lệ.");
         await Groups.AddToGroupAsync(Context.ConnectionId, account, Context.ConnectionAborted);
+        if (account.StartsWith("account:customer:", StringComparison.Ordinal))
+            await Groups.AddToGroupAsync(Context.ConnectionId, RealtimeGroups.TournamentPublic,
+                Context.ConnectionAborted);
 
         // Customers never enter staff permission groups, even if a token contains such a claim.
         if (account.StartsWith("account:staff:", StringComparison.Ordinal))

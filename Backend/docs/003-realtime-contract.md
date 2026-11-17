@@ -31,6 +31,8 @@ Tham chiếu cơ chế nền: [Microsoft — SignalR authentication/authorizatio
 | --- | --- | --- |
 | `RealtimeReady` | Caller, không có arguments | Server đã thêm xong các nhóm; client có thể refetch sau khi đăng ký handler |
 | `ComputerChanged` | Nhóm `permission:computer.view` | Trạng thái máy thực sự thay đổi và đã lưu thành công |
+| `TournamentChanged` | Nhóm `permission:tournament.view` và `tournament:public` | Thông tin giải đã đổi và commit thành công |
+| `RegistrationChanged` | Nhóm `permission:tournament.view` và `tournament:public` | Danh sách đăng ký đã đổi và commit thành công |
 
 Payload `ComputerChanged` dùng cùng envelope [RealtimeEvent](../src/CyberManagement.Application/DTOs/Realtime/RealtimeEvent.cs):
 
@@ -51,6 +53,7 @@ Payload `ComputerChanged` dùng cùng envelope [RealtimeEvent](../src/CyberManag
 - [ComputerService](../src/CyberManagement.Application/Services/ComputerService.cs) chỉ publish khi `Changed=true`. Validation, conflict, không tìm thấy hoặc SaveChanges thất bại không phát event; retry đã đạt trạng thái đích không phát lại.
 - [IRealtimePublisher](../src/CyberManagement.Application/Interfaces/Services/IRealtimePublisher.cs) thuộc Application; implementation SignalR thuộc API. Domain/Application không tham chiếu Hub hoặc HttpContext.
 - Owner gọi `PublishToPermissionAsync(permission, message, cancellationToken)` hoặc `PublishToAccountAsync(RealtimeAccountType, accountId, message, cancellationToken)` **sau khi transaction của nghiệp vụ đã commit**. Account ID lấy từ dữ liệu server/claims được kiểm tra, không tin nhóm/ID nhận do client gửi. Interface này không tự commit hoặc chứng minh transaction của caller đã hoàn tất.
+- Tournament owner dùng `PublishTournamentChangedAsync` sau commit. Hub tự thêm các kết nối đã xác thực vào nhóm công khai chỉ nhận thông báo giải; event không mang dữ liệu người đăng ký và client phải đọc lại API có quyền.
 - Sau commit, thao tác máy dùng `CancellationToken.None` khi thông báo để việc hủy request không làm bỏ qua thay đổi đã lưu. Publisher có timeout 2 giây, ghi warning nếu gửi thất bại và giữ nguyên kết quả lưu thành công.
 - Thông báo là best effort, chưa có outbox/lưu phát lại, không thay schema trong bước này. Client phải refetch khi initial connect/reconnect/`RealtimeReady`; event bị mất không được làm mất trạng thái SQL đã commit.
 - Bản này dùng một API process cho demo hai máy LAN. Chưa có backplane cho nhiều API instance; không suy ra các nhóm/thông báo được chia sẻ giữa nhiều host.

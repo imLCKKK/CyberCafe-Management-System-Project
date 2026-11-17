@@ -17,7 +17,7 @@ internal static class SessionSchemaChecks
         var session = model.FindEntityType(typeof(GamingSession))!;
         var charge = model.FindEntityType(typeof(SessionCharge))!;
         Check("Migration snapshot matches the current SQL Server model", !db.Database.HasPendingModelChanges());
-        Check("Billing schema preserves the existing table count", model.GetRelationalModel().Tables.Count() == 38);
+        Check("Billing schema preserves the existing table count", model.GetRelationalModel().Tables.Count() == 40);
         Check("Legacy sessions retain unknown rate and actor as null",
             session.FindProperty(nameof(GamingSession.HourlyRateSnapshot))!.IsNullable
             && session.FindProperty(nameof(GamingSession.OpenedByEmployeeId))!.IsNullable
@@ -48,8 +48,8 @@ internal static class SessionSchemaChecks
                 .SequenceEqual([nameof(SessionCharge.GamingSessionId), nameof(SessionCharge.EndTime)])));
         Check("Ledger deletion cannot remove or detach historical charges", charge.GetForeignKeys().Any(foreignKey =>
             foreignKey.PrincipalEntityType.ClrType == typeof(WalletTransaction) && foreignKey.DeleteBehavior == DeleteBehavior.NoAction));
-        var migration = db.Database.GetMigrations().Last();
-        var prior = db.Database.GetMigrations().SkipLast(1).Last();
+        const string migration = "20261114104346_PrepareSessionBilling";
+        var prior = db.Database.GetMigrations().TakeWhile(id => id != migration).Last();
         var migrator = db.GetService<IMigrator>();
         var up = migrator.GenerateScript(prior, migration, MigrationsSqlGenerationOptions.Idempotent);
         var down = migrator.GenerateScript(migration, prior);

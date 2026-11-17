@@ -8,7 +8,10 @@ public class Invoice
 
     public int? GamingSessionId { get; set; }
 
-    public int EmployeeId { get; set; }
+    public int? EmployeeId { get; set; }
+
+    // System phát hành tự động; Staff phải có nhân viên.
+    public string ActorType { get; set; } = "Staff";
 
     public int? PromotionId { get; set; }
 
@@ -26,7 +29,7 @@ public class Invoice
 
     public GamingSession? GamingSession { get; set; }
 
-    public Employee Employee { get; set; } = null!;
+    public Employee? Employee { get; set; }
 
     public Promotion? Promotion { get; set; }
 

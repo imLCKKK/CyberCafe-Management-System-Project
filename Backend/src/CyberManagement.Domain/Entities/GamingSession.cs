@@ -16,20 +16,19 @@ public class GamingSession
 
     public decimal TotalCost { get; set; }
 
-    // Null identifies legacy sessions whose original billing snapshot is unknown.
     public decimal? HourlyRateSnapshot { get; set; }
 
-    public int? OpenedByEmployeeId { get; set; }
-
-    public int? ClosedByEmployeeId { get; set; }
-
-    public string? OpenOperationKey { get; set; }
-
-    public string? CloseOperationKey { get; set; }
-
-    public string? CloseReason { get; set; }
+    public decimal? PricePerHourSnapshot { get; set; }
 
     public string Status { get; set; } = "Active";
+
+    public int? OpenedByEmployeeId { get; set; }
+    public string? OpenOperationKey { get; set; }
+    public string? CloseOperationKey { get; set; }
+    public string? ClosedByActorType { get; set; }
+    public int? ClosedByEmployeeId { get; set; }
+    public string? CloseReason { get; set; }
+    public int? ClosingInvoiceId { get; set; }
 
     public Computer Computer { get; set; } = null!;
 

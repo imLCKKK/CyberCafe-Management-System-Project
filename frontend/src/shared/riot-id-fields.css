@@ -5,6 +5,6 @@
 .riot-id-parts input { width: 100%; min-width: 0; }
 .riot-id-separator { padding-bottom: 11px; font-size: 20px; font-weight: 700; }
 .riot-id-fields > small { display: block; margin-top: 8px; line-height: 1.5; }
-.opgg-privacy-note { margin: 0; padding: 12px 14px; border: 1px solid #6e965e70; border-radius: 8px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.opgg-privacy-note { margin: 0; padding: 12px 14px; border: 1px solid rgba(var(--accent-rgb), .35); border-radius: 8px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 .opgg-privacy-note strong { display: block; }
 .admin-form > .riot-id-fields { grid-column: 1 / -1; }

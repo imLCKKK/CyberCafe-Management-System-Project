@@ -1,6 +1,8 @@
 # SCRUM-8 — Kịch bản nghiệm thu hai máy LAN
 
-Cập nhật 08/11/2026. **Chưa nghiệm thu LAN:** người dùng xác nhận chưa có máy B. Kiểm thử local dùng hai browser context tách biệt trên một máy để mỗi tài khoản có localStorage riêng; không thay bằng chứng hai máy vật lý hoặc duyệt của Trưởng nhóm.
+**Ghi nhận ngày 14/11/2026 theo xác nhận Trưởng nhóm trong phiên review Sprint 1.** Trưởng nhóm cho biết đã thử hai máy LAN và chạy ổn. Hướng dẫn và bằng chứng local bên dưới được giữ theo thời điểm kiểm tra, các số đo local chỉ mô tả hai browser context trên một máy.
+
+Mốc 08/11/2026 ghi nhận người dùng chưa có máy B, local integration đã chạy với hai browser context tách biệt để mỗi tài khoản có localStorage riêng.
 
 ## 1. Tái hiện kiểm thử tự động trên một máy
 
@@ -95,4 +97,4 @@ Các endpoint `/api/admin/__checks/*` chỉ nằm trong test project và yêu c�
 
 Gõ `stop` tại terminal host A; xác nhận log dọn đúng DB ngẫu nhiên. Dừng Vite, xóa biến môi trường test và đóng các tab/tài khoản thử. Bàn giao commit/nhánh, hai IP, thời điểm, browser, video/FPS, 10 dòng số đo, min/max, kết quả reconnect/restart/quyền và lỗi quan sát. Che token/connection string nếu ảnh có Console/Network.
 
-Trạng thái hiện tại: **local integration đạt; hai máy LAN chưa chạy, chưa nghiệm thu; Trưởng nhóm chưa duyệt Done**.
+Trạng thái được ghi nhận ngày 14/11/2026 gồm local integration đạt và Trưởng nhóm xác nhận đã thử hai máy LAN chạy ổn trong phiên review Sprint 1. Bộ số đo thô, IP và thời điểm thực hiện LAN được ghi theo bằng chứng của lần thử thực tế khi bàn giao, các artifact local giữ rõ phạm vi một máy.

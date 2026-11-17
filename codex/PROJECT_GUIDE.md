@@ -2,6 +2,12 @@
 
 Cập nhật 02/11/2026 theo quyết định dùng backend 35 bảng; giữ lịch/phân công baseline 31/10/2026. Đọc file này trước khi sửa code, sau đó đọc đúng task trong [SPRINT_TASKS.md](SPRINT_TASKS.md). File này đủ để nắm hướng đi; các liên kết giúp kiểm tra chi tiết. Luôn đối chiếu trạng thái code/nhánh hiện tại, không coi ngày ghi trong tài liệu là bằng chứng chức năng đã hoàn thành.
 
+Cập nhật UI ngày 09/11/2026: Trưởng nhóm trực tiếp thực hiện `S1-U-1 — Apply-Nexora-Branding-Theme` và cung cấp logo NEXORA CYBER; `S2-U-1` (ảnh món/component thẻ món) vẫn thuộc Phúc.
+
+Quyết định ngày 14/11/2026 giao **Trưởng nhóm trực tiếp hoàn thiện các phần dang dở của Sprint 1**, gồm chốt và đồng bộ contract phiên/ví/chứng từ tại S1-P-1, S1-M-1 và S1-T-1. Actor tự đóng/phát hành khi hết tiền là System, người mở phiên được lưu riêng. Trưởng nhóm tự hoàn tất phần thiết kế/bàn giao Sprint 1. Phúc thực hiện phiên/worker ở S2-P-1, Minh thực hiện ví ở S2-M-1 và Trường thực hiện hóa đơn ở S2-T-2. Contract hiện hành nằm ở [phiên mục 5.1](../Backend/docs/002-computer-session-contract.md#51-quyết-định-tự-đóng-phiên-và-người-thực-hiện--14112026) và [chứng từ mục 6.3.2](../docs/contracts/inventory-invoice-voucher.md#632-phát-hành-tự-động-với-actor-system--quyết-định-14112026).
+
+Lựa chọn xác nhận lại ngày 14/11/2026 bổ sung contract S1-K-2 yêu cầu đơn món thanh toán đủ trước khi nhân viên nhận để làm. Cash đã thu khóa hủy, quản lý xử lý ngoại lệ tại quầy. Hóa đơn món ăn và hóa đơn tiền giờ xuất riêng. Mỗi lần thu phí giờ có SessionCharge/ledger/Payment cùng transaction, tự đóng phát hành phí giờ chưa có chứng từ với actor System. Trưởng nhóm tự hoàn thiện thiết kế Sprint 1, các owner triển khai S2 theo phân công module.
+
 ## 1. Dự án làm gì và đã chốt điều gì?
 
 Hệ thống quản lý phòng máy: admin/nhân viên quản lý máy, phiên, khách, ví, món/đơn, kho, nhân viên, hóa đơn, báo cáo, giải đấu và khuyến mãi; khách dùng web để xem phiên, gọi món, dùng ví và đăng ký giải.
@@ -13,11 +19,12 @@ Hệ thống quản lý phòng máy: admin/nhân viên quản lý máy, phiên, 
 | Demo | Hai máy mở web trên cùng LAN, dùng chung API/SQL; SignalR báo thay đổi, mục tiêu cập nhật trong 2 giây được đo khi nghiệm thu |
 | Máy trạm | Không xây phần mềm khóa/điều khiển Windows |
 | Thanh toán | ZaloPay sandbox chính thức cho nạp ví và thanh toán đơn món; giữ ví/tiền mặt/nạp tại quầy; không dùng tiền thật |
+| Thu tiền món | Quyết định 14/11/2026 yêu cầu thanh toán đủ rồi nhân viên mới nhận món để làm. Cash do nhân viên xác nhận thực thu, Wallet/ZaloPay do server xác minh |
 | Khuyến mãi | Voucher món ăn giảm % hoặc số tiền cố định, ngày hiệu lực, đơn tối thiểu, hạn mức; server tính và lưu snapshot trên chứng từ |
 | Giải đấu | Quản lý giải/đăng ký/đội, thống kê OP.GG; bắt buộc có ML hỗ trợ chia đội, Phúc phụ trách |
-| Nhận diện | NEXORA CYBER; nền đen `#0B0F14`, tím `#A855F7`, cyan `#22D3EE`, chữ `#E5F0FF`. Concept logo nhóm sẽ chốt chiều 31/10/2026; chưa tự chọn một trong ba mẫu. Phúc triển khai token/layout trước, đối chiếu asset đã duyệt trước khi hoàn tất logo |
+| Nhận diện | NEXORA CYBER; nền đen `#0B0F14`, tím `#A855F7`, cyan `#22D3EE`, chữ `#E5F0FF`. Logo do Trưởng nhóm cung cấp ngày 09/11/2026: [nexora-cyber.png](../frontend/public/branding/nexora-cyber.png), biểu tượng N neon cyan–tím trên nền đen kèm chữ NEXORA CYBER. Trưởng nhóm thực hiện logo/theme chung trong S1-U-1 |
 | Hạn nộp | 21/11/2026; S1 31/10–05/11, S2 06–10/11, S3 10–15/11, S4 15–19/11; ngày 10/11 và 15/11 là mốc bàn giao giữa hai sprint; dự phòng 20–21/11 |
-| Cách giao việc | 55 Task Jira độc lập: 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI giao Phúc theo yêu cầu mới; các bước nhỏ là checklist, không tạo Task cha/Sub-task |
+| Cách giao việc | 55 Task Jira độc lập: 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI: S1-U-1 do Trưởng nhóm thực hiện, S2-U-1 do Phúc thực hiện; các bước nhỏ là checklist, không tạo Task cha/Sub-task |
 | Reviewer | **Trưởng nhóm**, chính là người yêu cầu lập bộ tài liệu này và trực tiếp duyệt thay đổi |
 
 Chưa có tên/account Jira hoặc GitHub của reviewer trong tài liệu. Không tự suy ra đó là Đại, Minh hay tài khoản đang chạy AI trên máy khác. Các thành viên hỗ trợ đối chiếu nghiệp vụ; quyền duyệt cuối thuộc Trưởng nhóm. AI hỗ trợ thực hiện hoặc review theo yêu cầu, không tự nhận là người đã duyệt.
@@ -107,6 +114,7 @@ Người dùng thao tác React
 - ZaloPay: server tạo giao dịch TopUp/Order; callback xác minh chữ ký/giao dịch/số tiền hoặc truy vấn provider mới ghi nhận. Redirect của browser không chứng minh thanh toán; callback/query lặp không ghi tiền hai lần. Không giữ SQL transaction trong thời gian chờ provider.
 - Đơn chờ ZaloPay cần policy giữ tồn/lượt voucher, hết hạn, callback muộn và hoàn tiền. Quy tắc cụ thể chốt ở S1, không tự đổi phương thức hoàn tiền.
 - ML: đăng ký hợp lệ → Phúc cung cấp dữ liệu/model/suy luận và đề xuất đội → Đại tích hợp UI/xác nhận → API lưu đội cùng version/snapshot → SignalR. Có dữ liệu đánh giá và baseline; phân biệt mô hình học từ dữ liệu với thuật toán ghép đội viết tay.
+- Quyết định ngày 10/11/2026: baseline/fallback SCRUM-4 và SCRUM-9 dùng chung `rank-snake-v1`: sắp `OpggSnapshot.rank.tier` giảm dần, hòa theo `RegistrationId` tăng dần rồi phân snake; không xếp theo SkillScore tổng hợp. Thiếu rank OP.GG hợp lệ báo lỗi; dự phòng có nhãn/phương pháp riêng. Yêu cầu ML và đánh giá so baseline giữ nguyên. Confirm phải giữ phân đội/vai trò của đề xuất server; swap sau xác nhận mang nguồn Manual, giữ lịch sử và không được tính là kết quả baseline/ML.
 - OP.GG lỗi/không có dữ liệu phải hiện đúng; fixture chỉ dùng kiểm thử, không ghi thành dữ liệu provider thật.
 
 ## 5. Người sở hữu từng phần
@@ -115,13 +123,14 @@ Người dùng thao tác React
 | --- | --- |
 | Đại | Auth/quyền/nhân viên, luồng giải đấu/đăng ký/UI xác nhận/lưu đội; UI CRUD voucher; điều phối tích hợp |
 | Minh | Khách/hồ sơ, ví/ledger, nạp tại quầy, ZaloPay; thao tác tiền dùng chung |
-| Phúc | Máy/phiên/tiền giờ/Home, SignalR, OP.GG, **ML chia đội**, nhận diện NEXORA/theme chung và ảnh món |
+| Phúc | Máy/phiên/tiền giờ/Home, SignalR, OP.GG, **ML chia đội**, ảnh món/component thẻ món |
 | Khang | Danh mục/sản phẩm/menu/gợi ý/đơn/checkout/hủy; tích hợp voucher và gateway vào đơn |
 | Trường | Kho/chứng từ/hóa đơn/báo cáo; API/rule voucher; điều phối thứ tự migration |
+| Trưởng nhóm | Trực tiếp thực hiện S1-U-1 và hoàn thiện các phần dang dở/contract liên module của Sprint 1 theo quyết định 14/11/2026, giữ quyền review và duyệt cuối |
 
 Owner không đồng nghĩa reviewer. Tất cả Task gửi **Trưởng nhóm** duyệt. Trường điều phối migration nhưng từng owner viết entity/config của mình; Phúc cung cấp realtime chung nhưng từng owner tự nối event/UI module mình.
 
-Phúc nhận thêm **S1-U-1** (NEXORA CYBER/logo/theme cyan–tím–đen) và **S2-U-1** (ảnh món/component thẻ món) theo phân công mới. Giữ mã U để tra cứu; Assignee là Phúc. Phúc có 4 Task ở S1/S2, ưu tiên bàn giao contract/hook và component ảnh sớm cho người tích hợp; không gộp UI vào ML để che tải công việc. Khang giữ logic vòng quay/checkout trong **S2-K-3**, hồi quy ở **S3-K-2**; Phúc cung cấp token/component/asset, không tạo Task trùng. Trưởng nhóm review cuối, các owner kiểm tra chéo module của mình.
+Theo quyết định ngày 09/11/2026, **S1-U-1** (NEXORA CYBER/logo/theme cyan–tím–đen) do **Trưởng nhóm** trực tiếp thực hiện; **S2-U-1** (ảnh món/component thẻ món) vẫn do **Phúc** thực hiện. Giữ mã U để tra cứu. Phúc có 3 Task ở S1 và 4 Task ở S2, ưu tiên bàn giao contract/hook và component ảnh sớm cho người tích hợp; không gộp UI vào ML để che tải công việc. Khang giữ logic vòng quay/checkout trong **S2-K-3**, hồi quy ở **S3-K-2**; Trưởng nhóm cung cấp token/theme, Phúc cung cấp component/asset ảnh món, không tạo Task trùng. Trưởng nhóm review cuối, các owner kiểm tra chéo module của mình.
 
 ## 6. Quy trình khi AI nhận một Task
 

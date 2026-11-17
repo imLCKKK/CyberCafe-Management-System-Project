@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import React, { useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Monitor, 
@@ -13,15 +13,18 @@ import {
   Menu, 
   ChevronRight,
   LogOut,
+  Banknote,
 } from 'lucide-react';
 import './layout.css';
 import { AdminProvider } from '../admin/shared/AdminContext';
 import { useAuth } from '../shared/auth/AuthContext';
+import Brand from '../shared/branding/Brand';
 
 const menu = [
   ['/admin/dashboard', 'Tổng quan', LayoutDashboard],
   ['/admin/computers', 'Máy', Monitor],
   ['/admin/customers', 'Khách hàng', Users],
+  ['/admin/topups', 'Nạp tại quầy', Banknote],
   ['/admin/orders', 'Order', ShoppingCart],
   ['/admin/products', 'Sản phẩm', Package],
   ['/admin/inventory', 'Kho', Package],
@@ -37,6 +40,8 @@ export function AdminLayout() {
 
 function AdminShell() {
   const [collapsed, setCollapsed] = useState(false);
+  const menuToggle = useRef(null);
+  const { pathname } = useLocation();
   const { principal, signOut } = useAuth();
   const visibleMenu = principal?.type === 'employee'
     ? menu.filter(([path]) => {
@@ -45,28 +50,30 @@ function AdminShell() {
         '/admin/products': ['product.view'], '/admin/inventory': ['stockreceipt.view'],
         '/admin/invoices': ['invoice.view'], '/admin/tournaments': ['tournament.view'], '/admin/staff': ['employee.view'],
         '/admin/reports': ['report.view'],
+        '/admin/topups': ['wallet.topup'],
       }[path];
       return !permissions || permissions.some((permission) => principal.permissions.includes(permission));
     })
     : menu;
   const displayName = principal?.type === 'employee' ? principal.username : 'Bản demo';
   const displayRole = principal?.type === 'employee' ? principal.role : 'Chưa đăng nhập';
+  const pageTitle = menu.find(([path]) => path === pathname)?.[1] || 'Quản trị';
 
   return (
     <div className={`admin-shell ${collapsed ? 'collapsed' : ''}`}>
+      <a className="skip-link" href="#admin-content">Đến nội dung chính</a>
       {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">N</div>
-          {!collapsed && (
-            <div className="brand-copy">
-              <b>NET CAFE</b>
-              <span>Management</span>
-            </div>
-          )}
+      <aside className="sidebar" onKeyDown={(event) => {
+        if (event.key === 'Escape' && !collapsed) {
+          setCollapsed(true);
+          menuToggle.current?.focus();
+        }
+      }}>
+        <div className="sidebar-brand">
+          <Brand area="Quản trị" compact={collapsed}/>
         </div>
 
-        <nav className="nav">
+        <nav className="nav" id="admin-navigation" aria-label="Điều hướng quản trị">
           {!collapsed && <div className="nav-label">QUẢN LÝ</div>}
           {visibleMenu.map(([to, label, Icon]) => (
             <NavLink 
@@ -93,20 +100,21 @@ function AdminShell() {
             </div>
           )}
           {principal?.type === 'employee' && <button className="admin-logout" aria-label="Đăng xuất" title="Đăng xuất" onClick={() => void signOut()}><LogOut size={18}/></button>}
-          <button aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} aria-expanded={!collapsed} onClick={() => setCollapsed(v => !v)}>
+          <button ref={menuToggle} aria-controls="admin-navigation" aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} aria-expanded={!collapsed} onClick={() => setCollapsed(v => !v)}>
             <Menu size={19} />
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="main">
+      <main className="main" id="admin-content" tabIndex={-1}>
         <header className="topbar">
-          <div>
+          <Brand compact/>
+          <div className="topbar-copy">
+            <strong>NEXORA CYBER</strong>
             <div className="breadcrumb">
-              Quản lý <ChevronRight size={14} /> Admin
+              Quản trị <ChevronRight size={14} /> {pageTitle}
             </div>
-            <h1>Net Cafe Management</h1>
           </div>
         </header>
         <Outlet />
