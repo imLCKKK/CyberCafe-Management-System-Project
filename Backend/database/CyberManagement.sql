@@ -2653,3 +2653,24 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117034907_AddEmployeeRowVersion'
+)
+BEGIN
+    ALTER TABLE [Employees] ADD [Version] rowversion NOT NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117034907_AddEmployeeRowVersion'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261117034907_AddEmployeeRowVersion', N'10.0.14');
+END;
+
+COMMIT;
+GO

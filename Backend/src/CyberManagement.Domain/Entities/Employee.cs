@@ -18,6 +18,8 @@ public class Employee
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public byte[] Version { get; set; } = new byte[8];
+
     public Role Role { get; set; } = null!;
 
     public ICollection<Shift> Shifts { get; set; } = new List<Shift>();

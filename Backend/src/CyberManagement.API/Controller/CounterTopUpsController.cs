@@ -35,11 +35,13 @@ public sealed class CounterTopUpsController(CounterTopUpService topups) : Contro
     }
 
     [HttpGet("admin/topups")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.WalletTopUp)]
     public async Task<IActionResult> GetAdmin(CancellationToken cancellationToken, int page = 1, int pageSize = 20, string status = "Pending") =>
         Ok(await topups.GetAdminAsync(status, page, pageSize, cancellationToken));
 
     [HttpPost("admin/topups/{requestId}/approve")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.WalletTopUp)]
     public async Task<IActionResult> Approve(int requestId, [FromBody] ApproveCounterTopUpCommand command, CancellationToken cancellationToken) =>
         Ok(await topups.ApproveAsync(requestId, StaffId(), command, cancellationToken));

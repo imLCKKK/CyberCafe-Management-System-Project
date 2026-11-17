@@ -16,6 +16,7 @@ const employee = {
     'invoice.view',
     'tournament.view',
     'employee.view',
+    'employee.manage',
     'report.view',
     'promotion.manage',
   ],

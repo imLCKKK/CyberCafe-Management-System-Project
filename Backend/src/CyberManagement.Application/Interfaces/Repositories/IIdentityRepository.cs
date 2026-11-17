@@ -36,5 +36,8 @@ public interface IIdentityRepository
 
     void UpdateEmployee(Employee employee);
 
+    Task SaveEmployeeWithAuditAsync(
+        Employee employee, AuditLog audit, bool preserveAnotherActiveAdmin, CancellationToken cancellationToken);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }

@@ -49,6 +49,69 @@ kết quả pass. Realtime hai máy LAN và quyết định duyệt/Done cần b
 
 
 
+## SCRUM-17: audit thay đổi nhân viên
+
+Các thao tác tạo/sửa/khóa/mở khóa/đổi mật khẩu ghi `AuditLogs` cùng transaction với
+Employee. `EmployeeId` trong audit là actor lấy từ JWT; `EntityType=Employee`,
+`EntityId` là nhân viên bị thay đổi, `CreatedAt` là thời gian UTC server.
+`Action` lần lượt là `Created`, `Updated` (gồm đổi role), `Locked`, `Unlocked`,
+`PasswordChanged`. Không ghi request, mật khẩu hoặc hash vào audit.
+Tạo mới lấy ID do SQL sinh trong cùng transaction; lỗi ghi audit rollback cả nhân viên.
+Audit dùng bảng `AuditLogs` hiện có.
+
+PUT `/api/employees/{id}` bắt buộc `expectedVersion` là token Base64 8 byte lấy
+từ `version` trong GET/list/create/update. Thiếu/sai token trả 400; token cũ hoặc
+cập nhật cạnh tranh trả 409 ProblemDetails với `VersionConflict`, không đổi nhân viên
+và không thêm audit. Client phải tải lại rồi mới gửi chỉnh sửa với token mới;
+không tự retry bằng version mới trên dữ liệu form cũ.
+
+Migration `AddEmployeeRowVersion` thêm `Employees.Version` kiểu SQL Server
+`rowversion NOT NULL`; SQL tự cấp token cho bản ghi hiện có và sau mỗi UPDATE,
+kể cả khóa/mở khóa/đổi mật khẩu. Áp migration theo quy trình EF bên dưới trước
+khi chạy API mới; không sửa migration đã áp, không cần reset dữ liệu.
+InMemory không mô phỏng bộ sinh rowversion; kiểm tra version cạnh tranh cần SQL.
+
+Tạo nhân viên (`password`) và đổi mật khẩu (`newPassword`) được kiểm tra tại
+Application service: 12–72 ký tự, ít nhất một chữ và một số. Đổi mật khẩu yêu cầu
+`currentPassword` đúng, `newPassword` khác mật khẩu cũ và `confirmNewPassword`
+khớp chính xác (phân biệt hoa/thường, không trim mật khẩu).
+Vi phạm trả 400 trước khi hash/lưu; không tạo Employee, không đổi hash/version
+và không thêm audit. Policy này không thay đổi đăng nhập, tài khoản seed hoặc khách hàng.
+Request tạo nhân viên giữ trường `password`; confirmation chỉ bắt buộc ở đổi mật khẩu.
+
+GET list/detail nhân viên yêu cầu `employee.view`; tạo/sửa/khóa/mở khóa yêu cầu
+`employee.manage`. Không còn điều kiện Admin chung cho controller: theo catalog,
+Manager được xem nhưng không được quản lý.
+
+Controller nhân viên và catalog role còn yêu cầu policy `ActiveAccount`: mỗi request
+đọc `Employees.IsActive` từ DB; role Admin trong JWT đã cấp không bỏ qua kiểm tra này.
+Admin bị khóa dùng token cũ vẫn nhận 403 khi đọc, tạo/sửa/khóa hoặc tự mở khóa,
+kể cả JWT chưa hết hạn; request bị chặn không đổi Employee/hash/version hay audit.
+Một Admin khác đang hoạt động phải mở khóa. Khi được mở khóa, token cũ còn hạn
+có thể dùng lại theo trạng thái DB; đây không phải cơ chế thu hồi JWT.
+
+`POST /api/auth/change-password` dành cho năm role nhân viên đang hoạt động,
+không yêu cầu `employee.view/manage`. ID đích và actor đều lấy từ `sub` của JWT;
+token Customer bị từ chối kể cả khi CustomerId trùng EmployeeId. Sai mật khẩu hiện tại
+trả 400; chưa đăng nhập trả 401; không phải nhân viên hoặc bị vô hiệu hóa trả 403.
+Route cũ `/api/employees/{id}/change-password` giữ làm alias chỉ cho chính chủ:
+khác ID JWT luôn 403, kể cả Admin; đây không phải thao tác reset mật khẩu quản trị.
+Đổi thành công trả 204, ghi một audit với actor bằng đối tượng, không thu hồi JWT.
+UI nhân viên có nút đổi mật khẩu riêng ở sidebar, không phụ thuộc quyền xem nhân viên.
+
+Chạy kiểm tra HTTP/persistence riêng:
+
+```powershell
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --employees-only
+```
+
+InMemory kiểm tra nội dung audit và request bị từ chối, không chứng minh rollback.
+Đặt `AUTH_CHECKS_SQL_CONNECTION` như phần kiểm tra SQL bên trên để chạy thêm các ca
+cố ý làm audit thất bại cho cả năm thao tác, PUT stale và hai PUT cùng version
+(một 200, một 409), và policy mật khẩu (thiếu/yếu/biên 12–72 ký tự/xác nhận/tái sử dụng).
+Harness tạo và dọn database ngẫu nhiên
+riêng, không sửa database được chỉ định trong connection string.
+
 ## Build từ repository root
 
 ```powershell
@@ -74,7 +137,19 @@ $env:ConnectionStrings__DefaultConnection = 'Server=localhost;Database=CyberMana
 .\scripts\dotnet-local.cmd user-secrets set 'Authentication:Jwt:SigningKey' '<your-random-secret-at-least-32-bytes>' --project Backend\src\CyberManagement.API
 ```
 
-Cũng có thể cấp `Authentication__Jwt__SigningKey` từ môi trường/secret manager. Không dùng lại key từng được commit. Seed tài khoản Development yêu cầu cấu hình đủ cả năm `SeedAccounts:<Role>:Password` (ít nhất 12 ký tự mỗi mật khẩu) hoặc không cấu hình account seed nào; xem [các lệnh seed](docs/001-monorepo.md). Role/permission vẫn được đồng bộ khi seed mà không tạo account mẫu.
+Cũng có thể cấp `Authentication__Jwt__SigningKey` từ môi trường/secret manager. Giá trị signing key và mật khẩu seed từng được commit phải được coi là đã lộ: tạo key/mật khẩu mới và thay chúng ở mọi môi trường hoặc DB nơi đã dùng. Thay file cấu hình không xóa các giá trị khỏi lịch sử Git; đổi signing key sẽ làm token cũ không còn hợp lệ.
+
+Seed tài khoản Development yêu cầu cấu hình đủ cả năm `SeedAccounts:<Role>:Password` (ít nhất 12 ký tự mỗi mật khẩu) hoặc không cấu hình account seed nào. Dùng mật khẩu riêng, mạnh cho từng role:
+
+```powershell
+.\scripts\dotnet-local.cmd user-secrets set 'SeedAccounts:Admin:Password' '<unique-password-12+-chars>' --project Backend\src\CyberManagement.API
+.\scripts\dotnet-local.cmd user-secrets set 'SeedAccounts:Manager:Password' '<unique-password-12+-chars>' --project Backend\src\CyberManagement.API
+.\scripts\dotnet-local.cmd user-secrets set 'SeedAccounts:Cashier:Password' '<unique-password-12+-chars>' --project Backend\src\CyberManagement.API
+.\scripts\dotnet-local.cmd user-secrets set 'SeedAccounts:Waiter:Password' '<unique-password-12+-chars>' --project Backend\src\CyberManagement.API
+.\scripts\dotnet-local.cmd user-secrets set 'SeedAccounts:Technician:Password' '<unique-password-12+-chars>' --project Backend\src\CyberManagement.API
+```
+
+Môi trường có thể dùng `SeedAccounts__<Role>__Password` thay cho User Secrets. Seeder chỉ tạo tài khoản còn thiếu; thay mật khẩu trong cấu hình không đổi mật khẩu tài khoản seed đã tồn tại, nên các tài khoản đó cần được reset riêng qua quy trình được phép. Xem thêm [các lệnh seed](docs/001-monorepo.md). Role/permission vẫn được đồng bộ khi seed mà không tạo account mẫu.
 
 ## Chạy API
 

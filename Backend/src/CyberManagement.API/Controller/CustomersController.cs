@@ -13,12 +13,14 @@ namespace CyberManagement.API.Controller;
 public sealed class CustomersController(ICustomerService customers) : ControllerBase
 {
     [HttpGet("admin/customers")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.CustomerView)]
     public async Task<IActionResult> GetCustomers(
         CancellationToken cancellationToken, int page = 1, int pageSize = 20, string? search = null) =>
         Ok(await customers.GetCustomersAsync(page, pageSize, search, cancellationToken));
 
     [HttpPost("admin/customers")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.CustomerCreate)]
     public async Task<IActionResult> CreateCustomer(
         [FromBody] CreateCustomerCommand command, CancellationToken cancellationToken)
@@ -28,11 +30,13 @@ public sealed class CustomersController(ICustomerService customers) : Controller
     }
 
     [HttpGet("admin/customers/{customerId}")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.CustomerView)]
     public async Task<IActionResult> GetCustomer(int customerId, CancellationToken cancellationToken) =>
         Ok(await customers.GetProfileAsync(customerId, cancellationToken));
 
     [HttpGet("admin/customers/{customerId}/wallet")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.WalletView)]
     public async Task<IActionResult> GetWallet(
         int customerId, CancellationToken cancellationToken, int page = 1, int pageSize = 20) =>

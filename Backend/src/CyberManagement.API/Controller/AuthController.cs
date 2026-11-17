@@ -2,7 +2,10 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using CyberManagement.Application.DTOs.Authentication;
+using CyberManagement.Application.DTOs.Employees;
 using CyberManagement.Application.Interfaces.Services;
+using CyberManagement.Application.Services;
+using CyberManagement.API.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -14,6 +17,7 @@ namespace CyberManagement.API.Controller;
 public sealed class AuthController(
     IIdentityService identityService,
     ICustomerIdentityService customerIdentityService,
+    EmployeesService employeesService,
     IConfiguration configuration) : ControllerBase
 {
     [AllowAnonymous]
@@ -86,6 +90,25 @@ public sealed class AuthController(
     [Authorize(Roles = "Admin,Manager,Cashier,Waiter,Technician")]
     [HttpPost("logout")]
     public IActionResult Logout() => NoContent();
+
+    [HttpPost("change-password")]
+    [EndpointSummary("Change the authenticated employee's password")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
+    [Authorize(Roles = "Admin,Manager,Cashier,Waiter,Technician")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(User.FindFirstValue(JwtRegisteredClaimNames.Sub), out var employeeId))
+            return Unauthorized();
+
+        await employeesService.ChangePasswordAsync(employeeId, request, employeeId, cancellationToken);
+        return NoContent();
+    }
 
     [Authorize(Roles = "Admin,Manager,Cashier,Waiter,Technician")]
     [HttpGet("me")]

@@ -15,6 +15,7 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(x => x.Phone).HasMaxLength(20);
         builder.Property(x => x.Username).HasMaxLength(50).IsRequired();
         builder.Property(x => x.PasswordHash).HasMaxLength(255).IsRequired();
+        builder.Property(x => x.Version).IsRowVersion();
 
         builder.HasIndex(x => x.Username).IsUnique();
 

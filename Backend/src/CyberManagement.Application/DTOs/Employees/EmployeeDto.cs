@@ -1,5 +1,6 @@
 namespace CyberManagement.Application.DTOs.Employees;
 
+/// <summary>Employee profile with a Base64 row version for optimistic concurrency.</summary>
 public sealed record EmployeeDto(
     int EmployeeId,
     string Username,
@@ -7,4 +8,5 @@ public sealed record EmployeeDto(
     string? Phone,
     string RoleName,
     bool IsActive,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    string Version);

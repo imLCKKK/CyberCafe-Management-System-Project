@@ -1,7 +1,9 @@
 using CyberManagement.Application.Interfaces.Repositories;
+using CyberManagement.Application.Exceptions;
 using CyberManagement.Domain.Entities;
 using CyberManagement.Infrastructure.Persistance;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace CyberManagement.Infrastructure.Repositories;
 
@@ -70,6 +72,54 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
     public void RemoveEmployee(Employee employee) => database.Employees.Remove(employee);
 
     public void UpdateEmployee(Employee employee) => database.Employees.Update(employee);
+
+    public async Task SaveEmployeeWithAuditAsync(
+        Employee employee,
+        AuditLog audit,
+        bool preserveAnotherActiveAdmin,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = database.Database.IsRelational()
+            ? await database.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+
+        if (preserveAnotherActiveAdmin)
+        {
+            if (database.Database.IsSqlServer())
+            {
+                const string lockResource = "EmployeeAdminInvariant";
+                await database.Database.ExecuteSqlInterpolatedAsync(
+                    $"DECLARE @lockResult int; EXEC @lockResult = sys.sp_getapplock @Resource = {lockResource}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000; IF @lockResult < 0 THROW 51000, 'Could not acquire employee admin invariant lock.', 1;",
+                    cancellationToken);
+            }
+
+            var anotherActiveAdminExists = await database.Employees
+                .AnyAsync(employeeRow =>
+                    employeeRow.EmployeeId != employee.EmployeeId
+                    && employeeRow.IsActive
+                    && employeeRow.Role.RoleName == "Admin",
+                    cancellationToken);
+            if (!anotherActiveAdminExists)
+                throw new BusinessRuleException("Không thể thay đổi trạng thái hoặc quyền của Admin hoạt động cuối cùng.");
+        }
+
+        // A new employee needs its SQL-generated ID before it can be the audit target.
+        if (database.Entry(employee).State == EntityState.Added)
+            await database.SaveChangesAsync(cancellationToken);
+
+        audit.EntityId = employee.EmployeeId;
+        database.AuditLogs.Add(audit);
+        try
+        {
+            await database.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new BusinessRuleException("VersionConflict: hồ sơ nhân viên đã thay đổi. Vui lòng tải lại.");
+        }
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
+    }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         database.SaveChangesAsync(cancellationToken);

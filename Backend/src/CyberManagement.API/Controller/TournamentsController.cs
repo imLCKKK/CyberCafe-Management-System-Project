@@ -47,6 +47,7 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
         return CreatedAtAction(nameof(GetClientRegistrations), new { tournamentId }, registration);
     }
     [HttpGet("admin/games")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.TournamentView)]
     public async Task<IActionResult> GetAdminGames(CancellationToken cancellationToken)
     {
@@ -55,6 +56,7 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
     }
 
     [HttpGet("admin/games/{gameId:int}/ranks")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.TournamentView)]
     public async Task<IActionResult> GetAdminRanks(int gameId, CancellationToken cancellationToken)
     {
@@ -63,6 +65,7 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
     }
 
     [HttpGet("admin/tournaments")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.TournamentView)]
     public async Task<IActionResult> GetAdminTournaments(CancellationToken cancellationToken)
     {
@@ -71,6 +74,7 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
     }
 
     [HttpGet("admin/tournaments/{tournamentId:int}")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.TournamentView)]
     public async Task<IActionResult> GetAdminTournament(int tournamentId, CancellationToken cancellationToken)
     {
@@ -79,6 +83,7 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
     }
 
     [HttpPost("admin/tournaments")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.TournamentManage)]
     public async Task<IActionResult> Create(
         [FromBody] CreateTournamentRequest request, [FromHeader(Name = "Idempotency-Key")] string key,
@@ -94,12 +99,14 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
     }
 
     [HttpPut("admin/tournaments/{tournamentId:int}")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.TournamentManage)]
     public async Task<IActionResult> Update(
         int tournamentId, [FromBody] UpdateTournamentRequest request, CancellationToken cancellationToken) =>
         Ok(await tournaments.UpdateAsync(GetEmployeeId(), tournamentId, request, cancellationToken));
 
     [HttpPost("admin/tournaments/{tournamentId:int}/transitions")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.TournamentManage)]
     public async Task<IActionResult> Transition(
         int tournamentId, [FromBody] TransitionTournamentRequest request,
@@ -111,6 +118,7 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
     }
 
     [HttpGet("admin/tournaments/{tournamentId:int}/registrations")]
+    [Authorize(Policy = ApiPolicies.ActiveAccount)]
     [Authorize(Policy = ApiPolicies.TournamentView)]
     public async Task<IActionResult> GetAdminRegistrations(int tournamentId, CancellationToken cancellationToken)
     {

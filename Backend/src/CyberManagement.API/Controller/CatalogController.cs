@@ -2,11 +2,13 @@ using CyberManagement.Application.DTOs.Catalog;
 using CyberManagement.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using CyberManagement.API.Security;
 
 namespace CyberManagement.API.Controller;
 
 [ApiController]
 [Route("api/admin")]
+[Authorize(Policy = ApiPolicies.ActiveAccount)]
 [Authorize(Roles = "Admin,Manager,Cashier,Waiter,Technician")]
 public sealed class CatalogController(CatalogService catalog) : ControllerBase
 {
