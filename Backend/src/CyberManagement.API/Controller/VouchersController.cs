@@ -1,4 +1,5 @@
 using CyberManagement.Application.DTOs.Vouchers;
+using CyberManagement.Application.DTOs.Realtime;
 using CyberManagement.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +14,7 @@ namespace CyberManagement.API.Controller;
 [ProducesResponseType(StatusCodes.Status403Forbidden)]
 [ProducesResponseType(StatusCodes.Status404NotFound)]
 [ProducesResponseType(StatusCodes.Status409Conflict)]
-public sealed class VouchersController(IVoucherService vouchers) : ControllerBase
+public sealed class VouchersController(IVoucherService vouchers, IRealtimePublisher publisher) : ControllerBase
 {
     // Quyền đọc và quyền quản lý được kiểm tra riêng.
     [HttpGet]
@@ -35,6 +36,7 @@ public sealed class VouchersController(IVoucherService vouchers) : ControllerBas
         CancellationToken cancellationToken)
     {
         var result = await vouchers.CreateAsync(request, cancellationToken);
+        await PublishChangedAsync(result.Id);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
@@ -42,14 +44,28 @@ public sealed class VouchersController(IVoucherService vouchers) : ControllerBas
     [Authorize(Policy = "permission:promotion.manage")]
     [ProducesResponseType<VoucherDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<VoucherDto>> Update(int id, [FromBody] SaveVoucherRequest request,
-        CancellationToken cancellationToken) =>
-        Ok(await vouchers.UpdateAsync(id, request, cancellationToken));
+        CancellationToken cancellationToken)
+    {
+        var result = await vouchers.UpdateAsync(id, request, cancellationToken);
+        await PublishChangedAsync(result.Id);
+        return Ok(result);
+    }
 
     // Tắt voucher thay cho xóa lịch sử.
     [HttpPut("{id:int}/status")]
     [Authorize(Policy = "permission:promotion.manage")]
     [ProducesResponseType<VoucherDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<VoucherDto>> UpdateStatus(int id, [FromBody] UpdateVoucherStatusRequest request,
-        CancellationToken cancellationToken) =>
-        Ok(await vouchers.UpdateStatusAsync(id, request, cancellationToken));
+        CancellationToken cancellationToken)
+    {
+        var result = await vouchers.UpdateStatusAsync(id, request, cancellationToken);
+        await PublishChangedAsync(result.Id);
+        return Ok(result);
+    }
+
+    // Management services return after commit; cancellation must not suppress a committed change.
+    private Task PublishChangedAsync(int id) =>
+        publisher.PublishToPermissionAsync("promotion.view",
+            new RealtimeEvent(Guid.NewGuid(), RealtimeEvent.PromotionChanged, id, DateTimeOffset.UtcNow),
+            CancellationToken.None);
 }

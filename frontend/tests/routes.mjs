@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { cdp, evaluate, until, screenshot, errors, socket, go, input, outputDir } from './cdp.mjs';
 
-const admin = ['dashboard', 'computers', 'customers', 'orders', 'products', 'inventory', 'invoices', 'tournaments', 'staff', 'reports'];
+const admin = ['dashboard', 'computers', 'customers', 'orders', 'products', 'promotions', 'inventory', 'invoices', 'tournaments', 'staff', 'reports'];
 const client = ['home', 'ordering', 'wallet', 'invoices', 'account', 'tournaments'];
 const results = [];
 try {
@@ -11,7 +11,8 @@ try {
   await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
     window.fetch = async url => {
       const path = new URL(url, location.href).pathname;
-      if (path === '/api/auth/me') return Response.json({ employeeId: 4, username: 'test-admin', role: 'Admin', permissions: ['order.view', 'computer.view', 'customer.view', 'product.view', 'stockreceipt.view', 'invoice.view', 'tournament.view', 'employee.view', 'report.view', 'promotion.manage'] });
+      if (path === '/api/auth/me') return Response.json({ employeeId: 4, username: 'test-admin', role: 'Admin', permissions: ['order.view', 'computer.view', 'customer.view', 'product.view', 'stockreceipt.view', 'invoice.view', 'tournament.view', 'employee.view', 'report.view', 'promotion.view', 'promotion.manage'] });
+      if (path === '/api/admin/vouchers') return Response.json([]);
       if (path === '/api/auth/customer/me') return Response.json({ customerId: 7, phone: '0900000007', fullName: 'Test customer' });
       return Response.json({ message: 'Unexpected request.' }, { status: 500 });
     };
@@ -100,10 +101,11 @@ try {
   await evaluate('localStorage.clear()');
   await go('/client/auth', 'document.querySelector(".auth-form")');
   await evaluate('localStorage.setItem("cybermanagement.auth.v1", JSON.stringify({ accessToken: "employee-browser-test-token", accountType: "employee" }))');
-  await go('/admin/promotions', 'document.querySelector(".placeholder")');
-  assert.ok(await evaluate("document.body.innerText.includes('CHƯA TRIỂN KHAI')"), 'Promotion placeholder remains documented');
+  await go('/admin/promotions');
+  await until('document.body.innerText.includes("Chưa có voucher.")');
+  assert.equal(await evaluate("document.body.innerText.includes('CHƯA TRIỂN KHAI')"), false, 'Voucher route is implemented');
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ passed: true, routeViewportChecks: results.length, widths: [1440, 1024, 768, 390, 320], redirects: 4, authForms: 2, permissionGuard: true, expiredSession: true, documentedPlaceholders: 1 }));
+  console.log(JSON.stringify({ passed: true, routeViewportChecks: results.length, widths: [1440, 1024, 768, 390, 320], redirects: 4, authForms: 2, permissionGuard: true, expiredSession: true, documentedPlaceholders: 0 }));
 } finally {
   await writeFile(outputDir + '/routes.json', JSON.stringify({ results, errors }, null, 2));
   socket.close();

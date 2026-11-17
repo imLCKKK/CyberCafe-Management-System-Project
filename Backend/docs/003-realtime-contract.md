@@ -33,6 +33,7 @@ Tham chiếu cơ chế nền: [Microsoft — SignalR authentication/authorizatio
 | `ComputerChanged` | Nhóm `permission:computer.view` | Trạng thái máy thực sự thay đổi và đã lưu thành công |
 | `TournamentChanged` | Nhóm `permission:tournament.view` và `tournament:public` | Thông tin giải đã đổi và commit thành công |
 | `RegistrationChanged` | Nhóm `permission:tournament.view` và `tournament:public` | Danh sách đăng ký đã đổi và commit thành công |
+| `PromotionChanged` | Nhóm `permission:promotion.view` | Tạo/sửa/bật–tắt voucher đã commit; `entityId` là PromotionId, client đọc lại API quản trị |
 
 Payload `ComputerChanged` dùng cùng envelope [RealtimeEvent](../src/CyberManagement.Application/DTOs/Realtime/RealtimeEvent.cs):
 

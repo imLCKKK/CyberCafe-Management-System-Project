@@ -17,6 +17,7 @@ const employee = {
     'tournament.view',
     'employee.view',
     'report.view',
+    'promotion.view',
     'promotion.manage',
   ],
 };
@@ -41,6 +42,7 @@ export function getPrincipalDestination(principal) {
     ['computer.view', '/admin/computers'],
     ['customer.view', '/admin/customers'],
     ['product.view', '/admin/products'],
+    ['promotion.view', '/admin/promotions'],
     ['stockreceipt.view', '/admin/inventory'],
     ['invoice.view', '/admin/invoices'],
     ['tournament.view', '/admin/tournaments'],

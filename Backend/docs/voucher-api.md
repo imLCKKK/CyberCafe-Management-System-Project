@@ -3,6 +3,25 @@
 Rule chung: [contract kho/chứng từ/voucher](../../docs/contracts/inventory-invoice-voucher.md#4-quy-tắc-voucher).
 Không thêm migration: dùng Promotions, PromotionUsages và snapshot Order/OrderDetail hiện có.
 
+## UI quản trị — SCRUM-19 / S2-D-3
+
+Menu **Voucher**, route `/admin/promotions`, dùng API bên dưới; không lưu voucher
+vào localStorage và không fallback dữ liệu demo. Quyền `promotion.view` cho phép
+xem/tìm/lọc; `promotion.manage` cho phép tạo/sửa/bật–tắt khi có quyền xem.
+Không xóa cứng; server vẫn là nơi kiểm tra mã trùng, mã đã có lịch sử và rule.
+
+Ngày trên form/list là giờ Việt Nam UTC+07:00, gửi UTC về server; kết thúc là
+mốc loại trừ. Trần giảm/hạn mức để trống gửi `null`, không gửi `0`.
+UI chỉ nhận tiền nguyên đồng trong giới hạn số nguyên an toàn JavaScript
+(`9,007,199,254,740,991`), không tự làm tròn số vượt giới hạn.
+
+Sau khi service quản trị commit, controller phát `PromotionChanged` bằng
+envelope [realtime chung](003-realtime-contract.md) tới **permission:promotion.view**.
+Không gửi rule, tên khách hoặc dữ liệu lượt dùng trong event. Khách và nhân viên
+không có quyền xem không nhận event này. Request thất bại không phát event.
+UI refetch khi nhận event và khi kết nối/reconnect; bộ lọc và nội dung form đang
+nhập được giữ. Thông báo best effort dùng publisher chung; chưa có outbox.
+
 ## Endpoint và quyền
 
 | Method | Route | Quyền | Thành công |
@@ -87,3 +106,19 @@ Chỉ dùng database GUID do fixture tạo, migrate mới và tự dọn; không
 Kiểm tra quyền HTTP, validation, giá server, trần/làm tròn/phân bổ, hạn mức toàn hệ thống/từng khách,
 retry, snapshot sau sửa rule, hoàn lượt một lần khi Cancelled/Expired, trả lại hạn mức,
 rollback cả trạng thái hết hạn và lượt dùng, cùng hai DbContext tranh lượt cuối.
+Các checks cũng kiểm tra create/update/status phát event sau commit cho Admin
+và Cashier chỉ đọc; Waiter/khách không nhận event, request lỗi không phát event.
+
+Kiểm tra trình duyệt UI → Vite → Kestrel/SignalR → SQL thật, vẫn dùng DB GUID
+fixture và tự dọn, từ gốc repository sau khi đặt `AUTH_CHECKS_SQL_CONNECTION`:
+
+```powershell
+npm.cmd --prefix frontend run test:vouchers
+npm.cmd --prefix frontend run test:vouchers:sql
+```
+
+Suite live cần Chrome/Edge (hoặc `CHROME_PATH`), không dùng DB nghiệp vụ.
+Bao phủ tạo %; sửa cố định; null hạn mức; lưu sau reload; bật/tắt; thay đổi từ
+HTTP client khác hiện trên UI qua event; lỗi trùng mã giữ form; lỗi mạng/thử lại;
+layout mobile; Cashier chỉ đọc và API ghi 403; Waiter bị chặn; anonymous 401.
+Đây là kiểm tra local, không thay nghiệm thu hai máy vật lý LAN.
