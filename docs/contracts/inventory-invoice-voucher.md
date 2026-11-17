@@ -153,6 +153,12 @@ backfill có kiểm tra, không cast long sang int nếu vượt phạm vi hoặ
   không đổi tên/đổi dấu hàng loạt khi chưa đối soát.
 - Unique có điều kiện (OrderDetailId,Type) khi OrderDetailId khác null theo policy đặt/hủy cả dòng
   một lần; không dùng constraint này để tuyên bố đã hỗ trợ giao/hoàn nhiều lần cùng dòng.
+- Khi lấy Product để cập nhật, phải đọc tồn/trạng thái bán hiện tại từ SQL dưới khóa,
+  kể cả khi entity đã được DbContext theo dõi và đang Modified vì sửa tên/giá.
+  Giữ chỉnh sửa hợp lệ ở các trường khác, đồng bộ lại giá trị gốc EF; từ chối sửa Stock/IsActive
+  trước lần lấy khóa đầu tiên. Trong cùng transaction đã giữ khóa, các lần gọi tiếp theo giữ
+  thay đổi đang chờ lưu; thông tin đã giữ khóa không được dùng lại sang transaction khác.
+
 - Không cascade xóa lịch sử. Receive từ phiếu nhập và API nhập phải dùng cùng nguồn,
   không để một phiếu được cộng tồn hai lần.
 
@@ -293,6 +299,17 @@ Bảng dưới quy định endpoint đích, dữ liệu và quyền bắt buộc
 POST movements là một route; server xác thực và kiểm tra quyền theo type đã validate:
 Receive cần stockreceipt.create, Adjust cần inventory.adjust. Không kiểm tra chỉ một quyền rồi cho
 client đổi type để thực hiện nhánh khác. Sale/Return không nhận từ endpoint nhập/điều chỉnh.
+
+**Idempotency cho nhập/điều chỉnh thủ công.** POST movements bắt buộc đúng một header
+`Idempotency-Key` là UUID dạng chuẩn `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`, khác UUID rỗng.
+Caller tạo khóa một lần cho một thao tác chủ động và giữ nguyên khóa khi retry; thao tác mới dùng khóa mới.
+Server lấy EmployeeId từ JWT và lưu OperationKey theo dạng `Manual:{employeeId}:{uuid-N}`;
+khóa được chuẩn hóa UUID và có phạm vi theo nhân viên, tách khỏi khóa Sale/Return của đơn.
+Payload đối chiếu gồm ProductId, Type, QuantityDelta, Reason đã trim và nhân viên thực hiện.
+Cùng khóa/cùng payload trả HTTP 201 với đúng movement ID, thời điểm và StockAfter của lần đầu;
+không cập nhật tồn hoặc thêm lịch sử. Cùng khóa/khác payload trả 409, thiếu/sai khóa trả 400.
+Quyền Receive/Adjust vẫn được kiểm tra trên mỗi request, kể cả retry.
+Service kiểm tra lại khóa sau khi giữ khóa Product; unique OperationKey chặn va chạm giữa các nguồn khác nhau.
 
 Chốt cho API quản trị kho: stockreceipt.view cho danh sách tồn và sổ biến động;
 product.view chỉ cho chức năng xem sản phẩm, không tự cấp quyền xem sổ kho.

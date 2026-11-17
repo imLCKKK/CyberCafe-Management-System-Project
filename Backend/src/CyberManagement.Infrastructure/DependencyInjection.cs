@@ -1,4 +1,4 @@
-﻿using CyberManagement.Application.Interfaces.Repositories;
+using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Infrastructure.Persistance;
 using CyberManagement.Infrastructure.Repositories;
@@ -28,6 +28,9 @@ public static class DependencyInjection
                 b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<IInventoryQueries, InventoryQueries>();
+        services.AddScoped<IInventoryRepository, InventoryRepository>();
+        services.AddScoped<IInventoryMovementRepository,InventoryMovementRepository>();
+        services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
         services.AddScoped<ICatalogRepository, CatalogRepository>();
         services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
         services.AddScoped<IComputerRepository, ComputerRepository>();
@@ -38,7 +41,12 @@ public static class DependencyInjection
         services.AddScoped<ISessionSettlement, SessionSettlement>();
         services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
         services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
+        services.AddScoped<IVoucherRepository, VoucherRepository>();
+        services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
+        services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
 
+        services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
         return services;
     }
 }
