@@ -4,6 +4,9 @@ namespace CyberManagement.Application.Interfaces.Repositories;
 
 public interface ITournamentRepository
 {
+    Task<string> GetStatsRiotIdAsync(int tournamentId, int registrationId, int? ownerId, CancellationToken token);
+    Task<(OpggSnapshot Snapshot, bool Changed)> SaveStatsAsync(int tournamentId, int registrationId, int? ownerId,
+        string riotId, string canonical, CancellationToken token);
     Task RequireActiveEmployeeAsync(int employeeId, CancellationToken cancellationToken);
     Task<IReadOnlyList<GameDto>> GetGamesAsync(bool includeInactive, CancellationToken cancellationToken);
     Task<IReadOnlyList<GameRankDto>> GetRanksAsync(int gameId, CancellationToken cancellationToken);

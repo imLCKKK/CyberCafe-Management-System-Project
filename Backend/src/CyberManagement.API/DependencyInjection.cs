@@ -14,6 +14,13 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddHttpClient<IOpggCollector, OpggCollector>(client =>
+        {
+            var port = configuration.GetValue("Opgg:AdapterPort", 8787);
+            client.BaseAddress = new Uri($"http://127.0.0.1:{port}/");
+            client.Timeout = TimeSpan.FromSeconds(28);
+            client.MaxResponseContentBufferSize = 16 * 1024;
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false });
         services.AddProblemDetails();
         services.AddExceptionHandler<ExceptionHandling.ApiExceptionHandler>();
         services.AddSignalR();

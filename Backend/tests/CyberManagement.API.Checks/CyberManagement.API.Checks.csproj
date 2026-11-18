@@ -20,4 +20,8 @@
     <ProjectReference Include="..\..\src\CyberManagement.API\CyberManagement.API.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="../../integrations/opgg/fixtures/snapshot-hash.json" Link="fixtures/snapshot-hash.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

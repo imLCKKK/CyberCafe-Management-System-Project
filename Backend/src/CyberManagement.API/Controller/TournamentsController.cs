@@ -118,6 +118,21 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
         return Ok(await tournaments.GetAdminRegistrationsAsync(tournamentId, cancellationToken));
     }
 
+    [HttpPost("client/tournaments/{tournamentId:int}/registrations/{registrationId:int}/opgg/refresh")]
+    [Authorize(Roles = "Customer")]
+    public async Task<IActionResult> RefreshOwnStats(int tournamentId, int registrationId,
+        [FromBody] RefreshOpggRequest request, CancellationToken token) =>
+        Ok(await tournaments.RefreshStatsAsync(tournamentId, registrationId, GetOwnCustomerId(), token));
+
+    [HttpPost("admin/tournaments/{tournamentId:int}/registrations/{registrationId:int}/opgg/refresh")]
+    [Authorize(Policy = ApiPolicies.TournamentManage)]
+    public async Task<IActionResult> RefreshRegistrationStats(int tournamentId, int registrationId,
+        [FromBody] RefreshOpggRequest request, CancellationToken token)
+    {
+        await tournaments.RequireActiveEmployeeAsync(GetEmployeeId(), token);
+        return Ok(await tournaments.RefreshStatsAsync(tournamentId, registrationId, null, token));
+    }
+
     private int GetOwnCustomerId()
     {
         var claim = User.FindFirstValue("customer_id");

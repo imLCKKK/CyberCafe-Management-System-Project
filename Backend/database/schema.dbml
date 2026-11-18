@@ -143,6 +143,7 @@ Table dbo.GamingSessions {
   CustomerId int [not null]
   EndTime datetime2 [null]
   LastChargedAt datetime2 [null]
+  PricePerHourSnapshot decimal(18,0) [null]
   StartTime datetime2 [not null]
   Status nvarchar(50) [not null]
   TotalCost decimal(18,0) [not null]
@@ -368,6 +369,16 @@ Table dbo.RefundAttempts {
     (ProviderAppId, MerchantRefundId) [name: 'IX_RefundAttempts_ProviderAppId_MerchantRefundId', unique]
   }
 }
+Table dbo.RegistrationStatsSnapshots {
+  SnapshotId uniqueidentifier [not null, pk]
+  CanonicalJson nvarchar(max) [not null]
+  FetchedAt datetimeoffset [not null]
+  RegistrationId int [not null]
+  RiotId nvarchar(128) [not null]
+  indexes {
+    (RegistrationId, RiotId, FetchedAt) [name: 'IX_RegistrationStatsSnapshots_RegistrationId_RiotId_FetchedAt', unique]
+  }
+}
 Table dbo.RolePermissions {
   RoleId int [not null]
   PermissionId int [not null]
@@ -454,7 +465,9 @@ Table dbo.Teams {
 }
 Table dbo.TournamentRegistrations {
   RegistrationId int [not null, pk, increment]
+  ChargeTransactionId int [null]
   CustomerId int [not null]
+  FeeCharged decimal(18,0) [null]
   HoursPlayed int [not null]
   PreferredRole nvarchar(50) [null]
   RankId int [not null]
@@ -465,6 +478,7 @@ Table dbo.TournamentRegistrations {
   TournamentId int [not null]
   WinRate decimal(5,2) [not null]
   indexes {
+    (ChargeTransactionId) [name: 'IX_TournamentRegistrations_ChargeTransactionId', unique]
     (CustomerId) [name: 'IX_TournamentRegistrations_CustomerId']
     (RankId) [name: 'IX_TournamentRegistrations_RankId']
     (TournamentId, CustomerId) [name: 'IX_TournamentRegistrations_TournamentId_CustomerId', unique]
@@ -486,6 +500,19 @@ Table dbo.Tournaments {
   indexes {
     (CreatedBy, CreateRequestKey) [name: 'IX_Tournaments_CreatedBy_CreateRequestKey', unique]
     (GameId) [name: 'IX_Tournaments_GameId']
+  }
+}
+Table dbo.TournamentTransitions {
+  TournamentTransitionId int [not null, pk, increment]
+  EmployeeId int [not null]
+  ExpectedVersion nvarchar(12) [not null]
+  RequestKey nvarchar(100) [not null]
+  ResponseJson nvarchar(max) [not null]
+  ToStatus nvarchar(50) [not null]
+  TournamentId int [not null]
+  indexes {
+    (EmployeeId) [name: 'IX_TournamentTransitions_EmployeeId']
+    (TournamentId, EmployeeId, RequestKey) [name: 'IX_TournamentTransitions_TournamentId_EmployeeId_RequestKey', unique]
   }
 }
 Table dbo.WalletTransactions {
@@ -558,6 +585,7 @@ Ref: dbo.PromotionUsages.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.PromotionUsages.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.PromotionUsages.(PromotionId) > dbo.Promotions.(PromotionId)
 Ref: dbo.RefundAttempts.(PaymentId) > dbo.Payments.(PaymentId)
+Ref: dbo.RegistrationStatsSnapshots.(RegistrationId) > dbo.TournamentRegistrations.(RegistrationId)
 Ref: dbo.RolePermissions.(PermissionId) > dbo.Permissions.(PermissionId)
 Ref: dbo.RolePermissions.(RoleId) > dbo.Roles.(RoleId)
 Ref: dbo.SessionCharges.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
@@ -572,8 +600,11 @@ Ref: dbo.Teams.(TournamentId) > dbo.Tournaments.(TournamentId)
 Ref: dbo.TournamentRegistrations.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.TournamentRegistrations.(RankId) > dbo.GameRanks.(RankId)
 Ref: dbo.TournamentRegistrations.(TournamentId) > dbo.Tournaments.(TournamentId)
+Ref: dbo.TournamentRegistrations.(ChargeTransactionId) > dbo.WalletTransactions.(TransactionId)
 Ref: dbo.Tournaments.(CreatedBy) > dbo.Employees.(EmployeeId)
 Ref: dbo.Tournaments.(GameId) > dbo.Games.(GameId)
+Ref: dbo.TournamentTransitions.(EmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.TournamentTransitions.(TournamentId) > dbo.Tournaments.(TournamentId)
 Ref: dbo.WalletTransactions.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.WalletTransactions.(ActorEmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.WalletTransactions.(OriginalDebitId) > dbo.WalletTransactions.(TransactionId)

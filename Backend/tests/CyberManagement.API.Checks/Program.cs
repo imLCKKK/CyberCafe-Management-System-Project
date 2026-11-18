@@ -98,6 +98,10 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     ["SeedAccounts:Waiter:Password"] = "Waiter-check-password-2026!",
     ["SeedAccounts:Technician:Password"] = "Technician-check-password-2026!"
 });
+var opggLive = args.Contains("--opgg-live");
+var opggChecks = opggLive || args.Contains("--opgg-checks");
+if (opggLive && databaseFixture.Provider != "SQL Server")
+    throw new ArgumentException("--opgg-live requires AUTH_CHECKS_SQL_CONNECTION for an isolated SQL database.");
 var realtimeSaveFailure = new RealtimeSaveFailure();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
@@ -106,6 +110,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 });
 builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
+var opggTransport = new OpggCheckTransport();
+if (opggChecks)
+    builder.Services.AddHttpClient<IOpggCollector, OpggCollector>().AddHttpMessageHandler(() => opggTransport);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
@@ -263,6 +270,12 @@ try
             await SendWithToken(HttpMethod.Get, "/api/auth/me", login.AccessToken));
         await CheckStatus($"{account.Role} cannot manage roles", HttpStatusCode.Forbidden,
             await SendWithToken(HttpMethod.Get, "/api/admin/roles", login.AccessToken));
+    }
+
+    if (opggChecks)
+    {
+        await OpggChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken, opggTransport, opggLive);
+        return;
     }
 
     if (!catalogOnly && !customerOnly && !walletOnly)
