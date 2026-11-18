@@ -10,7 +10,8 @@ function validateCatalog(categories, products) {
   }
   return {
     product_categories: categories.map(c => ({ id: c.id, name: c.name, is_active: c.isActive })),
-    products: products.map(p => ({ id: p.id, name: p.name, category_id: p.categoryId, current_price: p.currentPrice, stock_quantity: p.stockQuantity, is_active: p.isActive })),
+    products: products.map(p => ({ id: p.id, name: p.name, category_id: p.categoryId, current_price: p.currentPrice, stock_quantity: p.stockQuantity, is_active: p.isActive,
+      image_url: typeof p.imageUrl === 'string' ? p.imageUrl.trim() || null : null })),
     order_items: [],
   };
 }
@@ -34,7 +35,7 @@ export function saveCategory(form) {
 
 export function saveProduct(form) {
   return apiRequest(`/admin/products${form.id ? `/${form.id}` : ''}`, {
-    method: form.id ? 'PUT' : 'POST', body: JSON.stringify({ name: form.name, categoryId: Number(form.category_id), currentPrice: Number(form.current_price), isActive: form.is_active }),
+    method: form.id ? 'PUT' : 'POST', body: JSON.stringify({ name: form.name, categoryId: Number(form.category_id), currentPrice: Number(form.current_price), isActive: form.is_active, imageUrl: form.image_url }),
   });
 }
 

@@ -23,6 +23,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
+if (args.Contains("--menu-seed-only"))
+{
+    await NexoraMenuSeedChecks.RunAsync();
+    return;
+}
+
 if (args.Contains("--voucher-only"))
 {
     Console.WriteLine($"{await VoucherChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} voucher SQL/API checks passed.");

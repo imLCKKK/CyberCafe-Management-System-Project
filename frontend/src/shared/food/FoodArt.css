@@ -1,0 +1,76 @@
+.home-food-art.food-photo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--bg, #0b0f14);
+}
+
+.home-food-art.food-photo.food-art-small {
+  width: 48px;
+  height: 48px;
+  min-height: 0;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+
+.home-food-card .home-food-art.food-photo {
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.home-food-art.food-photo > img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.home-food-art.food-photo > .food-art-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  transform: none;
+  filter: none;
+  color: var(--muted);
+  background: radial-gradient(ellipse at center, rgba(var(--purple-rgb), .12), transparent 75%);
+}
+
+.food-art-placeholder > svg { color: var(--accent); opacity: .7; }
+.food-art-placeholder > span { font-size: 12px; }
+.home-food-card:hover .food-photo > .food-art-placeholder { transform: none; }
+
+.today-teaser-food .home-food-art.food-photo {
+  width: 72px;
+  height: 72px;
+  border-radius: 9px;
+}
+
+.today-wheel-art .home-food-art.food-photo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto;
+  border-radius: 9px;
+}
+
+.today-prize-hero .home-food-art.food-photo {
+  width: min(100%, 270px);
+  height: auto;
+  aspect-ratio: 1;
+  margin: 14px auto 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+@media (max-width: 480px) {
+  .home-food-card .home-food-art.food-photo { aspect-ratio: auto; }
+  .today-prize-hero .home-food-art.food-photo { width: min(100%, 220px); }
+}

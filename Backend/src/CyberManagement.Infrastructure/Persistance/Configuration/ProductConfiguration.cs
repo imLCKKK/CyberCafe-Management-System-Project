@@ -12,6 +12,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasKey(x => x.ProductId);
 
         builder.Property(x => x.ProductName).HasMaxLength(150).IsRequired();
+        builder.Property(x => x.ImageUrl).HasMaxLength(500);
         builder.Property(x => x.Price).HasPrecision(18, 0);
 
         builder.HasOne(x => x.Category)

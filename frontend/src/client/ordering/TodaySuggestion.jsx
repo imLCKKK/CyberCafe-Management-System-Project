@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, Check, Dices, RotateCw, Sparkles } from 'lucide-react';
-import { productArt } from '../shared/demoData';
+import { FoodArt } from '../../shared/food/FoodArt';
 import { money } from '../shared/demoModel';
 import { pickWeightedProduct, remainingStock } from './recommendation';
 import SuggestionResultDialog from './SuggestionResultDialog';
@@ -13,7 +13,7 @@ export function TodaySuggestionTeaser({ db, onOpen }) {
   const showcase = available.slice(0, 3);
   return <button type="button" className="today-teaser" onClick={onOpen} aria-label="Hôm nay ăn gì? Khám phá vòng quay gợi ý món">
     <span className="today-teaser-copy"><span className="today-eyebrow"><Sparkles size={13}/> CHƯA BIẾT CHỌN MÓN NÀO?</span><span className="today-teaser-title">Hôm nay <em>ăn gì?</em></span><span className="today-teaser-description">Một vòng quay, một món ngon.<br/>Để NEXORA chọn giúp bạn nhé!</span><span className="today-teaser-cta">Khám phá ngay <ArrowUpRight size={18}/></span></span>
-    <span className="today-teaser-art" aria-hidden="true"><span className="today-teaser-orbit"/>{showcase.map((product, index) => <span className={`today-teaser-food today-teaser-food-${index}`} key={product.id}><span>{productArt[product.id] || '🍽️'}</span><small>{product.name}</small></span>)}<span className="today-teaser-dice"><Dices size={23}/></span><span className="today-teaser-hint"><Sparkles size={11}/> Khám phá món mới</span></span>
+    <span className="today-teaser-art" aria-hidden="true"><span className="today-teaser-orbit"/>{showcase.map((product, index) => <span className={`today-teaser-food today-teaser-food-${index}`} key={product.id}><FoodArt product={product} inline/><small>{product.name}</small></span>)}<span className="today-teaser-dice"><Dices size={23}/></span><span className="today-teaser-hint"><Sparkles size={11}/> Khám phá món mới</span></span>
   </button>;
 }
 
@@ -98,7 +98,7 @@ export default function TodaySuggestion({ db, category, onCategoryChange, cart, 
     <div className="today-machine-heading"><span><i/>{phase === 'spinning' ? 'Đang tìm món ngon…' : 'Sẵn sàng khám phá'}</span><span>{available.length} món còn hàng</span></div>
     <div className={`today-wheel ${phase === 'spinning' ? 'spinning' : ''}`} ref={viewportRef} aria-hidden="true">
       <div className="today-wheel-track" ref={trackRef} onTransitionEnd={(event) => { if (phase === 'spinning' && event.target === trackRef.current && event.propertyName === 'transform') { setPhase('done'); setResultOpen(true); } }}>
-        {visible.map((product, index) => <div className={`today-wheel-card ${winner && index === (sequence.length === 1 ? 0 : WINNER_INDEX) ? 'is-winner' : ''}`} key={`${product.id}-${index}`}><span className="today-wheel-art">{productArt[product.id] || '🍽️'}</span><span>{product.name}</span><small>{money(product.current_price)}</small></div>)}
+        {visible.map((product, index) => <div className={`today-wheel-card ${winner && index === (sequence.length === 1 ? 0 : WINNER_INDEX) ? 'is-winner' : ''}`} key={`${product.id}-${index}`}><span className="today-wheel-art"><FoodArt product={product} inline eager/></span><span>{product.name}</span><small>{money(product.current_price)}</small></div>)}
       </div>
       <div className="today-wheel-focus"/>
     </div>
