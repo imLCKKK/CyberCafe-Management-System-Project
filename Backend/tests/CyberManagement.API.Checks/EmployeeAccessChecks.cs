@@ -349,6 +349,7 @@ internal static class EmployeeAccessChecks
             {
                 using var request = new HttpRequestMessage(method, path);
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
                 if (body is not null)
                     request.Content = JsonContent.Create(body);
                 return await client.SendAsync(request);
@@ -405,7 +406,10 @@ internal static class EmployeeAccessChecks
         {
             using var request = new HttpRequestMessage(method, path);
             if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            if (method == HttpMethod.Post && path == "/api/employees")
+            var requiresIdempotency = method == HttpMethod.Put
+                || (method == HttpMethod.Post && path.StartsWith("/api/employees", StringComparison.Ordinal))
+                || path == "/api/auth/change-password";
+            if (requiresIdempotency)
                 request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
             if (body is not null) request.Content = JsonContent.Create(body);
             using var response = await client.SendAsync(request);

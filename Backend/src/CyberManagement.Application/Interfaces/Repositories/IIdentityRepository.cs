@@ -22,6 +22,9 @@ public interface IIdentityRepository
 
     Task<Employee?> GetEmployeeByCreateKeyAsync(string createRequestKey, CancellationToken cancellationToken);
 
+    Task<AuditLog?> GetEmployeeMutationAsync(
+        int actorEmployeeId, string requestKey, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<Employee>> GetAllEmployeesAsync(CancellationToken cancellationToken);
 
     void AddRole(Role role);
@@ -39,7 +42,11 @@ public interface IIdentityRepository
     void UpdateEmployee(Employee employee);
 
     Task SaveEmployeeWithAuditAsync(
-        Employee employee, AuditLog audit, bool preserveAnotherActiveAdmin, CancellationToken cancellationToken);
+        Employee employee,
+        AuditLog audit,
+        bool preserveAnotherActiveAdmin,
+        CancellationToken cancellationToken,
+        Func<Employee, string>? mutationResponse = null);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }

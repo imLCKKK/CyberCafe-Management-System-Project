@@ -46,8 +46,6 @@ async function fillForm(name, phone, role) {
   await input('dialog [name=display_name]', name);
   await input('dialog [name=phone]', phone);
   await input('dialog [name=role]', role);
-  await input('dialog [name=position]', 'Thu ngân');
-  await input('dialog [name=shift]', '08:00–16:00');
 }
 async function openCreate() {
   await click('Thêm nhân viên');
@@ -84,6 +82,7 @@ try {
 
   await openCreate();
   const waiterId = await roleId('Waiter');
+  await input('dialog [name=username]', '0900017011');
   await fillForm('SQL Staff Created', '0900017011', waiterId);
   await input('dialog [name=password]', 'Staff-live-password-2026!');
   await submit();
@@ -114,6 +113,8 @@ try {
     [...row.querySelectorAll("button")].find(button => button.textContent === "Chỉnh sửa").click();
   })()`);
   await until('Boolean(document.querySelector("dialog select[name=role]"))');
+  assert.equal(await evaluate('document.querySelector("dialog input[name=username]").value'), saved.username);
+  assert.equal(await evaluate('document.querySelector("dialog input[name=username]").readOnly'), true);
   assert.equal(await evaluate('document.querySelector("dialog select[name=role]").value'), String(waiterId));
   const managerId = await roleId('Manager');
   await fillForm('SQL Staff Updated', '0900017022', managerId);
@@ -132,6 +133,7 @@ try {
   assert.equal(put?.status, 200);
   assert.equal(JSON.parse(put.body).roleId, managerId);
   assert.equal(JSON.parse(put.body).expectedVersion, saved.version);
+  assert.equal(Object.hasOwn(JSON.parse(put.body), 'username'), false);
   assert.equal(updated.audits.length, created.audits.length + 1);
   assert.equal(updated.audits.at(-1).employeeId, adminId);
   assert.equal(updated.audits.at(-1).entityId, saved.employeeId);
@@ -146,6 +148,7 @@ try {
   console.log('PASS real staff edit + role change -> PUT 200 with expectedVersion -> independent SQL/GET read -> reload preserves new profile and role');
 
   await openCreate();
+  await input('dialog [name=username]', '0900017011');
   await fillForm('Rejected duplicate', '0900017011', waiterId);
   await input('dialog [name=password]', 'Staff-live-password-2026!');
   await submit();

@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { FormDialog } from '../shared/AdminUI';
-import { employeesApi } from '../shared/employeesApi';
+import { employeesApi, newEmployeeCreateKey } from '../shared/employeesApi';
 
 export default function ChangePasswordDialog({ onClose, onSaved }) {
+  const passwordIntent = useRef(null);
+
   return <FormDialog
     title="Đổi mật khẩu của tôi"
     description="Mật khẩu mới có 12–72 ký tự, ít nhất một chữ và một số, khác mật khẩu hiện tại."
@@ -16,7 +18,11 @@ export default function ChangePasswordDialog({ onClose, onSaved }) {
     onClose={onClose}
     onSave={async (form) => {
       if (form.newPassword !== form.confirmNewPassword) throw new Error('Xác nhận mật khẩu mới không khớp.');
-      await employeesApi.changePassword(form);
+      const fingerprint = JSON.stringify(form);
+      if (passwordIntent.current?.fingerprint !== fingerprint)
+        passwordIntent.current = { fingerprint, key: newEmployeeCreateKey() };
+      await employeesApi.changePassword(form, passwordIntent.current.key);
+      passwordIntent.current = null;
       onSaved();
     }}
   />;

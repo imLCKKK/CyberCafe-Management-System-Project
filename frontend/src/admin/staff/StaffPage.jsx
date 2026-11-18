@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, ShieldCheck, UserCheck, Users, History } from 'lucide-react';
 import { useAdminAction } from '../shared/AdminContext';
 import { AdminPage, StatCard, Panel, Table, Toolbar, Filter, Status, Notice, DetailDialog, FormDialog, Row } from '../shared/AdminUI';
 import { dateTime, matches } from '../shared/adminModel';
 import { DonutChart } from '../shared/Charts';
 import PersonForm from '../shared/PersonForm';
-import { employeesApi } from '../shared/employeesApi';
+import { employeesApi, newEmployeeCreateKey } from '../shared/employeesApi';
 import { useAuth } from '../../shared/auth/AuthContext';
 
 export function StaffPage() {
@@ -17,6 +17,7 @@ export function StaffPage() {
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
+  const statusIntent = useRef(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -51,6 +52,7 @@ export function StaffPage() {
   const hasServerData = !loading && employees !== null;
   const people = (employees ?? []).map(e => ({
         id: e.employeeId,
+        username: e.username,
         display_name: e.fullName,
         phone: e.phone || '',
         role: e.roleName,
@@ -65,11 +67,15 @@ export function StaffPage() {
 
   const handleLockUnlock = async (employee) => {
     if (!hasServerData || !canManage) throw new Error('Bạn chưa có dữ liệu hoặc quyền quản lý nhân viên.');
+    const fingerprint = `${employee.id}:${employee.is_active ? 'lock' : 'unlock'}`;
+    if (statusIntent.current?.fingerprint !== fingerprint)
+      statusIntent.current = { fingerprint, key: newEmployeeCreateKey() };
     if (employee.is_active) {
-      await employeesApi.lock(employee.id);
+      await employeesApi.lock(employee.id, statusIntent.current.key);
     } else {
-      await employeesApi.unlock(employee.id);
+      await employeesApi.unlock(employee.id, statusIntent.current.key);
     }
+    statusIntent.current = null;
     setNotice(`Đã ${employee.is_active ? 'khóa' : 'mở khóa'} tài khoản nhân viên.`);
     reloadEmployees();
   };

@@ -29,28 +29,32 @@ export const employeesApi = {
     });
   },
 
-  async update(employeeId, data) {
+  async update(employeeId, data, idempotencyKey = newEmployeeCreateKey()) {
     return await apiRequest(`/employees/${employeeId}`, {
       method: 'PUT',
+      headers: { 'Idempotency-Key': idempotencyKey },
       body: data
     });
   },
 
-  async lock(employeeId) {
+  async lock(employeeId, idempotencyKey = newEmployeeCreateKey()) {
     return await apiRequest(`/employees/${employeeId}/lock`, {
-      method: 'POST'
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey }
     });
   },
 
-  async unlock(employeeId) {
+  async unlock(employeeId, idempotencyKey = newEmployeeCreateKey()) {
     return await apiRequest(`/employees/${employeeId}/unlock`, {
-      method: 'POST'
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey }
     });
   },
 
-  async changePassword(data) {
+  async changePassword(data, idempotencyKey = newEmployeeCreateKey()) {
     return await apiRequest('/auth/change-password', {
       method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
       body: data
     });
   }

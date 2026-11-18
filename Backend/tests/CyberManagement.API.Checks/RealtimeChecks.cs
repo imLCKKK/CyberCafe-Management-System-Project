@@ -30,12 +30,33 @@ internal static class RealtimeChecks
         var handler = new JwtSecurityTokenHandler();
         var adminId = int.Parse(handler.ReadJwtToken(adminToken).Subject);
         var observerId = int.Parse(handler.ReadJwtToken(staffTokens["Waiter"]).Subject);
-        var noPermissionId = adminId + 100;
+        int noPermissionId;
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var source = await database.Employees.AsNoTracking()
+                .Include(employee => employee.Role)
+                .SingleAsync(employee => employee.EmployeeId == observerId);
+            var fixture = new CyberManagement.Domain.Entities.Employee
+            {
+                Username = "realtime-no-permission",
+                FullName = "Realtime no-permission fixture",
+                PasswordHash = source.PasswordHash,
+                RoleId = source.RoleId,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            database.Employees.Add(fixture);
+            await database.SaveChangesAsync();
+            noPermissionId = fixture.EmployeeId;
+        }
         var otherCustomerId = adminId + 10;
         var noPermissionToken = Mint(adminToken, claims =>
         {
             claims.RemoveAll(claim => claim.Type == "permission");
             Replace(claims, "sub", noPermissionId.ToString());
+            Replace(claims, "name", "realtime-no-permission");
+            Replace(claims, "role", "Waiter");
         });
         // Deliberately signed test claims verify customer/staff separation even if IDs overlap.
         var sameIdCustomerToken = Mint(customerToken, claims =>
@@ -222,6 +243,8 @@ internal static class RealtimeChecks
                 .GetProperty("eventId").GetGuid() == postLockEvent.EventId);
         Check("Locked employee connection is removed from permission broadcast groups",
             await observer.TryNextAsync(TimeSpan.FromMilliseconds(250)) is null);
+        await ExpectStatus("Realtime fixture employee is restored for later suites", HttpStatusCode.OK,
+            await SendAsync(HttpMethod.Post, $"/api/employees/{observerId}/unlock", adminToken));
 
         return checks;
 
@@ -250,6 +273,8 @@ internal static class RealtimeChecks
         {
             using var request = new HttpRequestMessage(method, path);
             if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            if (method == HttpMethod.Put || (method == HttpMethod.Post && path.StartsWith("/api/employees", StringComparison.Ordinal)))
+                request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
             if (body is not null) request.Content = JsonContent.Create(body);
             return await client.SendAsync(request);
         }

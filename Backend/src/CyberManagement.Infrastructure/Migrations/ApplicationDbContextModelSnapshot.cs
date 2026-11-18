@@ -49,9 +49,24 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("RequestFingerprint")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("RequestKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("ResponseJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("LogId");
 
-                    b.HasIndex("EmployeeId");
+                    b.HasIndex("EmployeeId", "RequestKey")
+                        .IsUnique()
+                        .HasFilter("[RequestKey] IS NOT NULL");
 
                     b.ToTable("AuditLogs", (string)null);
                 });

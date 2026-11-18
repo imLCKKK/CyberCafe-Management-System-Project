@@ -8,11 +8,6 @@ const rowAction = (name, action = 'Chỉnh sửa') => evaluate(`(() => {
 const submit = () => evaluate('document.querySelector("dialog[open] form").requestSubmit()');
 const close = () => evaluate('document.querySelector("dialog[open] [aria-label=\\"Đóng\\"]").click()');
 const waitForForm = () => until('Boolean(document.querySelector("dialog[open] select[name=role]"))');
-const fillProfile = async () => {
-  await input('dialog [name=position]', 'Thu ngân');
-  await input('dialog [name=shift]', '08:00–16:00');
-};
-
 try {
   await cdp('Runtime.enable');
   await cdp('Page.enable');
@@ -25,10 +20,10 @@ try {
       { roleId: 87, roleName: 'Cashier' }
     ];
     let employees = [
-      { employeeId: 3, fullName: 'API Admin', phone: '0900000101', roleName: 'Admin', isActive: true },
-      { employeeId: 102, fullName: 'API Manager', phone: '0900000102', roleName: 'Manager', isActive: true },
-      { employeeId: 103, fullName: 'API Cashier', phone: '0900000103', roleName: 'Cashier', isActive: false },
-      { employeeId: 104, fullName: 'API Custom', phone: '0900000104', roleName: 'CustomRole', isActive: true }
+      { employeeId: 3, username: 'api-admin', fullName: 'API Admin', phone: '0900000101', roleName: 'Admin', isActive: true },
+      { employeeId: 102, username: 'api-manager', fullName: 'API Manager', phone: '0900000102', roleName: 'Manager', isActive: true },
+      { employeeId: 103, username: 'api-cashier', fullName: 'API Cashier', phone: '0900000103', roleName: 'Cashier', isActive: false },
+      { employeeId: 104, username: 'api-custom', fullName: 'API Custom', phone: '0900000104', roleName: 'CustomRole', isActive: true }
     ].map(employee => ({ ...employee, createdAt: '2026-11-17T00:00:00Z', version: 'AAAAAAAAAAE=' }));
     window.__staffCalls = [];
     window.__passwordCalls = [];
@@ -118,17 +113,18 @@ try {
 
   await rowAction('API Admin');
   await waitForForm();
+  assert.equal(await evaluate('document.querySelector("dialog input[name=username]").value'), 'api-admin');
+  assert.equal(await evaluate('document.querySelector("dialog input[name=username]").readOnly'), true);
   assert.equal(await evaluate('document.querySelector("dialog select[name=role]").value'), '41');
-  await fillProfile();
   await submit();
   await until('!document.querySelector("dialog[open]")');
   assert.equal(await evaluate('Object.hasOwn(window.__staffCalls.at(-1).body, "roleId")'), false);
   assert.equal(await evaluate('window.__staffCalls.at(-1).body.expectedVersion'), 'AAAAAAAAAAE=');
+  assert.equal(await evaluate('Object.hasOwn(window.__staffCalls.at(-1).body, "username")'), false);
 
   await until('document.querySelector("tbody")?.textContent.includes("API Admin")');
   await rowAction('API Admin');
   await waitForForm();
-  await fillProfile();
   await input('dialog [name=display_name]', 'Stale UI edit');
   await evaluate('window.__staffConflict = true');
   await submit();
@@ -139,7 +135,6 @@ try {
   await until('!document.querySelector("dialog[open]") && document.querySelector("tbody")?.textContent.includes("External edit")');
   await rowAction('External edit');
   await waitForForm();
-  await fillProfile();
   await input('dialog [name=display_name]', 'API Admin');
   await submit();
   await until('!document.querySelector("dialog[open]")');
@@ -149,7 +144,6 @@ try {
   await waitForForm();
   assert.equal(await evaluate('document.querySelector("dialog select[name=role]").value'), '16');
   await input('dialog select[name=role]', '87');
-  await fillProfile();
   await submit();
   await until('!document.querySelector("dialog[open]")');
   assert.equal(await evaluate('window.__staffCalls.at(-1).body.roleId'), 87);
@@ -159,6 +153,7 @@ try {
   await waitForForm();
   assert.equal(await evaluate('document.querySelector("dialog select[name=role]").value'), '');
   assert.deepEqual(await evaluate('[...document.querySelector("dialog select[name=role]").options].map(option => option.value)'), ['', '41', '16', '87']);
+  await input('dialog [name=username]', 'api-new');
   await input('dialog [name=display_name]', 'API New');
   await input('dialog [name=phone]', '0900000105');
   await input('dialog [name=password]', 'StaffTest@2026');

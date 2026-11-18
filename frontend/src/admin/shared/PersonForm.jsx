@@ -7,6 +7,7 @@ export default function PersonForm({ account, kind, onClose, onSaved, onReload }
   const [rolesError, setRolesError] = useState('');
   const [conflict, setConflict] = useState(false);
   const createIntent = useRef(null);
+  const updateIntent = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -27,7 +28,14 @@ export default function PersonForm({ account, kind, onClose, onSaved, onReload }
 
   const currentRole = roles.find((role) => role.roleName === account?.role);
   const fields = [
-    { name: 'username', label: 'Tên đăng nhập', maxLength: 50, pattern: '^\\S+$', help: 'Không được có khoảng trắng' },
+    {
+      name: 'username',
+      label: 'Tên đăng nhập',
+      maxLength: 50,
+      pattern: '^\\S+$',
+      readOnly: Boolean(account),
+      help: account ? 'Tên đăng nhập không thể thay đổi sau khi tạo.' : 'Không được có khoảng trắng'
+    },
     { name: 'display_name', label: 'Họ và tên', maxLength: 150 },
     { name: 'phone', label: 'Số điện thoại', type: 'tel', maxLength: 11 }
   ];
@@ -53,7 +61,11 @@ export default function PersonForm({ account, kind, onClose, onSaved, onReload }
           expectedVersion: account.version,
           ...(selectedRole.roleName !== account.role ? { roleId: selectedRole.roleId } : {})
         };
-        await employeesApi.update(account.id, updateData);
+        const fingerprint = JSON.stringify(updateData);
+        if (updateIntent.current?.fingerprint !== fingerprint)
+          updateIntent.current = { fingerprint, key: newEmployeeCreateKey() };
+        await employeesApi.update(account.id, updateData, updateIntent.current.key);
+        updateIntent.current = null;
       } else {
         const createData = {
           username: form.username,

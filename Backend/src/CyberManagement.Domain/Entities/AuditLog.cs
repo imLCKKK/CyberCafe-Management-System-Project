@@ -14,5 +14,11 @@ public class AuditLog
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public string? RequestKey { get; set; }
+
+    public string? RequestFingerprint { get; set; }
+
+    public string? ResponseJson { get; set; }
+
     public Employee? Employee { get; set; }
 }

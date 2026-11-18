@@ -26,6 +26,24 @@ afterEach(() => {
   else globalThis.localStorage = originalStorage;
 });
 
+test('employee mutations send an Idempotency-Key header', async () => {
+  const requests = [];
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options });
+    return Response.json({ employeeId: 7 });
+  };
+
+  const key = newEmployeeCreateKey();
+  await employeesApi.update(7, { fullName: 'Updated' }, key);
+  await employeesApi.lock(7, key);
+  await employeesApi.unlock(7, key);
+  await employeesApi.changePassword({ newPassword: 'Updated-password-2026!' }, key);
+
+  assert.equal(requests.length, 4);
+  for (const entry of requests)
+    assert.equal(entry.options.headers.get('Idempotency-Key'), key);
+});
+
 test('employee create sends a valid Idempotency-Key header', async () => {
   globalThis.fetch = async (url, options) => {
     request = { url, options };

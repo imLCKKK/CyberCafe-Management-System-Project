@@ -80,18 +80,58 @@ internal static class EmployeeAuditChecks
         Check("Employee list exposes the current profile version",
             (await ReadEmployeesAsync()).Single(row => row.EmployeeId == targetId).Version == initialVersion);
         Check("Employee version is an 8-byte Base64 token", Convert.FromBase64String(initialVersion).Length == 8);
-        await ExpectSuccessAsync(HttpMethod.Put, targetPath, new { fullName = "Updated audit target", phone = "0900000188", expectedVersion = initialVersion });
+        var updateKey = $"employee-update:{targetId}";
+        var updateBody = new { fullName = "Updated audit target", phone = "0900000188", expectedVersion = initialVersion };
+        await ExpectSuccessAsync(HttpMethod.Put, targetPath, updateBody, idempotencyKey: updateKey);
         await ExpectAuditAsync("Updated");
         var afterFirstUpdate = await ReadEmployeeAsync();
+        using (var replay = await SendAsync(HttpMethod.Put, targetPath, updateBody, idempotencyKey: updateKey))
+        {
+            var replayed = await replay.Content.ReadFromJsonAsync<EmployeeDto>();
+            Check("Employee update replay returns the original response before stale-version validation",
+                replay.StatusCode == HttpStatusCode.OK
+                && replay.Headers.TryGetValues("Idempotency-Replayed", out var values)
+                && values.Single() == "true"
+                && replayed == afterFirstUpdate);
+        }
+        using (var conflict = await SendAsync(HttpMethod.Put, targetPath,
+            new { fullName = "Different idempotent payload", phone = "0900000188", expectedVersion = initialVersion },
+            idempotencyKey: updateKey))
+            Check("Employee update key cannot be reused with another payload", conflict.StatusCode == HttpStatusCode.Conflict);
         await ExpectSuccessAsync(HttpMethod.Put, targetPath, new { roleId = managerRoleId, expectedVersion = afterFirstUpdate.Version });
         await ExpectAuditAsync("Updated");
-        await ExpectSuccessAsync(HttpMethod.Post, targetPath + "/lock");
+        var lockKey = Guid.NewGuid().ToString("D");
+        await ExpectSuccessAsync(HttpMethod.Post, targetPath + "/lock", idempotencyKey: lockKey);
         await ExpectAuditAsync("Locked");
-        await ExpectSuccessAsync(HttpMethod.Post, targetPath + "/unlock");
+        using (var replay = await SendAsync(HttpMethod.Post, targetPath + "/lock", idempotencyKey: lockKey))
+        {
+            var replayed = await replay.Content.ReadFromJsonAsync<EmployeeDto>();
+            Check("Employee lock replay returns the original inactive response",
+                replay.StatusCode == HttpStatusCode.OK
+                && replay.Headers.TryGetValues("Idempotency-Replayed", out var values)
+                && values.Single() == "true"
+                && replayed?.IsActive == false);
+        }
+        var unlockKey = Guid.NewGuid().ToString("D");
+        await ExpectSuccessAsync(HttpMethod.Post, targetPath + "/unlock", idempotencyKey: unlockKey);
         await ExpectAuditAsync("Unlocked");
+        using (var replay = await SendAsync(HttpMethod.Post, targetPath + "/unlock", idempotencyKey: unlockKey))
+            Check("Employee unlock replay returns the original active response",
+                replay.StatusCode == HttpStatusCode.OK
+                && replay.Headers.TryGetValues("Idempotency-Replayed", out var values)
+                && values.Single() == "true"
+                && (await replay.Content.ReadFromJsonAsync<EmployeeDto>())?.IsActive == true);
+        var passwordKey = Guid.NewGuid().ToString("D");
+        var passwordBody = new { currentPassword = originalPassword, newPassword = changedPassword, confirmNewPassword = changedPassword };
         await ExpectSuccessAsync(HttpMethod.Post, targetPath + "/change-password",
-            new { currentPassword = originalPassword, newPassword = changedPassword, confirmNewPassword = changedPassword }, HttpStatusCode.NoContent);
+            passwordBody, HttpStatusCode.NoContent, passwordKey);
         await ExpectAuditAsync("PasswordChanged");
+        using (var replay = await SendAsync(HttpMethod.Post, "/api/auth/change-password",
+            passwordBody, idempotencyKey: passwordKey))
+            Check("Password change replay returns 204 before verifying the old password",
+                replay.StatusCode == HttpStatusCode.NoContent
+                && replay.Headers.TryGetValues("Idempotency-Replayed", out var values)
+                && values.Single() == "true");
 
         var beforeRejections = await SnapshotAsync();
         using (var response = await SendAsync(HttpMethod.Post, targetPath + "/change-password",
@@ -144,6 +184,7 @@ internal static class EmployeeAuditChecks
             }
         }
 
+        beforeRejections = await SnapshotAsync();
         foreach (var invalid in new object[]
         {
             new { fullName = "Missing version" },
@@ -278,7 +319,10 @@ internal static class EmployeeAuditChecks
             using var request = new HttpRequestMessage(method, path);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer",
                 token ?? (path.EndsWith("/change-password", StringComparison.Ordinal) ? passwordToken : staffTokens["Admin"]));
-            if (method == HttpMethod.Post && path == "/api/employees")
+            var requiresIdempotency = method == HttpMethod.Put
+                || (method == HttpMethod.Post && path.StartsWith("/api/employees", StringComparison.Ordinal))
+                || path == "/api/auth/change-password";
+            if (requiresIdempotency)
                 request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString("D"));
             if (body is not null) request.Content = JsonContent.Create(body);
             return await client.SendAsync(request);
@@ -300,9 +344,14 @@ internal static class EmployeeAuditChecks
                 ?? throw new InvalidOperationException("Missing employee list.");
         }
 
-        async Task ExpectSuccessAsync(HttpMethod method, string path, object? body = null, HttpStatusCode expected = HttpStatusCode.OK)
+        async Task ExpectSuccessAsync(
+            HttpMethod method,
+            string path,
+            object? body = null,
+            HttpStatusCode expected = HttpStatusCode.OK,
+            string? idempotencyKey = null)
         {
-            using var response = await SendAsync(method, path, body);
+            using var response = await SendAsync(method, path, body, idempotencyKey: idempotencyKey);
             Check($"Employee {method} {path} succeeds", response.StatusCode == expected);
         }
 

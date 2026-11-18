@@ -16,6 +16,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         {
             EntityNotFoundException => StatusCodes.Status404NotFound,
             BusinessRuleException => StatusCodes.Status409Conflict,
+            ConflictException => StatusCodes.Status409Conflict,
             ValidationException => StatusCodes.Status400BadRequest,
             ArgumentException => StatusCodes.Status400BadRequest,
             UnauthorizedAccessException => context.User.Identity?.IsAuthenticated == true

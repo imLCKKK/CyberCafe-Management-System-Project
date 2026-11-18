@@ -98,7 +98,25 @@ public sealed class EmployeesService(
 
         employee.PasswordHash = passwordHasher.HashPassword(employee, request.Password);
         repository.AddEmployee(employee);
-        await SaveWithAuditAsync(employee, currentEmployeeId, "Created", cancellationToken);
+        AuditLog? mutation = createRequestKey is null
+            ? null
+            : new AuditLog
+            {
+                EmployeeId = currentEmployeeId,
+                EntityId = 0,
+                EntityType = "Employee",
+                Action = "Created",
+                RequestKey = createRequestKey,
+                RequestFingerprint = createRequestFingerprint,
+                CreatedAt = DateTime.UtcNow
+            };
+        await SaveWithAuditAsync(
+            employee,
+            currentEmployeeId,
+            "Created",
+            cancellationToken,
+            mutation: mutation,
+            mutationResponse: saved => JsonSerializer.Serialize(ToDto(saved)));
 
         return new EmployeeDto(
             employee.EmployeeId,
@@ -111,11 +129,19 @@ public sealed class EmployeesService(
             Convert.ToBase64String(employee.Version));
     }
 
-    public async Task<EmployeeDto> UpdateEmployeeAsync(
+    public Task<EmployeeDto> UpdateEmployeeAsync(
         int employeeId,
         UpdateEmployeeRequest request,
         int currentEmployeeId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        UpdateEmployeeCoreAsync(employeeId, request, currentEmployeeId, cancellationToken, null);
+
+    private async Task<EmployeeDto> UpdateEmployeeCoreAsync(
+        int employeeId,
+        UpdateEmployeeRequest request,
+        int currentEmployeeId,
+        CancellationToken cancellationToken,
+        AuditLog? mutation)
     {
         var expectedVersion = new byte[8];
         if (request.ExpectedVersion is null
@@ -171,7 +197,13 @@ public sealed class EmployeesService(
 
         repository.UpdateEmployee(employee);
         await SaveWithAuditAsync(
-            employee, currentEmployeeId, "Updated", cancellationToken, preserveAnotherActiveAdmin);
+            employee,
+            currentEmployeeId,
+            "Updated",
+            cancellationToken,
+            preserveAnotherActiveAdmin,
+            mutation,
+            saved => JsonSerializer.Serialize(ToDto(saved)));
 
         var updatedEmployee = await repository.GetEmployeeByIdAsync(employeeId, cancellationToken)
             ?? throw new InvalidOperationException("Không thể lấy thông tin nhân viên sau cập nhật.");
@@ -187,10 +219,17 @@ public sealed class EmployeesService(
             Convert.ToBase64String(updatedEmployee.Version));
     }
 
-    public async Task<EmployeeDto> LockEmployeeAsync(
+    public Task<EmployeeDto> LockEmployeeAsync(
         int employeeId,
         int currentEmployeeId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        LockEmployeeCoreAsync(employeeId, currentEmployeeId, cancellationToken, null);
+
+    private async Task<EmployeeDto> LockEmployeeCoreAsync(
+        int employeeId,
+        int currentEmployeeId,
+        CancellationToken cancellationToken,
+        AuditLog? mutation)
     {
         if (employeeId == currentEmployeeId)
             throw new InvalidOperationException("Không thể khóa chính mình.");
@@ -206,7 +245,13 @@ public sealed class EmployeesService(
         employee.IsActive = false;
         repository.UpdateEmployee(employee);
         await SaveWithAuditAsync(
-            employee, currentEmployeeId, "Locked", cancellationToken, preserveAnotherActiveAdmin);
+            employee,
+            currentEmployeeId,
+            "Locked",
+            cancellationToken,
+            preserveAnotherActiveAdmin,
+            mutation,
+            saved => JsonSerializer.Serialize(ToDto(saved)));
 
         var lockedEmployee = await repository.GetEmployeeByIdAsync(employeeId, cancellationToken)
             ?? throw new InvalidOperationException("Không thể lấy thông tin nhân viên sau khóa.");
@@ -222,10 +267,17 @@ public sealed class EmployeesService(
             Convert.ToBase64String(lockedEmployee.Version));
     }
 
-    public async Task<EmployeeDto> UnlockEmployeeAsync(
+    public Task<EmployeeDto> UnlockEmployeeAsync(
         int employeeId,
         int currentEmployeeId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        UnlockEmployeeCoreAsync(employeeId, currentEmployeeId, cancellationToken, null);
+
+    private async Task<EmployeeDto> UnlockEmployeeCoreAsync(
+        int employeeId,
+        int currentEmployeeId,
+        CancellationToken cancellationToken,
+        AuditLog? mutation)
     {
         var employee = await repository.GetEmployeeByIdAsync(employeeId, cancellationToken)
             ?? throw new InvalidOperationException("Nhân viên không tồn tại.");
@@ -235,7 +287,13 @@ public sealed class EmployeesService(
 
         employee.IsActive = true;
         repository.UpdateEmployee(employee);
-        await SaveWithAuditAsync(employee, currentEmployeeId, "Unlocked", cancellationToken);
+        await SaveWithAuditAsync(
+            employee,
+            currentEmployeeId,
+            "Unlocked",
+            cancellationToken,
+            mutation: mutation,
+            mutationResponse: saved => JsonSerializer.Serialize(ToDto(saved)));
 
         var unlockedEmployee = await repository.GetEmployeeByIdAsync(employeeId, cancellationToken)
             ?? throw new InvalidOperationException("Không thể lấy thông tin nhân viên sau mở khóa.");
@@ -251,11 +309,19 @@ public sealed class EmployeesService(
             Convert.ToBase64String(unlockedEmployee.Version));
     }
 
-    public async Task ChangePasswordAsync(
+    public Task ChangePasswordAsync(
         int employeeId,
         ChangePasswordRequest request,
         int currentEmployeeId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        ChangePasswordCoreAsync(employeeId, request, currentEmployeeId, cancellationToken, null);
+
+    private async Task ChangePasswordCoreAsync(
+        int employeeId,
+        ChangePasswordRequest request,
+        int currentEmployeeId,
+        CancellationToken cancellationToken,
+        AuditLog? mutation)
     {
         if (employeeId != currentEmployeeId)
             throw new UnauthorizedAccessException("Chỉ được đổi mật khẩu của chính mình.");
@@ -280,7 +346,13 @@ public sealed class EmployeesService(
 
         employee.PasswordHash = passwordHasher.HashPassword(employee, request.NewPassword);
         repository.UpdateEmployee(employee);
-        await SaveWithAuditAsync(employee, currentEmployeeId, "PasswordChanged", cancellationToken);
+        await SaveWithAuditAsync(
+            employee,
+            currentEmployeeId,
+            "PasswordChanged",
+            cancellationToken,
+            mutation: mutation,
+            mutationResponse: _ => "{}");
     }
 
     private Task SaveWithAuditAsync(
@@ -288,27 +360,40 @@ public sealed class EmployeesService(
         int currentEmployeeId,
         string action,
         CancellationToken cancellationToken,
-        bool preserveAnotherActiveAdmin = false) =>
-        repository.SaveEmployeeWithAuditAsync(
+        bool preserveAnotherActiveAdmin = false,
+        AuditLog? mutation = null,
+        Func<Employee, string>? mutationResponse = null)
+    {
+        var audit = mutation ?? new AuditLog();
+        audit.EmployeeId = currentEmployeeId;
+        audit.EntityType = "Employee";
+        audit.Action = action;
+        audit.CreatedAt = DateTime.UtcNow;
+        return repository.SaveEmployeeWithAuditAsync(
             employee,
-            new AuditLog
-            {
-                EmployeeId = currentEmployeeId,
-                EntityType = "Employee",
-                Action = action,
-                CreatedAt = DateTime.UtcNow
-            },
+            audit,
             preserveAnotherActiveAdmin,
-            cancellationToken);
+            cancellationToken,
+            mutationResponse);
+    }
     
     public async Task<(EmployeeDto Employee, bool Replayed)> CreateEmployeeWithIdempotencyAsync(
         CreateEmployeeRequest request,
-        Guid idempotencyKey,
+        string idempotencyKey,
         int currentEmployeeId,
         CancellationToken cancellationToken)
     {
-        var keyStr = idempotencyKey.ToString("D");
+        var keyStr = idempotencyKey;
         var fingerprint = ComputeFingerprint(request);
+        var existingMutation = await repository.GetEmployeeMutationAsync(
+            currentEmployeeId, keyStr, cancellationToken);
+        if (existingMutation is not null)
+        {
+            if (existingMutation.Action != "Created"
+                || !string.Equals(existingMutation.RequestFingerprint, fingerprint, StringComparison.Ordinal))
+                throw new ConflictException("409: Idempotency-Key đã được sử dụng với thao tác hoặc payload khác.");
+            return (Deserialize<EmployeeDto>(existingMutation.ResponseJson!), true);
+        }
 
         var existing = await repository.GetEmployeeByCreateKeyAsync(keyStr, cancellationToken);
         if (existing is not null)
@@ -336,29 +421,192 @@ public sealed class EmployeesService(
         }
         catch (ConflictException)
         {
+            var concurrentMutation = await repository.GetEmployeeMutationAsync(
+                currentEmployeeId, keyStr, cancellationToken);
+            if (concurrentMutation is not null)
+            {
+                if (concurrentMutation.Action != "Created"
+                    || !string.Equals(fingerprint, concurrentMutation.RequestFingerprint, StringComparison.Ordinal))
+                    throw new ConflictException("409: Idempotency-Key đã được sử dụng với thao tác hoặc payload khác.");
+                return (Deserialize<EmployeeDto>(concurrentMutation.ResponseJson!), true);
+            }
+
             var concurrentResult = await repository.GetEmployeeByCreateKeyAsync(keyStr, cancellationToken)
                 ?? throw new InvalidOperationException("Không tìm thấy kết quả của yêu cầu idempotent đồng thời.");
-
             if (!string.Equals(fingerprint, concurrentResult.CreateRequestFingerprint, StringComparison.Ordinal))
                 throw new ConflictException("409: Idempotency-Key đã được sử dụng với payload khác.");
-
-            return (new EmployeeDto(
-                concurrentResult.EmployeeId,
-                concurrentResult.Username,
-                concurrentResult.FullName,
-                concurrentResult.Phone,
-                concurrentResult.Role.RoleName,
-                concurrentResult.IsActive,
-                concurrentResult.CreatedAt,
-                Convert.ToBase64String(concurrentResult.Version)), true);
+            return (ToDto(concurrentResult), true);
         }
     }
 
-    private static string ComputeFingerprint(CreateEmployeeRequest request)
+    public async Task<(EmployeeDto Employee, bool Replayed)> UpdateEmployeeWithIdempotencyAsync(
+        int employeeId,
+        UpdateEmployeeRequest request,
+        string idempotencyKey,
+        int currentEmployeeId,
+        CancellationToken cancellationToken)
+    {
+        var mutation = await FindOrCreateMutationAsync(
+            employeeId, currentEmployeeId, "Updated", request, idempotencyKey, cancellationToken);
+        if (mutation.Existing is not null)
+            return (Deserialize<EmployeeDto>(mutation.Existing.ResponseJson!), true);
+
+        try
+        {
+            var employee = await UpdateEmployeeCoreAsync(
+                employeeId, request, currentEmployeeId, cancellationToken, mutation.New);
+            return (employee, false);
+        }
+        catch (ConflictException)
+        {
+            var replay = await GetReplayAsync<EmployeeDto>(
+                currentEmployeeId, mutation.New!.RequestKey!, mutation.New.RequestFingerprint!, cancellationToken);
+            return (replay, true);
+        }
+    }
+
+    public async Task<(EmployeeDto Employee, bool Replayed)> LockEmployeeWithIdempotencyAsync(
+        int employeeId,
+        string idempotencyKey,
+        int currentEmployeeId,
+        CancellationToken cancellationToken)
+    {
+        var mutation = await FindOrCreateMutationAsync(
+            employeeId, currentEmployeeId, "Locked", new { }, idempotencyKey, cancellationToken);
+        if (mutation.Existing is not null)
+            return (Deserialize<EmployeeDto>(mutation.Existing.ResponseJson!), true);
+
+        try
+        {
+            var employee = await LockEmployeeCoreAsync(
+                employeeId, currentEmployeeId, cancellationToken, mutation.New);
+            return (employee, false);
+        }
+        catch (ConflictException)
+        {
+            var replay = await GetReplayAsync<EmployeeDto>(
+                currentEmployeeId, mutation.New!.RequestKey!, mutation.New.RequestFingerprint!, cancellationToken);
+            return (replay, true);
+        }
+    }
+
+    public async Task<(EmployeeDto Employee, bool Replayed)> UnlockEmployeeWithIdempotencyAsync(
+        int employeeId,
+        string idempotencyKey,
+        int currentEmployeeId,
+        CancellationToken cancellationToken)
+    {
+        var mutation = await FindOrCreateMutationAsync(
+            employeeId, currentEmployeeId, "Unlocked", new { }, idempotencyKey, cancellationToken);
+        if (mutation.Existing is not null)
+            return (Deserialize<EmployeeDto>(mutation.Existing.ResponseJson!), true);
+
+        try
+        {
+            var employee = await UnlockEmployeeCoreAsync(
+                employeeId, currentEmployeeId, cancellationToken, mutation.New);
+            return (employee, false);
+        }
+        catch (ConflictException)
+        {
+            var replay = await GetReplayAsync<EmployeeDto>(
+                currentEmployeeId, mutation.New!.RequestKey!, mutation.New.RequestFingerprint!, cancellationToken);
+            return (replay, true);
+        }
+    }
+
+    public async Task<bool> ChangePasswordWithIdempotencyAsync(
+        int employeeId,
+        ChangePasswordRequest request,
+        string idempotencyKey,
+        int currentEmployeeId,
+        CancellationToken cancellationToken)
+    {
+        var mutation = await FindOrCreateMutationAsync(
+            employeeId, currentEmployeeId, "PasswordChanged", request, idempotencyKey, cancellationToken);
+        if (mutation.Existing is not null)
+            return true;
+
+        try
+        {
+            await ChangePasswordCoreAsync(
+                employeeId, request, currentEmployeeId, cancellationToken, mutation.New);
+            return false;
+        }
+        catch (ConflictException)
+        {
+            await GetReplayAsync<JsonElement>(
+                currentEmployeeId, mutation.New!.RequestKey!, mutation.New.RequestFingerprint!, cancellationToken);
+            return true;
+        }
+    }
+
+    private async Task<(AuditLog? Existing, AuditLog? New)> FindOrCreateMutationAsync(
+        int employeeId,
+        int actorEmployeeId,
+        string operation,
+        object request,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var requestKey = idempotencyKey;
+        var fingerprint = ComputeFingerprint(new { operation, employeeId, request });
+        var existing = await repository.GetEmployeeMutationAsync(actorEmployeeId, requestKey, cancellationToken);
+        if (existing is not null)
+        {
+            if (!string.Equals(existing.RequestFingerprint, fingerprint, StringComparison.Ordinal)
+                || existing.EntityId != employeeId
+                || existing.Action != operation)
+                throw new ConflictException("409: Idempotency-Key đã được sử dụng với thao tác hoặc payload khác.");
+            return (existing, null);
+        }
+
+        return (null, new AuditLog
+        {
+            EntityType = "Employee",
+            EntityId = employeeId,
+            EmployeeId = actorEmployeeId,
+            RequestKey = requestKey,
+            Action = operation,
+            RequestFingerprint = fingerprint,
+            CreatedAt = DateTime.UtcNow
+        });
+    }
+
+    private async Task<T> GetReplayAsync<T>(
+        int actorEmployeeId,
+        string requestKey,
+        string fingerprint,
+        CancellationToken cancellationToken)
+    {
+        var existing = await repository.GetEmployeeMutationAsync(actorEmployeeId, requestKey, cancellationToken)
+            ?? throw new InvalidOperationException("Không tìm thấy kết quả của yêu cầu idempotent đồng thời.");
+        if (!string.Equals(existing.RequestFingerprint, fingerprint, StringComparison.Ordinal))
+            throw new ConflictException("409: Idempotency-Key đã được sử dụng với thao tác hoặc payload khác.");
+        return Deserialize<T>(existing.ResponseJson!);
+    }
+
+    private static EmployeeDto ToDto(Employee employee) => new(
+        employee.EmployeeId,
+        employee.Username,
+        employee.FullName,
+        employee.Phone,
+        employee.Role.RoleName,
+        employee.IsActive,
+        employee.CreatedAt,
+        Convert.ToBase64String(employee.Version));
+
+    private static T Deserialize<T>(string json) =>
+        JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new InvalidOperationException("Kết quả idempotent đã lưu không hợp lệ.");
+
+    private static string ComputeFingerprint(object request)
     {
         var json = JsonSerializer.Serialize(request, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
         using var sha256 = SHA256.Create();
         var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(json));
         return Convert.ToHexString(hash).ToUpperInvariant();
     }
+
+    private static string ComputeFingerprint(CreateEmployeeRequest request) => ComputeFingerprint((object)request);
 }

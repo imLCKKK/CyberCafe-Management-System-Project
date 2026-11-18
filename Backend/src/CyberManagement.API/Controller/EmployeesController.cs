@@ -7,6 +7,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using CyberManagement.API.Security;
+using System.Text.RegularExpressions;
 
 namespace CyberManagement.API.Controller;
 
@@ -51,10 +52,7 @@ public sealed class EmployeesController(
             if (string.IsNullOrEmpty(currentEmployeeIdClaim) || !int.TryParse(currentEmployeeIdClaim, out var currentEmployeeId))
                 return Unauthorized(new { message = "Không thể xác định nhân viên hiện tại." });
 
-            var raw = Request.Headers["Idempotency-Key"];
-            if (raw.Count != 1 || !Guid.TryParseExact(raw[0], "D", out var key))
-                return BadRequest(new { message = "Idempotency-Key phải là UUID dạng chuẩn." });
-
+            var key = ReadIdempotencyKey();
             var result = await employeesService.CreateEmployeeWithIdempotencyAsync(
                 request, key, currentEmployeeId, cancellationToken);
             
@@ -94,9 +92,11 @@ public sealed class EmployeesController(
             if (string.IsNullOrEmpty(currentEmployeeIdClaim) || !int.TryParse(currentEmployeeIdClaim, out var currentEmployeeId))
                 return Unauthorized(new { message = "Không thể xác định nhân viên hiện tại." });
 
-            var employee = await employeesService.UpdateEmployeeAsync(
-                employeeId, request, currentEmployeeId, cancellationToken);
-            return Ok(employee);
+            var key = ReadIdempotencyKey();
+            var result = await employeesService.UpdateEmployeeWithIdempotencyAsync(
+                employeeId, request, key, currentEmployeeId, cancellationToken);
+            MarkReplay(result.Replayed);
+            return Ok(result.Employee);
         }
         catch (InvalidOperationException ex) when (ex is not BusinessRuleException)
         {
@@ -116,9 +116,12 @@ public sealed class EmployeesController(
             if (string.IsNullOrEmpty(currentEmployeeIdClaim) || !int.TryParse(currentEmployeeIdClaim, out var currentEmployeeId))
                 return Unauthorized(new { message = "Không thể xác định nhân viên hiện tại." });
 
-            var employee = await employeesService.LockEmployeeAsync(employeeId, currentEmployeeId, cancellationToken);
+            var key = ReadIdempotencyKey();
+            var result = await employeesService.LockEmployeeWithIdempotencyAsync(
+                employeeId, key, currentEmployeeId, cancellationToken);
+            MarkReplay(result.Replayed);
             await realtimeAccountConnections.RevokeEmployeeAsync(employeeId);
-            return Ok(employee);
+            return Ok(result.Employee);
         }
         catch (InvalidOperationException ex) when (ex is not BusinessRuleException)
         {
@@ -138,13 +141,31 @@ public sealed class EmployeesController(
             if (string.IsNullOrEmpty(currentEmployeeIdClaim) || !int.TryParse(currentEmployeeIdClaim, out var currentEmployeeId))
                 return Unauthorized(new { message = "Không thể xác định nhân viên hiện tại." });
 
-            var employee = await employeesService.UnlockEmployeeAsync(employeeId, currentEmployeeId, cancellationToken);
-            return Ok(employee);
+            var key = ReadIdempotencyKey();
+            var result = await employeesService.UnlockEmployeeWithIdempotencyAsync(
+                employeeId, key, currentEmployeeId, cancellationToken);
+            MarkReplay(result.Replayed);
+            return Ok(result.Employee);
         }
         catch (InvalidOperationException ex) when (ex is not BusinessRuleException)
         {
             return BadRequest(new { message = ex.Message });
         }
+    }
+
+    private string ReadIdempotencyKey()
+    {
+        var raw = Request.Headers["Idempotency-Key"];
+        var key = raw.Count == 1 ? raw[0] : null;
+        if (key is null || !Regex.IsMatch(key, @"\A[A-Za-z0-9._:-]{8,100}\z"))
+            throw new ValidationException("Idempotency-Key phải có 8–100 ký tự chữ, số, '.', '_', ':', '-'.");
+        return key;
+    }
+
+    private void MarkReplay(bool replayed)
+    {
+        if (replayed)
+            Response.Headers["Idempotency-Replayed"] = "true";
     }
 
     [HttpPost("{employeeId:int}/change-password")]
@@ -163,7 +184,10 @@ public sealed class EmployeesController(
             if (currentEmployeeId != employeeId)
                 return Forbid();
 
-            await employeesService.ChangePasswordAsync(employeeId, request, currentEmployeeId, cancellationToken);
+            var key = ReadIdempotencyKey();
+            var replayed = await employeesService.ChangePasswordWithIdempotencyAsync(
+                employeeId, request, key, currentEmployeeId, cancellationToken);
+            MarkReplay(replayed);
             return NoContent();
         }
         catch (InvalidOperationException ex) when (ex is not BusinessRuleException)

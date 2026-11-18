@@ -1,6 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.ComponentModel.DataAnnotations;
 using CyberManagement.Application.DTOs.Authentication;
 using CyberManagement.Application.DTOs.Employees;
 using CyberManagement.Application.Interfaces.Services;
@@ -106,7 +108,15 @@ public sealed class AuthController(
         if (!int.TryParse(User.FindFirstValue(JwtRegisteredClaimNames.Sub), out var employeeId))
             return Unauthorized();
 
-        await employeesService.ChangePasswordAsync(employeeId, request, employeeId, cancellationToken);
+        var raw = Request.Headers["Idempotency-Key"];
+        var key = raw.Count == 1 ? raw[0] : null;
+        if (key is null || !Regex.IsMatch(key, @"\A[A-Za-z0-9._:-]{8,100}\z"))
+            throw new ValidationException("Idempotency-Key phải có 8–100 ký tự chữ, số, '.', '_', ':', '-'.");
+
+        var replayed = await employeesService.ChangePasswordWithIdempotencyAsync(
+            employeeId, request, key, employeeId, cancellationToken);
+        if (replayed)
+            Response.Headers["Idempotency-Replayed"] = "true";
         return NoContent();
     }
 

@@ -57,6 +57,14 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
             .Include(e => e.Role)
             .SingleOrDefaultAsync(e => e.CreateRequestKey == createRequestKey, cancellationToken);
 
+    public Task<AuditLog?> GetEmployeeMutationAsync(
+        int actorEmployeeId,
+        string requestKey,
+        CancellationToken cancellationToken) =>
+        database.AuditLogs.SingleOrDefaultAsync(
+            row => row.EmployeeId == actorEmployeeId && row.RequestKey == requestKey,
+            cancellationToken);
+
     public async Task<IReadOnlyList<Employee>> GetAllEmployeesAsync(
         CancellationToken cancellationToken) =>
         await database.Employees
@@ -84,12 +92,30 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
         Employee employee,
         AuditLog audit,
         bool preserveAnotherActiveAdmin,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<Employee, string>? mutationResponse = null)
     {
         var isNewEmployee = database.Entry(employee).State == EntityState.Added;
         await using var transaction = database.Database.IsRelational()
             ? await database.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
             : null;
+
+        if (audit.RequestKey is not null)
+        {
+            if (database.Database.IsSqlServer())
+            {
+                var lockResource = $"EmployeeMutation:{audit.EmployeeId}:{audit.RequestKey}";
+                await database.Database.ExecuteSqlInterpolatedAsync(
+                    $"DECLARE @lockResult int; EXEC @lockResult = sys.sp_getapplock @Resource = {lockResource}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000; IF @lockResult < 0 THROW 51002, 'Could not acquire employee mutation idempotency lock.', 1;",
+                    cancellationToken);
+            }
+
+            if (await database.AuditLogs.AnyAsync(
+                    row => row.EmployeeId == audit.EmployeeId
+                        && row.RequestKey == audit.RequestKey,
+                    cancellationToken))
+                throw new ConflictException("Idempotency-Key đã được sử dụng.");
+        }
 
         if (isNewEmployee && employee.CreateRequestKey is not null)
         {
@@ -136,6 +162,11 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
         try
         {
             await database.SaveChangesAsync(cancellationToken);
+            if (audit.RequestKey is not null)
+            {
+                audit.ResponseJson = mutationResponse?.Invoke(employee) ?? throw new InvalidOperationException("Thiếu kết quả idempotent.");
+                await database.SaveChangesAsync(cancellationToken);
+            }
         }
         catch (DbUpdateConcurrencyException)
         {
