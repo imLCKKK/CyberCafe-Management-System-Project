@@ -27,7 +27,10 @@ public sealed class CatalogService(ICatalogRepository repository)
             throw new ValidationException("Cần chọn danh mục hợp lệ.");
         if (command.CurrentPrice < 0 || command.CurrentPrice > 999_999_999 || decimal.Truncate(command.CurrentPrice) != command.CurrentPrice)
             throw new ValidationException("Giá bán phải là số nguyên VND từ 0 đến 999.999.999.");
-        return repository.SaveProductAsync(id, command with { Name = name }, ct);
+        var validated = command with { Name = name };
+        if (command.ImageUrlSpecified)
+            validated = validated with { ImageUrl = NormalizeImageUrl(command.ImageUrl) };
+        return repository.SaveProductAsync(id, validated, ct);
     }
 
     public Task DisableCategoryAsync(int id, CancellationToken ct) { ValidateId(id); return repository.DisableCategoryAsync(id, ct); }
@@ -43,5 +46,18 @@ public sealed class CatalogService(ICatalogRepository repository)
     private static void ValidateId(int? id)
     {
         if (id is <= 0) throw new ValidationException("ID phải là số nguyên dương.");
+    }
+
+    private static string? NormalizeImageUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var url = value.Trim();
+        if (url.Length > 500 || url.Any(char.IsControl) || url.Contains('\\'))
+            throw new ValidationException("Đường dẫn ảnh tối đa 500 ký tự, không chứa ký tự điều khiển hoặc dấu gạch chéo ngược.");
+        if (url.StartsWith('/') && !url.StartsWith("//", StringComparison.Ordinal)) return url;
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            && string.IsNullOrEmpty(uri.UserInfo)) return url;
+        throw new ValidationException("Ảnh phải dùng đường dẫn bắt đầu bằng / hoặc URL HTTP/HTTPS hợp lệ.");
     }
 }
