@@ -23,7 +23,7 @@ async function logout() {
   await evaluate('document.querySelector(\'button[aria-label="Đăng xuất"]\').click()');
   await until('Boolean(document.querySelector(".auth-form"))');
 }
-const ready = () => until('Boolean(document.querySelector(".admin-module table")) && !document.body.innerText.includes("Đang tải voucher…")');
+const ready = () => until('location.pathname === "/admin/promotions" && document.querySelector(".admin-module h1")?.textContent.trim() === "Quản lý voucher" && Boolean(document.querySelector(".admin-module table")) && !document.body.innerText.includes("Đang tải voucher…")');
 const formInput = (name, value) => input(`dialog [name="${name}"]`, value);
 try {
   await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Network.enable');
