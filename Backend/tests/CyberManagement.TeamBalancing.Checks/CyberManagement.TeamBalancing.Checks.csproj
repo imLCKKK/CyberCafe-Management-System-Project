@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../tools/TeamBalancing.Training/TeamBalancing.Training.csproj" />
+    <None Include="../../integrations/opgg/fixtures/snapshot-hash.json" Link="fixtures/snapshot-hash.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="canonical-check.mjs" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

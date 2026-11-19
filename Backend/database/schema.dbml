@@ -376,6 +376,16 @@ Table dbo.RefundAttempts {
     (ProviderAppId, MerchantRefundId) [name: 'IX_RefundAttempts_ProviderAppId_MerchantRefundId', unique]
   }
 }
+Table dbo.RegistrationStatsSnapshots {
+  SnapshotId uniqueidentifier [not null, pk]
+  CanonicalJson nvarchar(max) [not null]
+  FetchedAt datetimeoffset [not null]
+  RegistrationId int [not null]
+  RiotId nvarchar(128) [not null]
+  indexes {
+    (RegistrationId, RiotId, FetchedAt) [name: 'IX_RegistrationStatsSnapshots_RegistrationId_RiotId_FetchedAt', unique]
+  }
+}
 Table dbo.RolePermissions {
   RoleId int [not null]
   PermissionId int [not null]
@@ -582,6 +592,7 @@ Ref: dbo.PromotionUsages.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.PromotionUsages.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.PromotionUsages.(PromotionId) > dbo.Promotions.(PromotionId)
 Ref: dbo.RefundAttempts.(PaymentId) > dbo.Payments.(PaymentId)
+Ref: dbo.RegistrationStatsSnapshots.(RegistrationId) > dbo.TournamentRegistrations.(RegistrationId)
 Ref: dbo.RolePermissions.(PermissionId) > dbo.Permissions.(PermissionId)
 Ref: dbo.RolePermissions.(RoleId) > dbo.Roles.(RoleId)
 Ref: dbo.SessionCharges.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)

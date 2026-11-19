@@ -5,4 +5,6 @@
   <Project Path="src/CyberManagement.Infrastructure/CyberManagement.Infrastructure.csproj" Id="2c500b20-78d2-4358-939f-9855216724c5" />
   <Project Path="tests/CyberManagement.API.Checks/CyberManagement.API.Checks.csproj" />
   <Project Path="tests/CyberManagement.Inventory.Checks/CyberManagement.Inventory.Checks.csproj" />
+  <Project Path="tests/CyberManagement.TeamBalancing.Checks/CyberManagement.TeamBalancing.Checks.csproj" />
+  <Project Path="tools/TeamBalancing.Training/TeamBalancing.Training.csproj" />
 </Solution>

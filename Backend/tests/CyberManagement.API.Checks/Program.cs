@@ -115,6 +115,10 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     ["SeedAccounts:Waiter:Password"] = "Waiter-check-password-2026!",
     ["SeedAccounts:Technician:Password"] = "Technician-check-password-2026!"
 });
+var opggLive = args.Contains("--opgg-live");
+var opggChecks = opggLive || args.Contains("--opgg-checks");
+if (opggLive && databaseFixture.Provider != "SQL Server")
+    throw new ArgumentException("--opgg-live requires AUTH_CHECKS_SQL_CONNECTION for an isolated SQL database.");
 var realtimeSaveFailure = new RealtimeSaveFailure();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
@@ -123,10 +127,22 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 });
 builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
+var opggTransport = new OpggCheckTransport();
+if (opggChecks)
+    builder.Services.AddHttpClient<IOpggCollector, OpggCollector>().AddHttpMessageHandler(() => opggTransport);
 builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
+builder.Services.AddScoped<ITeamPreviewRosterReader, CyberManagement.Infrastructure.TeamBalancing.TeamPreviewRosterReader>();
+if (args.Contains("--team-preview-checks") || args.Contains("--team-preview-ml-checks"))
+{
+    builder.Services.AddSingleton<PreviewReadInterleaving>();
+    builder.Services.AddScoped<CyberManagement.Infrastructure.TeamBalancing.TeamPreviewRosterReader>();
+    builder.Services.AddScoped<ITeamPreviewRosterReader, PreviewInterleavedReader>();
+}
+if (args.Contains("--team-preview-ml-checks"))
+    builder.Services.AddSingleton<ITeamBalanceScorer, PreviewFixtureScorer>();
 builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
 builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
 builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
@@ -285,6 +301,19 @@ try
             await SendWithToken(HttpMethod.Get, "/api/auth/me", login.AccessToken));
         await CheckStatus($"{account.Role} cannot manage roles", HttpStatusCode.Forbidden,
             await SendWithToken(HttpMethod.Get, "/api/admin/roles", login.AccessToken));
+    }
+
+    if (opggChecks)
+    {
+        await OpggChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken, opggTransport, opggLive);
+        return;
+    }
+
+    if (args.Contains("--team-preview-checks") || args.Contains("--team-preview-ml-checks"))
+    {
+        await TeamPreviewChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken,
+            args.Contains("--team-preview-ml-checks"), databaseFixture.Provider);
+        return;
     }
 
     if (!catalogOnly && !customerOnly && !walletOnly)

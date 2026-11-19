@@ -36,6 +36,20 @@ public static class DependencyInjection
         services.AddScoped<IComputerRepository, ComputerRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<ITournamentRepository, TournamentRepository>();
+        services.AddScoped<ITeamPreviewRosterReader, TeamBalancing.TeamPreviewRosterReader>();
+        services.AddSingleton<ITeamBalancingService>(_ =>
+        {
+            var directory = configuration["TeamBalancing:ModelDirectory"];
+            var hash = configuration["TeamBalancing:ManifestSha256"];
+            TeamBalancing.TeamBalanceModelArtifact? artifact = null;
+            if (!string.IsNullOrWhiteSpace(directory) && !string.IsNullOrWhiteSpace(hash))
+            {
+                try { artifact = TeamBalancing.TeamBalanceModelArtifact.Load(directory, hash); }
+                catch (CyberManagement.Application.Exceptions.TeamBalanceException)
+                { /* ML requests report MODEL_UNAVAILABLE while Balanced remains available. */ }
+            }
+            return new CyberManagement.Application.Services.TeamBalancingService(artifact);
+        });
         services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
         services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
         services.AddScoped<ISessionSettlement, SessionSettlement>();

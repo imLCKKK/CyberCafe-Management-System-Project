@@ -7,6 +7,7 @@ import {
   clearTournamentCreateKey, createTournament, getTournamentGames, getTournamentRegistrations, getTournaments,
   tournamentCreateKey, tournamentTransitionKey, transitionTournament, updateTournament,
 } from '../../shared/tournamentApi';
+import { RegistrationStats } from '../../shared/RegistrationStats';
 import { AdminPage, DetailDialog, Filter, FormDialog, Notice, Panel, Row, Status, Table, Toolbar, StatCard } from '../shared/AdminUI';
 import { dateTime, matches, money } from '../shared/adminModel';
 
@@ -60,10 +61,14 @@ export function TournamentsPage() {
   }, [accessToken, authLoading, principal, refreshVersion]);
 
   useEffect(() => {
-    if (!selectedId) { setRegistrations([]); return undefined; }
+    setRegistrations([]);
+  }, [accessToken, selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) return undefined;
     const controller = new AbortController();
     getTournamentRegistrations('admin', selectedId, controller.signal)
-      .then(setRegistrations)
+      .then((rows) => { if (!controller.signal.aborted) setRegistrations(rows); })
       .catch((cause) => { if (!controller.signal.aborted) setError(cause.message); });
     return () => controller.abort();
   }, [accessToken, selectedId, refreshVersion]);
@@ -177,7 +182,11 @@ export function TournamentsPage() {
       <Table rows={registrations} idKey="id" columns={[
         { key: 'customerName', label: 'Người chơi' },
         { key: 'riotId', label: 'Riot ID' },
-        { key: 'rankName', label: 'Hạng' },
+        { key: 'rankName', label: 'Hạng đăng ký' },
+        { key: 'opgg', label: 'Rank OP.GG', render: (row) => <><strong>{row.opggSnapshot?.stats.rank?.label || '—'}</strong>
+          <RegistrationStats key={row.id} audience="admin" tournamentId={selected.id} registrationId={row.id} snapshot={row.opggSnapshot}
+            canRefresh={canManage && !!row.riotId && selected.gameName.trim().toLowerCase() === 'valorant' && ['RegistrationOpen', 'RegistrationClosed'].includes(selected.status)}
+            onSaved={(saved) => setRegistrations((rows) => rows.map((item) => item.id === row.id ? { ...item, opggSnapshot: saved } : item))}/></> },
         { key: 'preferredRole', label: 'Vai trò' },
         { key: 'status', label: 'Trạng thái', render: (row) => <Status value={row.status}/> },
         { key: 'registeredAtUtc', label: 'Thời gian', render: (row) => dateTime(row.registeredAtUtc) },

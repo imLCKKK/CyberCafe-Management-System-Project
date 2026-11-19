@@ -30,6 +30,8 @@ public class TournamentRegistration
 
     public WalletTransaction? ChargeTransaction { get; set; }
 
+    public ICollection<RegistrationStatsSnapshot> StatsSnapshots { get; } = new List<RegistrationStatsSnapshot>();
+
     public Tournament Tournament { get; set; } = null!;
 
     public Customer Customer { get; set; } = null!;

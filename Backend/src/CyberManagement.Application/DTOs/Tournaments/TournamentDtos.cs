@@ -66,7 +66,8 @@ public sealed record TournamentRegistrationDto(
     decimal? SkillScore,
     string Status,
     DateTime RegisteredAtUtc,
-    [property: JsonIgnore] decimal? FeeCharged = null);
+    [property: JsonIgnore] decimal? FeeCharged = null,
+    OpggSnapshot? OpggSnapshot = null);
 
 public sealed record ClientTournamentRegistrationDto(
     int Id,
@@ -78,4 +79,8 @@ public sealed record ClientTournamentRegistrationDto(
     int HoursPlayed,
     string Status,
     DateTime RegisteredAtUtc,
-    bool IsCurrentCustomer);
+    bool IsCurrentCustomer,
+    OpggSnapshot? OpggSnapshot = null);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record RefreshOpggRequest();

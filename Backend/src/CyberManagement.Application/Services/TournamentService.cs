@@ -8,7 +8,7 @@ using CyberManagement.Application.Interfaces.Services;
 
 namespace CyberManagement.Application.Services;
 
-public sealed class TournamentService(ITournamentRepository repository, IRealtimePublisher publisher) : ITournamentService
+public sealed class TournamentService(ITournamentRepository repository, IRealtimePublisher publisher, IOpggCollector collector) : ITournamentService
 {
     private static readonly HashSet<string> PreferredRoles =
         ["Duelist", "Initiator", "Controller", "Sentinel", "Flex"];
@@ -134,6 +134,17 @@ public sealed class TournamentService(ITournamentRepository repository, IRealtim
             await publisher.PublishToPermissionAsync("wallet.view", message, CancellationToken.None);
         }
         return result;
+    }
+
+    public async Task<OpggSnapshot> RefreshStatsAsync(int tournamentId, int registrationId, int? ownerId,
+        CancellationToken token)
+    {
+        var riotId = await repository.GetStatsRiotIdAsync(tournamentId, registrationId, ownerId, token);
+        // Provider I/O must complete before taking the tournament write lock.
+        var capture = await collector.CaptureAsync(riotId, token);
+        var (snapshot, changed) = await repository.SaveStatsAsync(tournamentId, registrationId, ownerId, riotId, capture, token);
+        if (changed) await PublishAsync(RealtimeEvent.RegistrationChanged, tournamentId);
+        return snapshot;
     }
 
     private async Task PublishAsync(string eventType, int tournamentId) =>

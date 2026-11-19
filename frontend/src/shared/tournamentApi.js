@@ -1,3 +1,4 @@
+import { apiRequest as authenticatedRequest } from './auth/api.js';
 import { apiRequest } from './apiClient.js';
 
 export const getTournaments = (audience, signal) =>
@@ -61,3 +62,12 @@ export const registerTournament = (tournamentId, request) =>
   apiRequest(`/client/tournaments/${tournamentId}/registrations`, {
     method: 'POST', body: request,
   });
+
+export async function refreshRegistrationStats(audience, tournamentId, registrationId, signal) {
+  const saved = await authenticatedRequest(`/${audience}/tournaments/${tournamentId}/registrations/${registrationId}/opgg/refresh`, {
+    method: 'POST', body: '{}', signal,
+  });
+  if (!saved?.stats || saved.stats.source !== 'opgg' || !saved.provenance)
+    throw new Error('Máy chủ chưa trả về bản thống kê OP.GG đã lưu.');
+  return saved;
+}

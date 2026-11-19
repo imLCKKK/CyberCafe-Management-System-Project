@@ -14,7 +14,29 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddHttpClient<IOpggCollector, OpggCollector>(client =>
+        {
+            var port = configuration.GetValue("Opgg:AdapterPort", 8787);
+            client.BaseAddress = new Uri($"http://127.0.0.1:{port}/");
+            client.Timeout = TimeSpan.FromSeconds(28);
+            client.MaxResponseContentBufferSize = 16 * 1024;
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false });
         services.AddProblemDetails();
+        services.PostConfigure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+        {
+            var original = options.InvalidModelStateResponseFactory;
+            options.InvalidModelStateResponseFactory = context =>
+            {
+                var result = original(context);
+                if (context.ActionDescriptor is Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor
+                    { ControllerTypeInfo: var type, ActionName: nameof(Controller.TournamentsController.PreviewTeams) }
+                    && type.AsType() == typeof(Controller.TournamentsController)
+                    && result is Microsoft.AspNetCore.Mvc.ObjectResult { Value: Microsoft.AspNetCore.Mvc.ProblemDetails problem })
+                    problem.Extensions["code"] = "ValidationError";
+                return result;
+            };
+        });
+        services.AddSingleton<TeamPreviewPlans>();
         services.AddExceptionHandler<ExceptionHandling.ApiExceptionHandler>();
         services.AddSignalR();
         services.AddScoped<IRealtimePublisher, SignalRRealtimePublisher>();

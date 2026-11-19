@@ -12,6 +12,29 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         if (exception is OperationCanceledException && context.RequestAborted.IsCancellationRequested)
             return false;
 
+        if (exception is OpggProviderException provider)
+        {
+            if (provider.Status == 429) context.Response.Headers.RetryAfter = "60";
+            await Results.Json(new { message = provider.Message }, statusCode: provider.Status).ExecuteAsync(context);
+            return true;
+        }
+
+        if (exception is TeamBalanceException balance)
+        {
+            var code = balance.Code;
+            var httpStatus = code switch
+            {
+                "ValidationError" => 400, "TournamentNotFound" => 404,
+                "VersionConflict" or "TeamPlanInvalid" or "TeamSizeMismatch" or "TeamsAlreadyFormed" or "TournamentLocked" => 409,
+                "UNSUPPORTED_GAME_OR_SIZE" or "STATS_UNAVAILABLE" or "STATS_STALE" or "STATS_SCOPE_MISMATCH" or "ROLE_CONSTRAINT_UNSATISFIABLE" => 422,
+                "MODEL_UNAVAILABLE" or "PreviewUnavailable" => 503,
+                _ => 500
+            };
+            await Results.Problem(statusCode: httpStatus, detail: balance.Message, instance: context.Request.Path,
+                extensions: new Dictionary<string, object?> { ["code"] = code, ["traceId"] = context.TraceIdentifier }).ExecuteAsync(context);
+            return true;
+        }
+
         var status = exception switch
         {
             EntityNotFoundException => StatusCodes.Status404NotFound,
