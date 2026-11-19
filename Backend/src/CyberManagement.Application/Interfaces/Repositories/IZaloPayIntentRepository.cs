@@ -9,7 +9,9 @@ public interface IZaloPayIntentRepository
         decimal? topUpAmount, Guid requestKey, int appId, DateTimeOffset now, CancellationToken cancellationToken);
     Task<ZaloPayIntent> GetOwnAsync(int customerId, int intentId, CancellationToken cancellationToken);
     Task<ZaloPayIntent?> FindByMerchantAsync(string merchantId, CancellationToken cancellationToken);
-    Task<ZaloPayIntent> SaveCreateResultAsync(int intentId, GatewayCreateResult result, CancellationToken cancellationToken);
+    Task<GatewayCreateLease> AcquireCreateAsync(int intentId, DateTimeOffset now, Guid? queryToken, CancellationToken cancellationToken);
+    Task<ZaloPayIntent> SaveCreateResultAsync(int intentId, Guid token, GatewayCreateResult result,
+        DateTimeOffset now, CancellationToken cancellationToken);
     Task<GatewayQueryLease> AcquireQueryAsync(int intentId, DateTimeOffset now, CancellationToken cancellationToken);
     Task<ZaloPayIntent> SaveQueryResultAsync(int intentId, Guid token, GatewayQueryResult result,
         DateTimeOffset now, CancellationToken cancellationToken);

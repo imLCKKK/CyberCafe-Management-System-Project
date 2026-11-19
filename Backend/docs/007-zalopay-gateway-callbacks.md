@@ -41,15 +41,20 @@ VerifiedAtUtc, RequiresReconciliation và FailureReason; không chứa Key1/Key2
 SourceId là IntentId với TopUp, OrderId với Order. PaymentUrl là URL checkout có token: chỉ đưa cho
 khách chính chủ, không đưa vào log hoặc bằng chứng công khai.
 
-Key được namespace theo purpose và khách. Retry cùng key/payload trả snapshot đã lưu, không gọi
-Create lần nữa; cùng key khác nội dung trả 409. Một Order chỉ có một intent; tra intent cũ khi retry.
-Đơn phải thuộc khách, còn Pending, có số tiền hợp lệ và chưa có khoản Payment Succeeded.
+Key được namespace theo purpose và khách. Retry cùng key/payload dùng lại intent, merchant ID,
+số tiền và deadline đã lưu; cùng key khác nội dung trả 409. Một Order chỉ có một intent.
+Khi chưa có URL/receipt, retry hoặc worker Query mã cũ trước; chỉ kết quả NotFound rõ ràng và nguồn
+còn hợp lệ mới cho phép gửi lại Create với mã cũ. Query lỗi/đang xử lý không cho phép tạo mã mới.
+Đơn phải thuộc khách, ở AwaitingPayment theo contract checkout (vẫn đọc được Pending cũ),
+có số tiền hợp lệ và chưa có khoản Payment Succeeded. Cả tạo intent và ghi receipt dùng cùng tập trạng thái này.
 
 ## 3. Thời hạn, chữ ký và xác minh
 
 - TopUp có hạn 15 phút. Order dùng deadline gốc `OrderTime UTC + 15 phút`; tạo intent không gia hạn đơn.
-  Create Order chỉ được thực hiện khi còn ít nhất 300 giây. Adapter gửi số giây còn lại, làm tròn xuống,
-  trong khoảng 300..900; không mở một cửa sổ 15 phút mới sau khi đơn đã chờ.
+  Create Order chỉ được thực hiện khi còn ít nhất 300 giây. Lifetime của request gốc nằm trong
+  khoảng 300..900 giây. Phục hồi giữ nguyên tham số của intent; không đổi app_time/merchant ID
+  hoặc kéo dài deadline nội bộ. Trước khi gửi lại Create phải còn ít nhất 300 giây và vẫn đúng ngày
+  Việt Nam của merchant ID; hết điều kiện thì giữ để Query/đối soát, không tự sinh giao dịch thay thế.
 - Merchant ID do server sinh: ngày Việt Nam GMT+7 `yyMMdd_` và suffix duy nhất, tối đa 40 ký tự.
   AppId, khách, purpose, nguồn, tiền và thời điểm tạo lấy từ intent đã commit.
 - Create ký HMAC-SHA256 bằng Key1 trên đúng các trường/JSON đã gửi; Query ký merchant ID đã lưu.
@@ -80,9 +85,11 @@ Nguồn chính thức: [Create](https://docs.zalopay.vn/vi/docs/specs/order-crea
 | Kết quả quan sát | Trạng thái / xử lý |
 | --- | --- |
 | Vừa lưu intent, Create trả URL, Query `return_code=3` | Pending; URL không phải receipt |
-| Create bị từ chối rõ `2/-401` hoặc `2/-402` | Failed; không ghi receipt thành công |
+| Create đầu tiên bị từ chối rõ `2/-401` hoặc `2/-402` | Failed; không ghi receipt thành công |
+| Create phục hồi bị từ chối sau lần gửi cũ chưa rõ | Pending + CreateRecoveryRejected; tiếp tục Query vì lần từ chối mới không kết luận được lần gửi cũ |
+| Query Pending nhưng không có checkout URL | Pending + CheckoutUrlMissing và RequiresReconciliation; không tạo ID khác hay suy ra URL |
 | Query `2/-54` | Expired theo provider |
-| Query `2/-101` | Chưa có receipt; Pending kèm yêu cầu đối soát với intent còn chờ |
+| Query `2/-101` | Chưa có receipt; nếu thiếu URL và nguồn còn hợp lệ thì phục hồi Create với cùng mã, nếu không tiếp tục đối soát |
 | Thiếu số dư/lỗi lần thanh toán còn có thể thử lại | Pending; ghi nhận thất bại có thể thử lại, không đóng intent như đã thu |
 | Timeout/HTTP/auth/lỗi hệ thống/JSON không rõ | Giữ trạng thái đã lưu, RequiresReconciliation; không tự kết luận chưa thu tiền |
 | Query Succeeded và receipt khớp | Succeeded, lưu một receipt đã xác minh |
@@ -94,13 +101,17 @@ có thể trả true cùng lỗi hết hạn. `-63` có thể thử lại trư�
 hoặc một lần thất bại không thể phục hồi.
 
 Ghi intent/receipt là transaction SQL riêng, khóa Customer trước intent. Lease có token giới hạn
-Query cạnh tranh; unique operation key, merchant ID, OrderId và cặp AppId/provider ID bảo vệ nhiều API instance.
+cả Create và Query cạnh tranh; kết quả Create cũ không ghi đè lượt mới đã giữ lease khác.
+Unique operation key, merchant ID, OrderId và cặp AppId/provider ID bảo vệ nhiều API instance.
 Receipt đã lưu không bị retry thay ID/amount/time. Callback/query cùng giao dịch trả lại kết quả cũ,
 không tạo thêm receipt, Payment, ledger hoặc tác động nguồn.
 
 Callback trả `return_code=1` sau receipt hợp lệ đã commit hoặc duplicate khớp; `2` dữ liệu sai;
 `0` khi tạm thời chưa ghi nhận được để provider retry. Không phản chiếu exception, MAC, body hay keys.
 Worker tra cứu tối đa 5 intent đang chờ mỗi chu kỳ 15 giây; restart đọc trạng thái SQL đã lưu.
+Intent Pending chưa có kết luận không bị loại chỉ vì hết hạn đã quá 24 giờ; tiếp tục tra cứu theo
+lịch đã lưu. Từ 24 giờ sau expiry, các lần Query chưa chốt được kết quả giãn còn một giờ/lượt/intent;
+batch vẫn tối đa 5. Lấy được receipt sau downtime dài vẫn ghi nhận proof và đánh dấu LatePayment nếu đã quá hạn.
 Local expiry không tự chứng minh chưa thu tiền; Query/callback muộn vẫn phải được đối soát.
 
 S2-M-3 chỉ tiêu thụ receipt đúng nguồn, khớp tiền, chưa tiêu thụ và không cần đối soát; lưu thao tác nguồn,
@@ -194,3 +205,36 @@ Build .NET (0 warning/0 error) và frontend đạt; 981 checks API/SQL tổng, 3
 có kiểm tra trùng nhau, không cộng các con số thành số ca độc lập. `--check-schema` đạt;
 source adapter/service/repository gateway không thay đổi so với `7e5e689`, không gọi lại provider.
 Các giới hạn bằng chứng thanh toán/callback thật tại mục 5.2 vẫn giữ nguyên.
+
+### 5.4. Sửa phản hồi review ngày 19/11/2026
+
+Phạm vi bản sửa: worktree trên `432973f`, sau review `490303a..432973f`.
+
+- Create và ghi receipt nhận Order AwaitingPayment; vẫn tương thích Pending cũ và chặn nguồn đóng.
+- Phục hồi intent đã commit trước HTTP: cùng key giữ intent/merchant/tiền/app_time/deadline;
+  Query trước, chỉ NotFound mới gửi lại Create nếu nguồn còn hợp lệ. Create/Query dùng chung lease
+  30 giây, gia hạn trước gửi Create phục hồi; completion có token nên phản hồi cũ không ghi đè lượt mới.
+  Khách khóa, nguồn đổi/đóng, thiếu thời hạn hoặc đổi ngày merchant không được gửi lại Create.
+- Worker giữ intent Pending chưa có kết luận sau downtime quá 24 giờ; receipt tìm thấy sau hạn
+  lưu Succeeded + LatePayment/RequiresReconciliation để consumer không hồi sinh nguồn đã hết hạn.
+  Create phục hồi bị từ chối sau lần gửi chưa rõ vẫn được Query tiếp.
+
+Không đổi schema/migration, public HTTP API hoặc cấu hình secret. Interface repository thêm
+AcquireCreateAsync và tham số token/now cho SaveCreateResultAsync để bảo vệ completion.
+
+Kiểm tra bản sửa đã chạy thành công:
+
+| Kiểm tra | Kết quả |
+| --- | --- |
+| Build solution .NET | 0 error; 5 cảnh báo NU1900 do NuGet vulnerability service không truy cập được khi restore |
+| Cấu hình/chữ ký và protocol adapter | 77 + 115 fixture nội bộ pass |
+| Gateway HTTP/SQL tập trung | 364 checks pass, gồm ba ca tái hiện và recovery/concurrency/token fencing |
+| API SQL tổng | 1.031 checks pass, bao gồm các ca gateway; không cộng hai suite thành số ca độc lập |
+| git diff --check | Pass |
+
+SQL checks dùng repositories/services thật và database ngẫu nhiên riêng đã dọn; chỉ HTTP provider
+được thay bằng fixture nội bộ. Build artifacts đặt ở đường dẫn ngắn trong workspace để tránh giới hạn
+native SqlClient DLL trên Windows. Log cục bộ `.tools/review-fix-*.log` bị Git ignore.
+Không gọi lại Sandbox thật trong lượt sửa review này; không thay bằng chứng/giới hạn tại mục 5.2.
+SCRUM-23 ở checkout riêng được giữ nguyên. Các kiểm tra trên được thực hiện trước commit/push;
+Trưởng nhóm quyết định duyệt cuối.

@@ -9,4 +9,5 @@ public sealed record ZaloPayIntentDto(int Id, int CustomerId, string Purpose, in
 
 public sealed record GatewayIntentCreation(ZaloPayIntent Intent, bool Created);
 public sealed record GatewayQueryLease(ZaloPayIntent Intent, Guid? Token, bool Acquired);
+public sealed record GatewayCreateLease(ZaloPayIntent Intent, Guid? Token, bool Acquired);
 public sealed record GatewayReceiptResult(ZaloPayIntent Intent, bool Recorded);

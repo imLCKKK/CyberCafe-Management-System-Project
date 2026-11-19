@@ -33,13 +33,23 @@ public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, I
         if (customerId <= 0 || key == Guid.Empty) throw new ValidationException("Khách hàng và khóa yêu cầu không hợp lệ.");
         var creation = await repository.CreateAsync(customerId, purpose, orderId, amountVnd, key,
             gateway.AppId, clock.GetUtcNow(), cancellationToken);
-        if (!creation.Created) return ToDto(creation.Intent);
-        var intent = creation.Intent;
+        if (!creation.Created)
+            return ToDto(NeedsCreateRecovery(creation.Intent)
+                ? await SyncAsync(creation.Intent.IntentId, cancellationToken) : creation.Intent);
+        var lease = await repository.AcquireCreateAsync(creation.Intent.IntentId, clock.GetUtcNow(), null, cancellationToken);
+        if (!lease.Acquired || lease.Token is null) return ToDto(lease.Intent);
+        return ToDto(await SendCreateAsync(lease, cancellationToken));
+    }
+
+    private async Task<ZaloPayIntent> SendCreateAsync(GatewayCreateLease lease, CancellationToken cancellationToken)
+    {
+        var intent = lease.Intent;
         // The intent, source and merchant ID are durable before HTTP; no SQL transaction crosses this call.
         var response = await gateway.CreateAsync(new GatewayCreateRequest(intent.IntentId, intent.Purpose,
             intent.CustomerId, intent.OrderId, intent.ProviderAppId, intent.MerchantTransactionId,
             intent.ExpectedAmountVnd, intent.CreatedAtUtc, intent.ExpiresAtUtc), cancellationToken);
-        return ToDto(await repository.SaveCreateResultAsync(intent.IntentId, response, cancellationToken));
+        return await repository.SaveCreateResultAsync(intent.IntentId, lease.Token!.Value, response,
+            clock.GetUtcNow(), cancellationToken);
     }
 
     public async Task<ZaloPayIntentDto> GetOwnAsync(int customerId, int intentId, CancellationToken cancellationToken)
@@ -101,7 +111,17 @@ public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, I
         if (!lease.Acquired || lease.Token is null) return lease.Intent;
         var response = await gateway.QueryAsync(lease.Intent.ProviderAppId, lease.Intent.MerchantTransactionId, cancellationToken);
         if (response.Receipt is null)
+        {
+            // NotFound is the only recovery result that permits resending the original Create.
+            // Promote, rather than release, the shared lease so concurrent replays cannot also Create.
+            if (response.State == "NotFound" && NeedsCreateRecovery(lease.Intent))
+            {
+                var create = await repository.AcquireCreateAsync(intentId, clock.GetUtcNow(), lease.Token, cancellationToken);
+                return create.Acquired && create.Token is not null
+                    ? await SendCreateAsync(create, cancellationToken) : create.Intent;
+            }
             return await repository.SaveQueryResultAsync(intentId, lease.Token.Value, response, clock.GetUtcNow(), cancellationToken);
+        }
         return (await repository.RecordReceiptAsync(intentId, lease.Token.Value, response.Receipt,
             clock.GetUtcNow(), cancellationToken)).Intent;
     }
@@ -110,6 +130,9 @@ public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, I
     {
         if (!gateway.Enabled) throw new PaymentUnavailableException("ZaloPay Sandbox chưa được bật trên máy chủ.");
     }
+
+    private static bool NeedsCreateRecovery(ZaloPayIntent intent) => intent.Status == "Pending"
+        && intent.PaymentUrl is null && intent.ProviderTransactionId is null;
 
     private static void ValidateIds(int customerId, int intentId)
     {
