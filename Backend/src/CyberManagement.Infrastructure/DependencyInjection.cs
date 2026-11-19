@@ -1,4 +1,4 @@
-﻿using CyberManagement.Application.Interfaces.Repositories;
+using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Infrastructure.Persistance;
 using CyberManagement.Infrastructure.Repositories;
@@ -55,7 +55,12 @@ public static class DependencyInjection
         services.AddScoped<ISessionSettlement, SessionSettlement>();
         services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
         services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
+        services.AddScoped<IVoucherRepository, VoucherRepository>();
+        services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
+        services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
 
+        services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
         return services;
     }
 }

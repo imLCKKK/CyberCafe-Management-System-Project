@@ -19,9 +19,13 @@ namespace CyberManagement.Application
             services.AddScoped<ITournamentService, TournamentService>();
             services.AddScoped<ITeamBalancingService, TeamBalancingService>();
             services.AddScoped<CounterTopUpService>();
+            services.AddScoped<IVoucherService, VoucherService>();
             services.AddScoped<IRequestValidator<LoginCommand>, LoginCommandValidator>();
             services.AddScoped<IRequestValidator<CustomerLoginCommand>, CustomerLoginCommandValidator>();
             services.AddScoped<IInventoryService, InventoryService>();
+            services.AddScoped<InvoiceService>();
+            services.AddScoped<IInvoiceService>(provider => provider.GetRequiredService<InvoiceService>());
+            services.AddScoped<ISessionInvoiceIssuer>(provider => provider.GetRequiredService<InvoiceService>());
             return services;
         }
     }

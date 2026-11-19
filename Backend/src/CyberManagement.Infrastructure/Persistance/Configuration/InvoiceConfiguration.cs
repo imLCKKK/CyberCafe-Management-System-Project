@@ -13,6 +13,9 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             t.HasCheckConstraint("CK_Invoices_Amounts", "[Subtotal] >= 0 AND [Discount] >= 0 AND [Discount] <= [Subtotal] AND [TotalAmount] = [Subtotal] - [Discount]");
             t.HasCheckConstraint("CK_Invoices_Status", "[Status] IN ('Unpaid','Paid','Cancelled')");
         });
+        builder.ToTable("Invoices", t => t.HasCheckConstraint("CK_Invoices_Actor",
+            "([ActorType] = 'Staff' AND [EmployeeId] IS NOT NULL) OR ([ActorType] = 'System' AND [EmployeeId] IS NULL AND [GamingSessionId] IS NOT NULL)"));
+        builder.Property(x => x.ActorType).HasMaxLength(10).HasDefaultValue("Staff").IsRequired();
         builder.HasKey(x => x.InvoiceId);
 
         builder.Property(x => x.Subtotal).HasPrecision(18, 0);
