@@ -10,17 +10,24 @@ function validateSessionRow(row) {
     || !date(row.startTimeUtc) || (row.endTimeUtc !== null && !date(row.endTimeUtc))
     || (row.lastChargedAtUtc !== null && !date(row.lastChargedAtUtc))
     || !Number.isSafeInteger(row.totalCost) || row.totalCost < 0
-    || !['Active', 'Ended', 'Cancelled'].includes(row.status)
-    || (row.status === 'Active' && row.endTimeUtc !== null)
-    || (row.status !== 'Active' && row.endTimeUtc === null)
-    || (row.endTimeUtc !== null && Date.parse(row.endTimeUtc) < Date.parse(row.startTimeUtc))
+    || typeof row.status !== 'string'
     || (row.pricePerHourSnapshot !== null && !id(row.pricePerHourSnapshot))) throw invalid();
   return row;
 }
 
+export function sessionReconciliationReason(row) {
+  if (!['Active', 'Ended', 'Cancelled'].includes(row.status)
+    || (row.status === 'Active') !== (row.endTimeUtc === null)
+    || (row.endTimeUtc !== null && Date.parse(row.endTimeUtc) < Date.parse(row.startTimeUtc)))
+    return 'Trạng thái và thời điểm của phiên không nhất quán, cần đối soát.';
+  if (row.status === 'Active' && row.pricePerHourSnapshot === null)
+    return 'Phiên thiếu giá giờ đã lưu, cần đối soát trước khi đóng.';
+  return null;
+}
+
 export function validateSession(row) {
   const session = validateSessionRow(row);
-  if (session.status === 'Active' && session.pricePerHourSnapshot === null) throw invalid();
+  if (sessionReconciliationReason(session)) throw invalid();
   return session;
 }
 

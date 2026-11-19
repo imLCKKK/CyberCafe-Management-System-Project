@@ -69,6 +69,15 @@ test('Admin list keeps both legacy and billable sessions while Home requires an 
   reply({ walletBalance: 50000, session: legacy });
   await assert.rejects(getSessionHome(), { status: 200 });
 });
+test('Conflicting status and end time stay in the admin list but fail strict validation', async () => {
+  const active = row();
+  for (const fields of [{ status: 'Ended' }, { status: 'Cancelled' }, { endTimeUtc: '2026-11-18T01:00:00Z' }]) {
+    const legacy = { ...active, gamingSessionId: 44, computerId: 14, ...fields };
+    reply([legacy, active]);
+    assert.deepEqual(await getSessions(), [legacy, active]);
+    assert.throws(() => validateSession(legacy), { status: 200 });
+  }
+});
 test('API conflict remains an error, with no local success fallback', async () => {
   globalThis.fetch = async () => Response.json({ detail: 'Máy đã có phiên.' }, { status: 409 });
   await assert.rejects(openSession(12, 7, 'conflict'), { status: 409, message: 'Máy đã có phiên.' });

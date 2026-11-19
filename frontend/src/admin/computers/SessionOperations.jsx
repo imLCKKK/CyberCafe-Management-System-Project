@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { getSessions, openSession, closeSession } from '../../shared/sessionApi';
+import { getSessions, openSession, closeSession, sessionReconciliationReason } from '../../shared/sessionApi';
 import { getCustomers } from '../../shared/customerWalletApi';
 import { getAccessToken } from '../../shared/auth/api';
 
@@ -22,7 +22,8 @@ export function SessionOperations({ computer, permissions, onSaved }) {
     if (!permissions.includes('session.view')) { setLoading(false); return () => controller.abort(); }
     getSessions(controller.signal).then(rows => {
       if (!controller.signal.aborted && getAccessToken() === token)
-        setSession(rows.find(row => row.computerId === computer.ComputerId && row.status === 'Active') || null);
+        setSession(rows.find(row => row.computerId === computer.ComputerId
+          && (row.status === 'Active' || row.endTimeUtc === null)) || null);
     }).catch(failure => { if (!controller.signal.aborted) setError(failure.message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -48,8 +49,8 @@ export function SessionOperations({ computer, permissions, onSaved }) {
     finally { pending.current = null; if (!controller.signal.aborted) setBusy(false); }
   }
   if (!permissions.includes('session.view') && !permissions.includes('session.start')) return null;
-  const idle = computer.Status === 'Available' && !computer.HasOpenSession && !computer.HasOpenMaintenance;
-  const needsReconciliation = session?.pricePerHourSnapshot === null;
+  const idle = !session && computer.Status === 'Available' && !computer.HasOpenSession && !computer.HasOpenMaintenance;
+  const reconciliationReason = session && sessionReconciliationReason(session);
   return <section className="computer-management maintenance-panel" aria-label="Phiên chơi">
     <h3>Phiên chơi</h3>
     {loading && <p role="status">Đang tải phiên…</p>}
@@ -64,8 +65,8 @@ export function SessionOperations({ computer, permissions, onSaved }) {
       <button className="cafe-button primary" disabled={loading || busy || !customerId}>Mở phiên</button>
     </form>}
     {session && <p>Phiên #{session.gamingSessionId} · Khách #{session.customerId} · Đã thu {session.totalCost.toLocaleString('vi-VN')} đ</p>}
-    {needsReconciliation && <p className="cafe-error" role="alert">Phiên thiếu giá giờ đã lưu, cần đối soát trước khi đóng.</p>}
-    {session && !needsReconciliation && permissions.includes('session.end') && permissions.includes('invoice.create') &&
+    {reconciliationReason && <p className="cafe-error" role="alert">{reconciliationReason}</p>}
+    {session && !reconciliationReason && permissions.includes('session.end') && permissions.includes('invoice.create') &&
       <button className="cafe-button primary" disabled={busy}
         onClick={() => void run(signal => closeSession(session.gamingSessionId, key.current, signal))}>Đóng phiên và xuất hóa đơn</button>}
   </section>;

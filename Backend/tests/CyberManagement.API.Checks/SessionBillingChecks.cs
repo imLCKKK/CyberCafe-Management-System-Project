@@ -312,6 +312,11 @@ internal static class SessionBillingChecks
             try { await Bill(corruptCustomer); throw new InvalidOperationException("Expected inconsistent checkpoint rejection."); }
             catch (BusinessRuleException) { Check("Inconsistent checkpoint is rejected without silently repairing fees", true); }
             Check("Rejected checkpoint preserves financial and machine state", corruptBefore == await Snapshot(corruptSession.GamingSessionId));
+            await Edit(async db => (await db.GamingSessions.FindAsync(corruptSession.GamingSessionId))!.Status = "Ended");
+            var listed = await Read<SessionDto[]>(await Send(HttpMethod.Get, "/api/admin/sessions", admin));
+            Check("Admin list returns both the ended legacy row without an end time and the active session",
+                listed.Any(x => x.GamingSessionId == corruptSession.GamingSessionId && x.Status == "Ended" && x.EndTimeUtc is null)
+                && listed.Any(x => x.GamingSessionId == workerSession.GamingSessionId && x.Status == "Active"));
             return checks;
 
             async Task<string> Login(string username)
