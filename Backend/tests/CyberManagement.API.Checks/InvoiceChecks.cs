@@ -346,10 +346,16 @@ internal static class InvoiceChecks
             await ExpectHttp("Replay still checks current permission",HttpStatusCode.Forbidden,HttpMethod.Post,route,admin,request,"issue:original");
             await using(var scope=app.Services.CreateAsyncScope())
             {
-                var db=Db(scope);var migrationCount=(await db.Database.GetAppliedMigrationsAsync()).Count();
+                var db=Db(scope);
+                var latestMigrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();
+                // Exercise the invoice-owned downgrade guard before any later, empty feature migrations.
+                await db.GetService<IMigrator>().MigrateAsync("20261115145716_TrackOrderDetailCancellation");
+                var migrationCount=(await db.Database.GetAppliedMigrationsAsync()).Count();
                 await Throws<SqlException>("Unsafe downgrade refused",()=>db.GetService<IMigrator>().MigrateAsync("20261114071953_AddInventoryMovementOperationKey"));
                 Check("Refused downgrade preserves metadata/history",(await db.Database.GetAppliedMigrationsAsync()).Count()==migrationCount
                     &&await db.Invoices.AnyAsync(x=>x.ActorType=="System"));
+                await db.Database.MigrateAsync();
+                Check("Latest merged schema is restored after the invoice downgrade guard",(await db.Database.GetAppliedMigrationsAsync()).SequenceEqual(latestMigrations));
             }
             var upgradeFixture=new AuthCheckDatabase(connection);
             try

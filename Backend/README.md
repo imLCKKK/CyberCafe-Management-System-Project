@@ -20,6 +20,17 @@ writer không tự SaveChanges/commit. Hai migration bổ sung giữ ledger/Appr
 cho Pending và tạo model 39 bảng/bảy migration trên base SCRUM-13. Bảng dự án bên trên mô tả nền gốc.
 Quyết định phiên/đơn ngày 14/11 giữ nguyên; gateway ZaloPay, worker phiên và checkout theo task riêng.
 
+## SCRUM-22: adapter gateway và callback
+
+[Hợp đồng gateway](docs/007-zalopay-gateway-callbacks.md) mô tả API TopUp/Order, intent/receipt,
+HMAC/callback/Query, cấu hình secret và cách phân biệt fixture với gọi sandbox thật.
+Create lưu ID/số tiền trước HTTP; callback/Query ghi receipt chống lặp. Cộng ví, Payment nghiệp vụ,
+xác nhận Order và realtime hoàn tất thuộc S2-M-3; luồng tiền mặt SCRUM-21 giữ nguyên.
+
+Từ repository root, chạy `.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --zalopay-gateway-checks`;
+chế độ SQL `--gateway-only` yêu cầu `AUTH_CHECKS_SQL_CONNECTION`
+và tạo/dọn DB thử riêng. Chi tiết các lệnh nằm trong hợp đồng; không ghi keys hoặc URL token vào log.
+
 ## SCRUM-21: nạp tiền mặt và tiền tặng
 
 Khách chọn tám mức nạp tại `/client/wallet`; admin có `wallet.topup` thu đủ tiền mặt rồi duyệt tại

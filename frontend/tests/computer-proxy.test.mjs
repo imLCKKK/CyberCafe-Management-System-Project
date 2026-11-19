@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer, preview } from 'vite';
 
 for (const mode of ['legacy-dev', 'auth-dev', 'preview']) {
-test(`Vite ${mode} forwards auth/admin/menu/customers and realtime WebSockets while keeping OP.GG middleware local`, async () => {
+test(`Vite ${mode} forwards auth/admin/client/menu/customers/payments and realtime WebSockets while keeping OP.GG middleware local`, async () => {
   const backendRequests = [];
   const upgrades = [];
   const upgradedSockets = new Set();
@@ -48,9 +48,23 @@ test(`Vite ${mode} forwards auth/admin/menu/customers and realtime WebSockets wh
       ['/api/admin/computers/101/status', 'PATCH'],
       ['/api/admin/products', 'GET'],
       ['/api/admin/inventory', 'GET'],
+      ['/api/admin/invoices', 'GET'],
+      ['/api/admin/invoices', 'POST'],
+      ['/api/admin/invoices/1/print', 'GET'],
+      ['/api/client/invoices', 'GET'],
+      ['/api/client/invoices/1', 'GET'],
+      ['/api/client/invoices/1/print', 'GET'],
+      ['/api/admin/vouchers', 'GET'],
+      ['/api/admin/vouchers/1/status', 'PUT'],
+      ['/api/client/vouchers/preview', 'POST'],
       ['/api/menu', 'GET'],
       ['/api/customers/me', 'GET'],
       ['/api/customers/me/wallet', 'GET'],
+      ['/api/customers/me/payments/zalopay/1', 'GET'],
+      ['/api/customers/me/payments/zalopay/topups', 'POST'],
+      ['/api/customers/me/payments/zalopay/orders/1', 'POST'],
+      ['/api/customers/me/payments/zalopay/1/sync', 'POST'],
+      ['/api/payments/zalopay/callback', 'POST'],
       ['/api/customers/me/wallet/counter-topups/options', 'GET'],
       ['/api/customers/me/wallet/counter-topups', 'POST'],
       ['/api/admin/topups', 'GET'],

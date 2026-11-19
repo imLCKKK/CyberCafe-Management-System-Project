@@ -14,6 +14,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
 
         var status = exception switch
         {
+            PaymentUnavailableException => StatusCodes.Status503ServiceUnavailable,
             EntityNotFoundException => StatusCodes.Status404NotFound,
             BusinessRuleException => StatusCodes.Status409Conflict,
             ValidationException => StatusCodes.Status400BadRequest,
@@ -29,6 +30,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
             403 => "Không có quyền truy cập",
             404 => "Không tìm thấy dữ liệu",
             409 => "Không thể thực hiện thao tác",
+            503 => "Cổng thanh toán chưa sẵn sàng",
             _ => "Lỗi hệ thống"
         };
         if (status == 500)

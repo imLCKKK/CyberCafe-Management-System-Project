@@ -264,3 +264,11 @@ có `-UseOfficialDemo`. Script ghi CallbackUrl mới theo tunnel được cấp,
 Chỉ lưu URL sau khi marker public probe xác nhận cấu hình đang bật/hợp lệ và đường HTTPS truy cập được.
 Nhánh official demo sẽ tắt lại cờ do nó quản lý nếu bước enable/probe/fixture thất bại; cleanup không
 tự tắt cờ merchant riêng. Cờ Enabled vẫn không chứng minh credentials đã được provider chấp nhận.
+
+## 9. Triển khai S2-M-2 — SCRUM-22
+
+Ngày 15/11/2026 bổ sung [adapter và callback SCRUM-22](007-zalopay-gateway-callbacks.md) trên base dev
+`c6fd920`: hai purpose TopUp/Order dùng chung adapter, intent/receipt bền vững và callback/Query chống lặp.
+SCRUM-22 chưa cộng ví/ledger hoặc xác nhận/hoàn tất Order; các consumer nghiệp vụ thuộc S2-M-3.
+Luồng tiền mặt SCRUM-21 giữ riêng. Các mục bằng chứng S1 ở trên giữ nguyên ngày/phạm vi lịch sử,
+không được hiểu là kết quả provider hoặc nghiệm thu mới của SCRUM-22.
