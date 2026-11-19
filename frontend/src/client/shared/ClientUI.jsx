@@ -1,15 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, ChevronRight, Clock3, Info, Minus, Plus, ShoppingBag, X } from 'lucide-react';
 import HomeDialog from './Dialog';
-import { productArt } from './demoData';
+export { FoodArt } from '../../shared/food/FoodArt';
 import { dateTime, labels, money, requestItemCancel } from './demoModel';
 import { useClientDemo } from './ClientDemoContext';
 
 export function Badge({ status, children }) {
   return <span className={`home-badge ${['Pending', 'Mixed', 'CreditedUnpaid', 'Active'].includes(status) ? 'amber' : ['Cancelled', 'Rejected', 'Ended'].includes(status) ? 'muted' : ''}`}><i/>{children || labels[status] || status}</span>;
-}
-export function FoodArt({ product, small = false }) {
-  return <div className={`home-food-art food-art-${product.category_id} ${small ? 'food-art-small' : ''}`} aria-hidden="true"><span>{productArt[product.id] || '🍽️'}</span><i/><b>NEXORA KITCHEN</b></div>;
 }
 export function PageHeading({ eyebrow, title, description, children }) {
   return <div className="home-heading"><div><div className="home-eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{children}</div>;

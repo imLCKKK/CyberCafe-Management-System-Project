@@ -31,10 +31,13 @@ internal static class CatalogChecks
         var category = (await created.Content.ReadFromJsonAsync<CategoryDto>())!;
         object ProductBody(decimal price = 30000, bool active = true, int? categoryId = null) =>
             new { name = "TEST_Mì bò", categoryId = categoryId ?? category.Id, currentPrice = price, isActive = active };
-        using var productResponse = await Send(HttpMethod.Post, "/api/admin/products", admin, ProductBody());
+        const string imageUrl = "/food/mi-xao-bo-v1.640.jpg";
+        using var productResponse = await Send(HttpMethod.Post, "/api/admin/products", admin,
+            new { name = "TEST_Mì bò", categoryId = category.Id, currentPrice = 30000, isActive = true, imageUrl = $" {imageUrl} " });
         await Status("Create product", HttpStatusCode.Created, productResponse);
         var product = (await productResponse.Content.ReadFromJsonAsync<ProductDto>())!;
         Check("New product starts with zero stock", product.StockQuantity == 0);
+        Check("Create trims image URL", product.ImageUrl == imageUrl);
 
         foreach (var path in new[] { "/api/admin/categories", "/api/admin/products" })
         {
@@ -52,6 +55,9 @@ internal static class CatalogChecks
         foreach (var price in new[] { -1m, 0.5m, 1_000_000_000m })
             await Status("Invalid VND price " + price, HttpStatusCode.BadRequest,
                 await Send(HttpMethod.Post, "/api/admin/products", admin, ProductBody(price)));
+        foreach (var invalid in new[] { "javascript:alert(1)", "data:image/png;base64,AAA", "file:///photo.jpg", "//example.test/image.jpg", "/food\\image.jpg", "/food/a\nb.jpg", "food/image.jpg", "https://user:password@example.test/image.jpg", "/" + new string('x', 500) })
+            await Status("Invalid image URL", HttpStatusCode.BadRequest, await Send(HttpMethod.Post, "/api/admin/products", admin,
+                new { name = "Bad image", categoryId = category.Id, currentPrice = 30000, isActive = true, imageUrl = invalid }));
         await Status("Unknown category", HttpStatusCode.Conflict, await Send(HttpMethod.Post, "/api/admin/products", admin, ProductBody(categoryId: int.MaxValue)));
         await Status("Invalid category ID", HttpStatusCode.BadRequest, await Send(HttpMethod.Post, "/api/admin/products", admin, ProductBody(categoryId: 0)));
         await Status("Missing required price", HttpStatusCode.BadRequest, await Send(HttpMethod.Post, "/api/admin/products", admin,
@@ -75,9 +81,16 @@ internal static class CatalogChecks
         await Status("Manager edits price", HttpStatusCode.OK, await Send(HttpMethod.Put, $"/api/admin/products/{product.Id}", tokens["Manager"], ProductBody(35000)));
         var menu = await Menu();
         Check("Menu uses persisted price and inventory", menu.Products.Single(p => p.Id == product.Id) is { CurrentPrice: 35000, StockQuantity: 7 });
+        Check("An older caller can edit price without clearing image", menu.Products.Single(p => p.Id == product.Id).ImageUrl == imageUrl);
         using var adminReload = await Send(HttpMethod.Get, "/api/admin/products", admin);
         var reloaded = (await adminReload.Content.ReadFromJsonAsync<ProductDto[]>())!.Single(p => p.Id == product.Id);
         Check("Reload uses SQL price, name and stock", reloaded.CurrentPrice == 35000 && reloaded.StockQuantity == 7 && reloaded.Name == "TEST_Mì bò");
+        Check("Admin reload includes persisted image", reloaded.ImageUrl == imageUrl);
+        await Status("Explicit null clears image", HttpStatusCode.OK, await Send(HttpMethod.Put, $"/api/admin/products/{product.Id}", admin,
+            new { name = "TEST_Mì bò", categoryId = category.Id, currentPrice = 35000, isActive = true, imageUrl = (string?)null }));
+        Check("Menu reload observes cleared image", (await Menu()).Products.Single(p => p.Id == product.Id).ImageUrl is null);
+        await Status("Restore image", HttpStatusCode.OK, await Send(HttpMethod.Put, $"/api/admin/products/{product.Id}", admin,
+            new { name = "TEST_Mì bò", categoryId = category.Id, currentPrice = 35000, isActive = true, imageUrl }));
         await Status("Disable product", HttpStatusCode.NoContent, await Send(HttpMethod.Delete, $"/api/admin/products/{product.Id}", admin));
         Check("Disabled product is absent from menu", !(await Menu()).Products.Any(p => p.Id == product.Id));
         await Status("Re-enable zero-price product", HttpStatusCode.OK, await Send(HttpMethod.Put, $"/api/admin/products/{product.Id}", admin, ProductBody(0)));
@@ -92,6 +105,7 @@ internal static class CatalogChecks
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             Check("Catalog operations preserve stock and historical row", await db.Products.AnyAsync(p => p.ProductId == product.Id && p.Stock == 7));
+            Check("Image is stored on the same SQL product row", await db.Products.AnyAsync(p => p.ProductId == product.Id && p.ImageUrl == imageUrl));
             Check("Invalid requests did not insert products", await db.Products.CountAsync(p => p.CategoryId == category.Id) == 1);
         }
         return checks;

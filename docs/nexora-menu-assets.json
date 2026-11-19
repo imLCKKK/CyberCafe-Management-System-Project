@@ -1,0 +1,440 @@
+{
+    "task":  "SCRUM-34",
+    "kind":  "image_assets_only",
+    "assets":  [
+                   {
+                       "key":  "com-ga-xoi-mo",
+                       "name":  "Cơm gà xối mỡ",
+                       "group":  "rice",
+                       "imageUrl":  "/food/com-ga-xoi-mo-v1.640.jpg",
+                       "thumbnailUrl":  "/food/com-ga-xoi-mo-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-cay-hai-san",
+                       "name":  "Mì cay hải sản",
+                       "group":  "noodles",
+                       "imageUrl":  "/food/mi-cay-hai-san-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-cay-hai-san-v1.320.jpg"
+                   },
+                   {
+                       "key":  "tra-dao-cam-sa",
+                       "name":  "Trà đào cam sả",
+                       "group":  "tea",
+                       "imageUrl":  "/food/tra-dao-cam-sa-v1.640.jpg",
+                       "thumbnailUrl":  "/food/tra-dao-cam-sa-v1.320.jpg"
+                   },
+                   {
+                       "key":  "com-ga-sot-teriyaki",
+                       "name":  "Cơm gà sốt teriyaki",
+                       "group":  "rice",
+                       "imageUrl":  "/food/com-ga-sot-teriyaki-v1.640.jpg",
+                       "thumbnailUrl":  "/food/com-ga-sot-teriyaki-v1.320.jpg"
+                   },
+                   {
+                       "key":  "com-ga-sot-cay",
+                       "name":  "Cơm gà sốt cay",
+                       "group":  "rice",
+                       "imageUrl":  "/food/com-ga-sot-cay-v1.640.jpg",
+                       "thumbnailUrl":  "/food/com-ga-sot-cay-v1.320.jpg"
+                   },
+                   {
+                       "key":  "com-bo-xao-tieu-den",
+                       "name":  "Cơm bò xào tiêu đen",
+                       "group":  "rice",
+                       "imageUrl":  "/food/com-bo-xao-tieu-den-v1.640.jpg",
+                       "thumbnailUrl":  "/food/com-bo-xao-tieu-den-v1.320.jpg"
+                   },
+                   {
+                       "key":  "com-suon-nuong",
+                       "name":  "Cơm sườn nướng",
+                       "group":  "rice",
+                       "imageUrl":  "/food/com-suon-nuong-v1.640.jpg",
+                       "thumbnailUrl":  "/food/com-suon-nuong-v1.320.jpg"
+                   },
+                   {
+                       "key":  "com-chien-trung",
+                       "name":  "Cơm chiên trứng",
+                       "group":  "rice",
+                       "imageUrl":  "/food/com-chien-trung-v1.640.jpg",
+                       "thumbnailUrl":  "/food/com-chien-trung-v1.320.jpg"
+                   },
+                   {
+                       "key":  "com-chien-duong-chau",
+                       "name":  "Cơm chiên dương châu",
+                       "group":  "rice",
+                       "imageUrl":  "/food/com-chien-duong-chau-v1.640.jpg",
+                       "thumbnailUrl":  "/food/com-chien-duong-chau-v1.320.jpg"
+                   },
+                   {
+                       "key":  "com-chien-hai-san",
+                       "name":  "Cơm chiên hải sản",
+                       "group":  "rice",
+                       "imageUrl":  "/food/com-chien-hai-san-v1.640.jpg",
+                       "thumbnailUrl":  "/food/com-chien-hai-san-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-xao-bo",
+                       "name":  "Mì xào bò",
+                       "group":  "noodles",
+                       "imageUrl":  "/food/mi-xao-bo-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-xao-bo-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-xao-hai-san",
+                       "name":  "Mì xào hải sản",
+                       "group":  "noodles",
+                       "imageUrl":  "/food/mi-xao-hai-san-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-xao-hai-san-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-xao-trung-xuc-xich",
+                       "name":  "Mì xào trứng xúc xích",
+                       "group":  "noodles",
+                       "imageUrl":  "/food/mi-xao-trung-xuc-xich-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-xao-trung-xuc-xich-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-tron-bo",
+                       "name":  "Mì trộn bò",
+                       "group":  "noodles",
+                       "imageUrl":  "/food/mi-tron-bo-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-tron-bo-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-tron-ga-cay",
+                       "name":  "Mì trộn gà cay",
+                       "group":  "noodles",
+                       "imageUrl":  "/food/mi-tron-ga-cay-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-tron-ga-cay-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-tron-trung-xuc-xich",
+                       "name":  "Mì trộn trứng xúc xích",
+                       "group":  "noodles",
+                       "imageUrl":  "/food/mi-tron-trung-xuc-xich-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-tron-trung-xuc-xich-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-cay-ga",
+                       "name":  "Mì cay gà",
+                       "group":  "noodles",
+                       "imageUrl":  "/food/mi-cay-ga-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-cay-ga-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-cay-bo",
+                       "name":  "Mì cay bò",
+                       "group":  "noodles",
+                       "imageUrl":  "/food/mi-cay-bo-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-cay-bo-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-cay-thap-cam",
+                       "name":  "Mì cay thập cẩm",
+                       "group":  "noodles",
+                       "imageUrl":  "/food/mi-cay-thap-cam-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-cay-thap-cam-v1.320.jpg"
+                   },
+                   {
+                       "key":  "tra-sua-truyen-thong-tran-chau",
+                       "name":  "Trà sữa truyền thống trân châu",
+                       "group":  "tea",
+                       "imageUrl":  "/food/tra-sua-truyen-thong-tran-chau-v1.640.jpg",
+                       "thumbnailUrl":  "/food/tra-sua-truyen-thong-tran-chau-v1.320.jpg"
+                   },
+                   {
+                       "key":  "tra-sua-thai-xanh",
+                       "name":  "Trà sữa Thái xanh",
+                       "group":  "tea",
+                       "imageUrl":  "/food/tra-sua-thai-xanh-v1.640.jpg",
+                       "thumbnailUrl":  "/food/tra-sua-thai-xanh-v1.320.jpg"
+                   },
+                   {
+                       "key":  "tra-sua-socola",
+                       "name":  "Trà sữa socola",
+                       "group":  "tea",
+                       "imageUrl":  "/food/tra-sua-socola-v1.640.jpg",
+                       "thumbnailUrl":  "/food/tra-sua-socola-v1.320.jpg"
+                   },
+                   {
+                       "key":  "tra-sua-khoai-mon",
+                       "name":  "Trà sữa khoai môn",
+                       "group":  "tea",
+                       "imageUrl":  "/food/tra-sua-khoai-mon-v1.640.jpg",
+                       "thumbnailUrl":  "/food/tra-sua-khoai-mon-v1.320.jpg"
+                   },
+                   {
+                       "key":  "tra-sua-o-long",
+                       "name":  "Trà sữa ô long",
+                       "group":  "tea",
+                       "imageUrl":  "/food/tra-sua-o-long-v1.640.jpg",
+                       "thumbnailUrl":  "/food/tra-sua-o-long-v1.320.jpg"
+                   },
+                   {
+                       "key":  "sua-tuoi-tran-chau-duong-den",
+                       "name":  "Sữa tươi trân châu đường đen",
+                       "group":  "tea",
+                       "imageUrl":  "/food/sua-tuoi-tran-chau-duong-den-v1.640.jpg",
+                       "thumbnailUrl":  "/food/sua-tuoi-tran-chau-duong-den-v1.320.jpg"
+                   },
+                   {
+                       "key":  "tra-vai",
+                       "name":  "Trà vải",
+                       "group":  "tea",
+                       "imageUrl":  "/food/tra-vai-v1.640.jpg",
+                       "thumbnailUrl":  "/food/tra-vai-v1.320.jpg"
+                   },
+                   {
+                       "key":  "tra-chanh-day",
+                       "name":  "Trà chanh dây",
+                       "group":  "tea",
+                       "imageUrl":  "/food/tra-chanh-day-v1.640.jpg",
+                       "thumbnailUrl":  "/food/tra-chanh-day-v1.320.jpg"
+                   },
+                   {
+                       "key":  "tra-chanh",
+                       "name":  "Trà chanh",
+                       "group":  "tea",
+                       "imageUrl":  "/food/tra-chanh-v1.640.jpg",
+                       "thumbnailUrl":  "/food/tra-chanh-v1.320.jpg"
+                   },
+                   {
+                       "key":  "tra-tac-mat-ong",
+                       "name":  "Trà tắc mật ong",
+                       "group":  "tea",
+                       "imageUrl":  "/food/tra-tac-mat-ong-v1.640.jpg",
+                       "thumbnailUrl":  "/food/tra-tac-mat-ong-v1.320.jpg"
+                   },
+                   {
+                       "key":  "khoai-tay-chien",
+                       "name":  "Khoai tây chiên",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/khoai-tay-chien-v2.640.jpg",
+                       "thumbnailUrl":  "/food/khoai-tay-chien-v2.320.jpg"
+                   },
+                   {
+                       "key":  "khoai-tay-lac-pho-mai",
+                       "name":  "Khoai tây lắc phô mai",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/khoai-tay-lac-pho-mai-v2.640.jpg",
+                       "thumbnailUrl":  "/food/khoai-tay-lac-pho-mai-v2.320.jpg"
+                   },
+                   {
+                       "key":  "xuc-xich-chien",
+                       "name":  "Xúc xích chiên",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/xuc-xich-chien-v2.640.jpg",
+                       "thumbnailUrl":  "/food/xuc-xich-chien-v2.320.jpg"
+                   },
+                   {
+                       "key":  "ca-vien-chien",
+                       "name":  "Cá viên chiên",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/ca-vien-chien-v2.640.jpg",
+                       "thumbnailUrl":  "/food/ca-vien-chien-v2.320.jpg"
+                   },
+                   {
+                       "key":  "bo-vien-chien",
+                       "name":  "Bò viên chiên",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/bo-vien-chien-v2.640.jpg",
+                       "thumbnailUrl":  "/food/bo-vien-chien-v2.320.jpg"
+                   },
+                   {
+                       "key":  "ga-vien-chien",
+                       "name":  "Gà viên chiên",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/ga-vien-chien-v2.640.jpg",
+                       "thumbnailUrl":  "/food/ga-vien-chien-v2.320.jpg"
+                   },
+                   {
+                       "key":  "ga-popcorn",
+                       "name":  "Gà popcorn",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/ga-popcorn-v2.640.jpg",
+                       "thumbnailUrl":  "/food/ga-popcorn-v2.320.jpg"
+                   },
+                   {
+                       "key":  "pho-mai-que",
+                       "name":  "Phô mai que",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/pho-mai-que-v2.640.jpg",
+                       "thumbnailUrl":  "/food/pho-mai-que-v2.320.jpg"
+                   },
+                   {
+                       "key":  "met-vien-chien-thap-cam",
+                       "name":  "Mẹt viên chiên thập cẩm",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/met-vien-chien-thap-cam-v2.640.jpg",
+                       "thumbnailUrl":  "/food/met-vien-chien-thap-cam-v2.320.jpg"
+                   },
+                   {
+                       "key":  "hoanh-thanh-chien",
+                       "name":  "Hoành thánh chiên",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/hoanh-thanh-chien-v2.640.jpg",
+                       "thumbnailUrl":  "/food/hoanh-thanh-chien-v2.320.jpg"
+                   },
+                   {
+                       "key":  "banh-gao-lac-pho-mai",
+                       "name":  "Bánh gạo lắc phô mai",
+                       "group":  "snacks",
+                       "imageUrl":  "/food/banh-gao-lac-pho-mai-v2.640.jpg",
+                       "thumbnailUrl":  "/food/banh-gao-lac-pho-mai-v2.320.jpg"
+                   },
+                   {
+                       "key":  "com-them",
+                       "name":  "Cơm thêm",
+                       "group":  "addons",
+                       "imageUrl":  "/food/com-them-v1.640.jpg",
+                       "thumbnailUrl":  "/food/com-them-v1.320.jpg"
+                   },
+                   {
+                       "key":  "mi-them",
+                       "name":  "Mì thêm",
+                       "group":  "addons",
+                       "imageUrl":  "/food/mi-them-v1.640.jpg",
+                       "thumbnailUrl":  "/food/mi-them-v1.320.jpg"
+                   },
+                   {
+                       "key":  "trung-them",
+                       "name":  "Trứng thêm",
+                       "group":  "addons",
+                       "imageUrl":  "/food/trung-them-v1.640.jpg",
+                       "thumbnailUrl":  "/food/trung-them-v1.320.jpg"
+                   },
+                   {
+                       "key":  "xuc-xich-them",
+                       "name":  "Xúc xích thêm",
+                       "group":  "addons",
+                       "imageUrl":  "/food/xuc-xich-them-v1.640.jpg",
+                       "thumbnailUrl":  "/food/xuc-xich-them-v1.320.jpg"
+                   },
+                   {
+                       "key":  "bo-them",
+                       "name":  "Bò thêm",
+                       "group":  "addons",
+                       "imageUrl":  "/food/bo-them-v1.640.jpg",
+                       "thumbnailUrl":  "/food/bo-them-v1.320.jpg"
+                   },
+                   {
+                       "key":  "ga-them",
+                       "name":  "Gà thêm",
+                       "group":  "addons",
+                       "imageUrl":  "/food/ga-them-v1.640.jpg",
+                       "thumbnailUrl":  "/food/ga-them-v1.320.jpg"
+                   },
+                   {
+                       "key":  "hai-san-them",
+                       "name":  "Hải sản thêm",
+                       "group":  "addons",
+                       "imageUrl":  "/food/hai-san-them-v1.640.jpg",
+                       "thumbnailUrl":  "/food/hai-san-them-v1.320.jpg"
+                   },
+                   {
+                       "key":  "coca-cola",
+                       "name":  "Coca-Cola",
+                       "group":  "bottles",
+                       "imageUrl":  "/food/coca-cola-v1.640.jpg",
+                       "thumbnailUrl":  "/food/coca-cola-v1.320.jpg"
+                   },
+                   {
+                       "key":  "coca-cola-khong-duong",
+                       "name":  "Coca-Cola không đường",
+                       "group":  "bottles",
+                       "imageUrl":  "/food/coca-cola-khong-duong-v1.640.jpg",
+                       "thumbnailUrl":  "/food/coca-cola-khong-duong-v1.320.jpg"
+                   },
+                   {
+                       "key":  "pepsi",
+                       "name":  "Pepsi",
+                       "group":  "bottles",
+                       "imageUrl":  "/food/pepsi-v1.640.jpg",
+                       "thumbnailUrl":  "/food/pepsi-v1.320.jpg"
+                   },
+                   {
+                       "key":  "sprite",
+                       "name":  "Sprite",
+                       "group":  "bottles",
+                       "imageUrl":  "/food/sprite-v1.640.jpg",
+                       "thumbnailUrl":  "/food/sprite-v1.320.jpg"
+                   },
+                   {
+                       "key":  "7up",
+                       "name":  "7Up",
+                       "group":  "bottles",
+                       "imageUrl":  "/food/7up-v1.640.jpg",
+                       "thumbnailUrl":  "/food/7up-v1.320.jpg"
+                   },
+                   {
+                       "key":  "fanta-cam",
+                       "name":  "Fanta cam",
+                       "group":  "bottles",
+                       "imageUrl":  "/food/fanta-cam-v1.640.jpg",
+                       "thumbnailUrl":  "/food/fanta-cam-v1.320.jpg"
+                   },
+                   {
+                       "key":  "fanta-nho",
+                       "name":  "Fanta nho",
+                       "group":  "bottles",
+                       "imageUrl":  "/food/fanta-nho-v1.640.jpg",
+                       "thumbnailUrl":  "/food/fanta-nho-v1.320.jpg"
+                   },
+                   {
+                       "key":  "sting-dau",
+                       "name":  "Sting dâu",
+                       "group":  "bottles",
+                       "imageUrl":  "/food/sting-dau-v1.640.jpg",
+                       "thumbnailUrl":  "/food/sting-dau-v1.320.jpg"
+                   },
+                   {
+                       "key":  "twister-cam",
+                       "name":  "Twister cam",
+                       "group":  "bottles",
+                       "imageUrl":  "/food/twister-cam-v1.640.jpg",
+                       "thumbnailUrl":  "/food/twister-cam-v1.320.jpg"
+                   },
+                   {
+                       "key":  "combo-tiep-tran",
+                       "name":  "Tiếp Trận",
+                       "group":  "combos",
+                       "imageUrl":  "/food/combo-tiep-tran-poster-v1.640.jpg",
+                       "thumbnailUrl":  "/food/combo-tiep-tran-poster-v1.320.jpg"
+                   },
+                   {
+                       "key":  "combo-no-bung",
+                       "name":  "No Bụng",
+                       "group":  "combos",
+                       "imageUrl":  "/food/combo-no-bung-poster-v1.640.jpg",
+                       "thumbnailUrl":  "/food/combo-no-bung-poster-v1.320.jpg"
+                   },
+                   {
+                       "key":  "combo-bung-vi",
+                       "name":  "Bùng Vị",
+                       "group":  "combos",
+                       "imageUrl":  "/food/combo-bung-vi-poster-v1.640.jpg",
+                       "thumbnailUrl":  "/food/combo-bung-vi-poster-v1.320.jpg"
+                   },
+                   {
+                       "key":  "combo-an-vat-solo",
+                       "name":  "Ăn Vặt Solo",
+                       "group":  "combos",
+                       "imageUrl":  "/food/combo-an-vat-solo-poster-v1.640.jpg",
+                       "thumbnailUrl":  "/food/combo-an-vat-solo-poster-v1.320.jpg"
+                   },
+                   {
+                       "key":  "combo-dong-doi",
+                       "name":  "Đồng Đội — 2 người",
+                       "group":  "combos",
+                       "imageUrl":  "/food/combo-dong-doi-poster-v1.640.jpg",
+                       "thumbnailUrl":  "/food/combo-dong-doi-poster-v1.320.jpg"
+                   },
+                   {
+                       "key":  "combo-ga-gion-solo",
+                       "name":  "Gà Giòn Solo",
+                       "group":  "combos",
+                       "imageUrl":  "/food/combo-ga-gion-solo-poster-v1.640.jpg",
+                       "thumbnailUrl":  "/food/combo-ga-gion-solo-poster-v1.320.jpg"
+                   }
+               ]
+}

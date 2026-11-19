@@ -70,7 +70,7 @@ Cần .NET 10 SDK; `global.json` chọn bản ổn định. Wrapper tìm SDK por
 
 ## Cấu hình DB mới và secret
 
-`ConnectionStrings:DefaultConnection` trong cấu hình chung được để trống. API yêu cầu cấp connection string và JWT signing key bằng User Secrets hoặc biến môi trường. `appsettings.Development.json` nếu dùng chỉ là file local được ignore; không đặt signing key dùng chung trong repo.
+`ConnectionStrings:DefaultConnection` phải trỏ đúng server/DB của môi trường đang chạy; file chung hiện có giá trị cục bộ từ dev. Dùng cấu hình Development, User Secrets hoặc biến môi trường để ghi đè và cấp JWT signing key riêng. `appsettings.Development.json` nếu dùng chỉ là file local được ignore; không đặt signing key dùng chung trong repo.
 
 Ví dụ với SQL Server cục bộ, dùng **tên DB mới của bạn**, từ repository root:
 
@@ -177,6 +177,59 @@ Có tìm/lọc, tải lại và tải lại khi cửa sổ nhận focus; lỗi/r
 Giỏ chỉ lưu lựa chọn tạm trong màn hình; reload toàn trang làm trống giỏ. Lịch sử demo còn được gắn nhãn riêng.
 Đường đặt ví/tiền mặt demo đã được gỡ khỏi menu SQL: nút gửi đơn chưa khả dụng cho đến khi
 task checkout triển khai; không dùng ProductId thật để tạo đơn/trừ tiền localStorage.
+
+### SCRUM-34 — ảnh sản phẩm
+
+Migration mới `20261117130111_AddProductImageUrl` thêm `Products.ImageUrl` nullable `nvarchar(500)`;
+không sửa migration cũ. GET sản phẩm/menu trả thêm `imageUrl`. POST/PUT nhận trường ảnh tùy chọn:
+
+```json
+{"name":"Mì xào bò","categoryId":1,"currentPrice":32000,"isActive":true,"imageUrl":"/food/mi-xao-bo-v1.640.jpg"}
+```
+
+Ảnh cho phép đường dẫn từ gốc frontend (`/food/…`) hoặc URL HTTP/HTTPS không chứa thông tin đăng nhập,
+tối đa 500 ký tự sau trim; từ chối URL kiểu `javascript:`, `data:`, `file:`, đường dẫn `//`, ký tự điều khiển và dấu gạch chéo ngược.
+PUT không gửi `imageUrl` giữ nguyên ảnh cũ; gửi `null`, chuỗi trống hoặc toàn khoảng trắng xóa ảnh.
+Thay ảnh không ghi tồn hoặc giá lịch sử. Form admin có trường đường dẫn ảnh không bắt buộc và thumbnail.
+
+[Menu đã chốt](../docs/nexora-menu.md) và [bảng URL ảnh](../docs/nexora-menu-assets.json) phục vụ đối chiếu
+sản phẩm SQL; chúng không phải nguồn sản phẩm thay API. Backend không tự tải hoặc upload ảnh;
+đường dẫn `/food/…` được frontend phục vụ. Áp migration trên DB đúng đích theo quy trình cấu hình ở trên.
+
+### Nạp menu NEXORA vào Development
+
+Ngày 17/11/2026, nhánh SCRUM-34 đã đồng bộ `origin/dev` tại `490303a` (21 commit mới), giữ phần ảnh/menu local. API/web dùng DB Development đã cập nhật schema; chức năng nạp tại quầy từ SCRUM-21 hiện có tại `/client/wallet` và `/admin/topups`. Đăng nhập lại sau cập nhật để nhận phiên/quyền mới.
+
+Theo yêu cầu ngày 17/11/2026, đã tạo DB **`localhost / CyberManagement_Dev`**, áp đủ 15 migration
+và nạp **7 danh mục, 62 sản phẩm** cùng giá/ảnh theo menu đã chốt. Tất cả món mới có tồn bằng 0;
+nhập/điều chỉnh tồn vẫn thuộc nghiệp vụ kho. Combo và món thêm là các dòng danh mục;
+script này chưa triển khai cấu thành combo, trừ tồn thành phần hay lựa chọn cấp cay.
+
+Cấu hình máy hiện tại nằm trong `src/CyberManagement.API/appsettings.Development.json` (được Git ignore).
+File chứa connection string Windows Authentication, signing key riêng và mật khẩu ngẫu nhiên cho năm
+tài khoản Development do seeder hiện có tạo. Đăng nhập admin bằng `admin`; lấy mật khẩu tại
+`SeedAccounts:Admin:Password` trong file local, không copy file hoặc các secret lên Git.
+
+Script [NexoraMenuSeed.sql](database/NexoraMenuSeed.sql) chạy thủ công sau migration;
+không được gọi tự động trong API startup. Từ repo root:
+
+```powershell
+$env:ConnectionStrings__DefaultConnection = 'Server=localhost;Database=CyberManagement_Dev;Integrated Security=True;TrustServerCertificate=True'
+.\scripts\ef-local.cmd database update --project Backend\src\CyberManagement.Infrastructure --startup-project Backend\src\CyberManagement.API
+sqlcmd -S localhost -E -C -d CyberManagement_Dev -b -f 65001 -i Backend/database/NexoraMenuSeed.sql
+```
+
+Script chỉ nhận `CyberManagement_Dev` hoặc DB thử riêng `CyberManagement_AuthChecks_*`, kiểm tra migration
+ảnh đã áp, dừng nếu tên bị trùng/mapping danh mục mơ hồ. Chạy lại chỉ thêm dòng thiếu, giữ nguyên ID,
+giá, ảnh, trạng thái và tồn đã sửa; không xóa dữ liệu ngoài danh sách. Giá/ảnh của sản phẩm đã có cần
+được cập nhật qua form quản lý nếu muốn thay đổi. Bộ ảnh không thay nguồn dữ liệu API.
+
+Kiểm tra seed bằng SQL Server trong DB thử riêng do harness tự tạo và dọn:
+
+```powershell
+$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;TrustServerCertificate=True'
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --menu-seed-only
+```
 Checkout tương lai phải lấy lại giá/tồn tại server theo [contract đơn](docs/004-order-checkout-contract.md).
 Không có event SignalR mới trong task catalog.
 

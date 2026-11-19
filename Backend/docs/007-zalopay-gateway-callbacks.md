@@ -238,3 +238,23 @@ native SqlClient DLL trên Windows. Log cục bộ `.tools/review-fix-*.log` b�
 Không gọi lại Sandbox thật trong lượt sửa review này; không thay bằng chứng/giới hạn tại mục 5.2.
 SCRUM-23 ở checkout riêng được giữ nguyên. Các kiểm tra trên được thực hiện trước commit/push;
 Trưởng nhóm quyết định duyệt cuối.
+
+### 5.5. Ghép dev và giải conflict ngày 19/11/2026
+
+Ghép `dev c697aa8` vào SCRUM-22 `b0f6ec5` trên checkout riêng. Giữ ba mode độc lập
+`--menu-seed-only`, `--zalopay-live-checks` và `--zalopay-gateway-checks` trong runner.
+SQL/DBML được xuất lại từ EF model/migrations đã ghép: **41 bảng, 16 migrations**,
+có cả `ZaloPayGatewayIntents` và `AddProductImageUrl`; không sửa migration lịch sử.
+
+Build solution đạt 0 warning/0 error với restore từ cache và tắt NuGet audit do giới hạn mạng.
+Các bộ kiểm tra đạt: 77 + 115 fixture adapter, 364 gateway HTTP/SQL, 337 catalog HTTP/SQL,
+9 menu seed SQL và `--check-schema`. Những bộ này có kiểm tra trùng nhau, không cộng tổng.
+DB mới được kiểm tra qua EF migrations trong các suite SQL. Ca nâng cấp riêng dựng baseline
+bằng đúng 15 migrations của dev, lưu sẵn sản phẩm/ảnh/giá/tồn, rồi chạy SQL đã ghép hai lần:
+đủ 16 migrations, bảng gateway truy cập được, dữ liệu cũ giữ nguyên. Các DB thử đã dọn.
+
+Giới hạn có sẵn: thử chạy toàn bộ script SQL của dev trên DB trống gặp lỗi biên dịch batch
+tham chiếu `BonusAmount`/`TotalAmount` tại migration `CounterTopUpBonuses`, trước phần gateway.
+Không dùng kết quả nâng cấp nói trên làm bằng chứng script SQL toàn bộ chạy được từ DB trống;
+đường EF migrations trên DB mới đã pass. Không sửa lỗi script lịch sử ngoài phạm vi ghép conflict.
+Không gọi sandbox thật trong lượt này; kết quả còn chờ Trưởng nhóm xem xét.

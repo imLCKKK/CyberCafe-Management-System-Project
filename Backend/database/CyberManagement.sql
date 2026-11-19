@@ -3004,3 +3004,24 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117130111_AddProductImageUrl'
+)
+BEGIN
+    ALTER TABLE [Products] ADD [ImageUrl] nvarchar(500) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261117130111_AddProductImageUrl'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261117130111_AddProductImageUrl', N'10.0.14');
+END;
+
+COMMIT;
+GO

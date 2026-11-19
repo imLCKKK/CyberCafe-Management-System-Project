@@ -39,6 +39,19 @@ test('empty catalog stays empty; invalid or failed API never returns demo produc
   await assert.rejects(getCatalog(false), /Catalog offline/);
 });
 
+test('catalog carries optional image URLs without inferring photos from product IDs', async () => {
+  const imageUrl = '/food/samples/com-ga-xoi-mo-v1.png';
+  globalThis.fetch = async () => Response.json({ categories, products: [
+    { ...products[0], imageUrl: ` ${imageUrl} ` },
+    { ...products[0], id: 1 },
+    { ...products[0], id: 2, imageUrl: null },
+    { ...products[0], id: 3, imageUrl: { invalid: true } },
+  ] });
+  const db = await getCatalog(false);
+  assert.deepEqual(db.products.map(p => p.image_url), [imageUrl, null, null, null]);
+  assert.deepEqual(db.products.map(p => p.id), [987, 1, 2, 3]);
+});
+
 test('product writes send only catalog fields with authenticated request', async () => {
   globalThis.fetch = async (url, options) => {
     assert.equal(url, '/api/admin/products/987');
@@ -48,4 +61,16 @@ test('product writes send only catalog fields with authenticated request', async
     return Response.json(products[0]);
   };
   await saveProduct({ id: 987, name: 'Updated', category_id: '123', current_price: '40000', is_active: true, stock_quantity: 999, total: 1 });
+});
+
+test('product image writes distinguish omission, replacement and clearing', async () => {
+  const bodies = [];
+  globalThis.fetch = async (url, options) => { bodies.push(JSON.parse(options.body)); return Response.json(products[0]); };
+  const form = { id: 987, name: 'Updated', category_id: 123, current_price: 40000, is_active: true };
+  await saveProduct(form);
+  await saveProduct({ ...form, image_url: '/food/mi-xao-bo-v1.640.jpg' });
+  await saveProduct({ ...form, image_url: null });
+  assert.equal(Object.hasOwn(bodies[0], 'imageUrl'), false);
+  assert.equal(bodies[1].imageUrl, '/food/mi-xao-bo-v1.640.jpg');
+  assert.equal(bodies[2].imageUrl, null);
 });

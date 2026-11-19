@@ -24,6 +24,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
+if (args.Contains("--menu-seed-only"))
+{
+    await NexoraMenuSeedChecks.RunAsync();
+    return;
+}
+
 if (args.Contains("--zalopay-live-checks"))
 {
     await ZaloPayLiveChecks.RunAsync();
