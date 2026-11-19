@@ -13,6 +13,9 @@ public class OrderStatusHistoryConfiguration : IEntityTypeConfiguration<OrderSta
 
         builder.Property(x => x.OldStatus).HasMaxLength(50);
         builder.Property(x => x.NewStatus).HasMaxLength(50).IsRequired();
+        builder.Property(x => x.ActorType).HasMaxLength(10).IsRequired();
+        builder.Property(x => x.Reason).HasMaxLength(250);
+        builder.HasOne<OrderDetail>().WithMany().HasForeignKey(x => x.OrderDetailId).OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(x => x.Order)
             .WithMany(x => x.StatusHistory)

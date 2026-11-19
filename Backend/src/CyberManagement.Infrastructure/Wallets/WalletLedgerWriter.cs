@@ -177,7 +177,10 @@ public sealed class WalletLedgerWriter(ApplicationDbContext database) : IWalletL
             || !ValidText(mutation.SourceId, 100) || !ValidText(mutation.OperationKey, 100)
             || mutation.Description?.Length > 255 || mutation.Actor is null
             || !((mutation.Actor.Type == "Staff" && mutation.Actor.EmployeeId > 0)
-                || (mutation.Actor.Type == "System" && mutation.Actor.EmployeeId is null))
+                || (mutation.Actor.Type == "System" && mutation.Actor.EmployeeId is null)
+                // CustomerId on the immutable ledger identifies the customer actor.
+                || (mutation.Actor.Type == "Customer" && mutation.Actor.EmployeeId is null
+                    && mutation.Kind == WalletMutationKind.Debit && mutation.Type == "OrderPayment" && mutation.SourceType == "Order"))
             || (mutation.Kind == WalletMutationKind.Refund ? mutation.OriginalDebitId is not > 0 : mutation.OriginalDebitId is not null))
             throw new ValidationException("Thông tin thao tác ví không hợp lệ.");
         var validSource = (mutation.Kind, mutation.Type, mutation.SourceType) switch

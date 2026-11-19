@@ -2924,3 +2924,232 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [WalletTransactions] DROP CONSTRAINT [CK_WalletTransactions_WriterMetadata];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    DECLARE @var33 nvarchar(max);
+    SELECT @var33 = QUOTENAME([d].[name])
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[OrderStatusHistory]') AND [c].[name] = N'ChangedBy');
+    IF @var33 IS NOT NULL EXEC(N'ALTER TABLE [OrderStatusHistory] DROP CONSTRAINT ' + @var33 + ';');
+    ALTER TABLE [OrderStatusHistory] ALTER COLUMN [ChangedBy] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [OrderStatusHistory] ADD [ActorType] nvarchar(10) NOT NULL DEFAULT N'Staff';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [OrderStatusHistory] ADD [OrderDetailId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [OrderStatusHistory] ADD [Reason] nvarchar(250) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    DECLARE @var34 nvarchar(max);
+    SELECT @var34 = QUOTENAME([d].[name])
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Orders]') AND [c].[name] = N'EmployeeId');
+    IF @var34 IS NOT NULL EXEC(N'ALTER TABLE [Orders] DROP CONSTRAINT ' + @var34 + ';');
+    ALTER TABLE [Orders] ALTER COLUMN [EmployeeId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [Orders] ADD [ActorType] nvarchar(10) NOT NULL DEFAULT N'Staff';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [Orders] ADD [LastChangedAtUtc] datetime2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [Orders] ADD [PaymentMethod] nvarchar(10) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [Orders] ADD [Version] rowversion NOT NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [OrderDetails] ADD [ConfirmedAtUtc] datetime2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [OrderDetails] ADD [ConfirmedByEmployeeId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [OrderDetails] ADD [LineNumber] int NOT NULL DEFAULT 0;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    EXEC(N'UPDATE [Orders] SET [LastChangedAtUtc] = [OrderTime]; WITH numbered AS (SELECT [OrderDetailId], ROW_NUMBER() OVER (PARTITION BY [OrderId] ORDER BY [OrderDetailId]) AS n FROM [OrderDetails]) UPDATE d SET [LineNumber] = n.n FROM [OrderDetails] d JOIN numbered n ON n.[OrderDetailId] = d.[OrderDetailId];');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    CREATE TABLE [OrderOperations] (
+        [Id] int NOT NULL IDENTITY,
+        [ActorType] nvarchar(10) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [ActorId] int NOT NULL,
+        [Route] nvarchar(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [Key] nvarchar(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [RequestHash] nchar(64) NOT NULL,
+        [OrderId] int NOT NULL,
+        [CreatedAtUtc] datetime2 NOT NULL,
+        CONSTRAINT [PK_OrderOperations] PRIMARY KEY ([Id]),
+        CONSTRAINT [CK_OrderOperations_Actor] CHECK ([ActorType] IN ('Staff','Customer') AND [ActorId] > 0),
+        CONSTRAINT [FK_OrderOperations_Orders_OrderId] FOREIGN KEY ([OrderId]) REFERENCES [Orders] ([OrderId])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [WalletTransactions] ADD CONSTRAINT [CK_WalletTransactions_WriterMetadata] CHECK (([OperationKey] IS NULL AND [Kind] IS NULL AND [SourceType] IS NULL AND [SourceId] IS NULL AND [OriginalDebitId] IS NULL AND [ActorType] IS NULL AND [ActorEmployeeId] IS NULL) OR ([OperationKey] IS NOT NULL AND LEN(LTRIM(RTRIM([OperationKey]))) > 0 AND [Kind] IS NOT NULL AND [Kind] IN (''Credit'',''Debit'',''Refund'') AND [SourceType] IS NOT NULL AND LEN(LTRIM(RTRIM([SourceType]))) > 0 AND [SourceId] IS NOT NULL AND LEN(LTRIM(RTRIM([SourceId]))) > 0 AND [ActorType] IS NOT NULL AND (([ActorType] = ''Staff'' AND [ActorEmployeeId] IS NOT NULL) OR ([ActorType] = ''System'' AND [ActorEmployeeId] IS NULL) OR ([ActorType] = ''Customer'' AND [ActorEmployeeId] IS NULL AND [Kind] = ''Debit'' AND [Type] = ''OrderPayment'' AND [SourceType] = ''Order'')) AND [BalanceAfter] >= 0 AND (([Kind] = ''Debit'' AND [Amount] < 0 AND [OriginalDebitId] IS NULL) OR ([Kind] = ''Credit'' AND [Amount] > 0 AND [OriginalDebitId] IS NULL) OR ([Kind] = ''Refund'' AND [Amount] > 0 AND [OriginalDebitId] IS NOT NULL AND [OriginalDebitId] <> [TransactionId]))))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    CREATE INDEX [IX_OrderStatusHistory_OrderDetailId] ON [OrderStatusHistory] ([OrderDetailId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [Orders] ADD CONSTRAINT [CK_Orders_Actor] CHECK (([ActorType] = ''Staff'' AND [EmployeeId] IS NOT NULL) OR ([ActorType] = ''Customer'' AND [EmployeeId] IS NULL))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [Orders] ADD CONSTRAINT [CK_Orders_CheckoutMethod] CHECK ([PaymentMethod] IS NULL OR [PaymentMethod] IN (''Wallet'',''Cash'',''ZaloPay''))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    CREATE INDEX [IX_OrderDetails_ConfirmedByEmployeeId] ON [OrderDetails] ([ConfirmedByEmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_OrderOperations_ActorType_ActorId_Route_Key] ON [OrderOperations] ([ActorType], [ActorId], [Route], [Key]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    CREATE INDEX [IX_OrderOperations_OrderId] ON [OrderOperations] ([OrderId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [OrderDetails] ADD CONSTRAINT [FK_OrderDetails_Employees_ConfirmedByEmployeeId] FOREIGN KEY ([ConfirmedByEmployeeId]) REFERENCES [Employees] ([EmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    ALTER TABLE [OrderStatusHistory] ADD CONSTRAINT [FK_OrderStatusHistory_OrderDetails_OrderDetailId] FOREIGN KEY ([OrderDetailId]) REFERENCES [OrderDetails] ([OrderDetailId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261119050701_ImplementFoodOrderCheckout', N'10.0.14');
+END;
+
+COMMIT;
+GO

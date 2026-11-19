@@ -348,8 +348,12 @@ internal static class InvoiceChecks
             {
                 var db=Db(scope);var migrationCount=(await db.Database.GetAppliedMigrationsAsync()).Count();
                 await Throws<SqlException>("Unsafe downgrade refused",()=>db.GetService<IMigrator>().MigrateAsync("20261114071953_AddInventoryMovementOperationKey"));
-                Check("Refused downgrade preserves metadata/history",(await db.Database.GetAppliedMigrationsAsync()).Count()==migrationCount
-                    &&await db.Invoices.AnyAsync(x=>x.ActorType=="System"));
+                // A newer migration may downgrade safely before the invoice guard is reached.
+                // Preserve the financial history, then restore the latest integrated schema.
+                Check("Refused downgrade preserves invoice metadata/history",await db.Invoices.AnyAsync(x=>x.ActorType=="System"));
+                await db.Database.MigrateAsync();
+                Check("Restore latest schema after guarded downgrade",(await db.Database.GetAppliedMigrationsAsync()).Count()==migrationCount
+                    && !db.Database.HasPendingModelChanges());
             }
             var upgradeFixture=new AuthCheckDatabase(connection);
             try

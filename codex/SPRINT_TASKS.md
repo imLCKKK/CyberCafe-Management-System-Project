@@ -555,6 +555,14 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 
 #### S2-K-1 — Implement-Food-Orders-Voucher-Checkout
 
+**Jira:** `SCRUM-27` (người dùng xác nhận). Cập nhật triển khai local ngày 19/11/2026:
+API tạo/đọc đơn Wallet/Cash, thu Cash và nhận từng món đã được bổ sung trên nhánh
+`SCRUM-27-Implement-Food-Orders-Voucher-Checkout`; tích hợp ví/phí phiên/kho/voucher/chứng từ
+cùng transaction, rowversion và khóa HTTP lưu bền. SQL/API checks chạy bằng `--orders-only`
+trong DB thử riêng; hướng dẫn tại [Backend README](../Backend/README.md#scrum-27--s2-k-1-đặt-món-voucher-và-thanh-toán).
+Chưa commit hoặc áp migration vào DB ứng dụng; checklist bên dưới giữ chờ Trưởng nhóm review.
+UI, ZaloPay và hủy/hoàn tiếp tục theo S2-K-3, S2-K-2 và S3-K-1.
+
 **Description:**
 
 - Triển khai tạo/đọc/xử lý đơn với giá/tổng do server tính và snapshot dữ liệu món/giảm giá.

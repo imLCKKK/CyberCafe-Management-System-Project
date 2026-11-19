@@ -20,6 +20,42 @@ writer không tự SaveChanges/commit. Hai migration bổ sung giữ ledger/Appr
 cho Pending và tạo model 39 bảng/bảy migration trên base SCRUM-13. Bảng dự án bên trên mô tả nền gốc.
 Quyết định phiên/đơn ngày 14/11 giữ nguyên; gateway ZaloPay, worker phiên và checkout theo task riêng.
 
+## SCRUM-27 / S2-K-1: đặt món, voucher và thanh toán
+
+API đơn món dùng SQL thật: `POST/GET /api/client/orders`, `GET /api/client/orders/{id}`;
+nhân viên dùng các route tương ứng tại `/api/admin/orders`. Tạo đơn chỉ nhận ID món/số lượng,
+phương thức `Wallet` hoặc `Cash`, phiên và mã voucher tùy chọn. Server lấy giá, snapshot tên/giá/giảm,
+trừ tồn qua InventoryService và dùng lượt qua VoucherService trong cùng transaction.
+Wallet quyết toán phí phiên qua ISessionSettlement trước debit và ghi Payment; Cash chờ thực thu.
+
+Nhân viên xác nhận tiền mặt tại `POST /api/admin/orders/{id}/cash-collections` với
+`{"expectedVersion":"<base64 từ GET>","cashReceived":true}` và quyền `payment.create`.
+Nhận món tại `POST /api/admin/orders/{id}/items/{detailId}/confirm` với `expectedVersion` và
+`order.status.update`; server chặn khi chưa thanh toán đủ. Waiter chỉ được đặt Cash và nhận món đã trả tiền.
+Mọi POST cần `Idempotency-Key` 8–100 ký tự ASCII chữ/số hoặc `._:-`; retry giữ nguyên body/key.
+Replay trả 200, cùng OrderId và header `Idempotency-Replayed: true`; payload khác trả 409.
+Cash phải giữ bằng chứng tiếp nhận tại quầy theo contract mục 7.1.1, không thu lại chỉ vì timeout.
+
+Migration `20261119050701_ImplementFoodOrderCheckout` thêm rowversion, phương thức/actor,
+audit nhận món và bảng OrderOperations (model hiện tại 41 bảng, trên nền CyberManagement 35 bảng).
+EmployeeId/ChangedBy nullable cho khách, ledger Customer chỉ cho debit OrderPayment; không dùng nhân viên giả.
+Đơn lịch sử giữ PaymentMethod null, tiền và người thực hiện cũ; không tự suy phương thức thanh toán.
+SQL/DBML được xuất lại từ EF; downgrade bị chặn nếu đã có lịch sử checkout mới.
+
+Hóa đơn tiếp tục phát hành riêng qua module hóa đơn: checkout lưu Payment theo OrderId,
+ApplyFinancialChange cập nhật hóa đơn đã có cùng transaction, không tự phát hành hoặc thu thêm.
+Event OrderChanged/WalletChanged gửi sau commit tới nhóm được phép. UI đặt món thuộc S2-K-3,
+ZaloPay/giữ chỗ thuộc S2-K-2, hủy/hoàn tiền thuộc S3-K-1; các route đó chưa triển khai ở task này.
+
+Kiểm tra SQL/API, harness chỉ tạo và dọn DB `CyberManagement_AuthChecks_<ngẫu nhiên>`:
+
+```powershell
+$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;TrustServerCertificate=True'
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --orders-only
+```
+
+Contract: [004-order-checkout-contract.md](docs/004-order-checkout-contract.md).
+
 ## SCRUM-21: nạp tiền mặt và tiền tặng
 
 Khách chọn tám mức nạp tại `/client/wallet`; admin có `wallet.topup` thu đủ tiền mặt rồi duyệt tại
