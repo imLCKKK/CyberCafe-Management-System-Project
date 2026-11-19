@@ -37,7 +37,8 @@ Replay trả 200, cùng OrderId và header `Idempotency-Replayed: true`; payload
 Cash phải giữ bằng chứng tiếp nhận tại quầy theo contract mục 7.1.1, không thu lại chỉ vì timeout.
 
 Migration `20261119050701_ImplementFoodOrderCheckout` thêm rowversion, phương thức/actor,
-audit nhận món và bảng OrderOperations (model hiện tại 41 bảng, trên nền CyberManagement 35 bảng).
+audit nhận món và bảng OrderOperations (model sau tích hợp SCRUM-22 có 42 bảng/17 migration,
+trên nền CyberManagement 35 bảng).
 EmployeeId/ChangedBy nullable cho khách, ledger Customer chỉ cho debit OrderPayment; không dùng nhân viên giả.
 Đơn lịch sử giữ PaymentMethod null, tiền và người thực hiện cũ; không tự suy phương thức thanh toán.
 SQL/DBML được xuất lại từ EF; downgrade bị chặn nếu đã có lịch sử checkout mới.
@@ -46,6 +47,7 @@ Hóa đơn tiếp tục phát hành riêng qua module hóa đơn: checkout lưu 
 ApplyFinancialChange cập nhật hóa đơn đã có cùng transaction, không tự phát hành hoặc thu thêm.
 Event OrderChanged/WalletChanged gửi sau commit tới nhóm được phép. UI đặt món thuộc S2-K-3,
 ZaloPay/giữ chỗ thuộc S2-K-2, hủy/hoàn tiền thuộc S3-K-1; các route đó chưa triển khai ở task này.
+Adapter gateway SCRUM-22 từ chối tạo bill ZaloPay cho đơn đã chọn Cash/Wallet; phương thức đơn không đổi sau tạo.
 
 Kiểm tra SQL/API, harness chỉ tạo và dọn DB `CyberManagement_AuthChecks_<ngẫu nhiên>`:
 
@@ -55,6 +57,17 @@ $env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;Tru
 ```
 
 Contract: [004-order-checkout-contract.md](docs/004-order-checkout-contract.md).
+
+## SCRUM-22: adapter gateway và callback
+
+[Hợp đồng gateway](docs/007-zalopay-gateway-callbacks.md) mô tả API TopUp/Order, intent/receipt,
+HMAC/callback/Query, cấu hình secret và cách phân biệt fixture với gọi sandbox thật.
+Create lưu ID/số tiền trước HTTP; callback/Query ghi receipt chống lặp. Cộng ví, Payment nghiệp vụ,
+xác nhận Order và realtime hoàn tất thuộc S2-M-3; luồng tiền mặt SCRUM-21 giữ nguyên.
+
+Từ repository root, chạy `.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --zalopay-gateway-checks`;
+chế độ SQL `--gateway-only` yêu cầu `AUTH_CHECKS_SQL_CONNECTION`
+và tạo/dọn DB thử riêng. Chi tiết các lệnh nằm trong hợp đồng; không ghi keys hoặc URL token vào log.
 
 ## SCRUM-21: nạp tiền mặt và tiền tặng
 

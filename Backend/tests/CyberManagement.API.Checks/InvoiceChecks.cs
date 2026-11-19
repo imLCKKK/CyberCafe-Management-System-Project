@@ -346,13 +346,16 @@ internal static class InvoiceChecks
             await ExpectHttp("Replay still checks current permission",HttpStatusCode.Forbidden,HttpMethod.Post,route,admin,request,"issue:original");
             await using(var scope=app.Services.CreateAsyncScope())
             {
-                var db=Db(scope);var migrationCount=(await db.Database.GetAppliedMigrationsAsync()).Count();
+                var db=Db(scope);
+                var latestMigrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();
+                // Exercise the invoice-owned downgrade guard before any later, empty feature migrations.
+                await db.GetService<IMigrator>().MigrateAsync("20261115145716_TrackOrderDetailCancellation");
+                var migrationCount=(await db.Database.GetAppliedMigrationsAsync()).Count();
                 await Throws<SqlException>("Unsafe downgrade refused",()=>db.GetService<IMigrator>().MigrateAsync("20261114071953_AddInventoryMovementOperationKey"));
-                // A newer migration may downgrade safely before the invoice guard is reached.
-                // Preserve the financial history, then restore the latest integrated schema.
-                Check("Refused downgrade preserves invoice metadata/history",await db.Invoices.AnyAsync(x=>x.ActorType=="System"));
+                Check("Refused downgrade preserves metadata/history",(await db.Database.GetAppliedMigrationsAsync()).Count()==migrationCount
+                    &&await db.Invoices.AnyAsync(x=>x.ActorType=="System"));
                 await db.Database.MigrateAsync();
-                Check("Restore latest schema after guarded downgrade",(await db.Database.GetAppliedMigrationsAsync()).Count()==migrationCount
+                Check("Latest merged schema is restored after the invoice downgrade guard",(await db.Database.GetAppliedMigrationsAsync()).SequenceEqual(latestMigrations)
                     && !db.Database.HasPendingModelChanges());
             }
             var upgradeFixture=new AuthCheckDatabase(connection);

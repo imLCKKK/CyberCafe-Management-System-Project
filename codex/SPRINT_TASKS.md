@@ -465,6 +465,9 @@ Jira: **SCRUM-21**. Contract/API/migration và cách kiểm tra: [hợp đồng 
 
 #### S2-M-2 — Implement-ZaloPay-Gateway-Callbacks
 
+Jira: **SCRUM-22**. API/cấu hình/receipt và cách kiểm tra: [hợp đồng gateway](../Backend/docs/007-zalopay-gateway-callbacks.md).
+Task này ghi nhận receipt đã xác minh cho TopUp/Order; cộng ví/ledger và hoàn tất nguồn nghiệp vụ thuộc S2-M-3.
+
 **Description:**
 
 - Xây adapter tạo giao dịch ZaloPay sandbox cho TopUp/Order; số tiền và trạng thái dự kiến do server quản lý, secret qua cấu hình server.
@@ -564,6 +567,8 @@ Commit đầu `13bb492` thiếu 11 file mới do lệch casing thư mục `backe
 Bổ sung bàn giao ngày 19/11/2026 đưa đủ file triển khai vào Git theo đường dẫn chuẩn `Backend`
 và kiểm tra lại từ source xuất riêng commit. Chưa áp migration vào DB ứng dụng;
 checklist bên dưới giữ chờ Trưởng nhóm review.
+Tích hợp `dev` tại `bc984cf` ngày 19/11/2026: giữ cả module gateway SCRUM-22 và checkout SCRUM-27,
+đồng bộ EF/SQL/DBML thành 42 bảng/17 migration; adapter gateway chặn mở bill cho đơn đã chọn Cash/Wallet.
 UI, ZaloPay và hủy/hoàn tiếp tục theo S2-K-3, S2-K-2 và S3-K-1.
 
 **Description:**

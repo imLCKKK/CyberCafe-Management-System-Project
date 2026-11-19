@@ -1877,6 +1877,131 @@ namespace CyberManagement.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CyberManagement.Domain.Entities.ZaloPayIntent", b =>
+                {
+                    b.Property<int>("IntentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IntentId"));
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("ExpectedAmountVnd")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTimeOffset?>("LastQueryAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("MerchantTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateTimeOffset?>("NextQueryAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OperationKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<int?>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PaymentUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<decimal?>("ProviderAmountVnd")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
+                    b.Property<int>("ProviderAppId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ProviderOccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(19)
+                        .HasColumnType("nvarchar(19)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<Guid?>("QueryLeaseToken")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("QueryLeaseUntilUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("RequiresReconciliation")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateTimeOffset?>("VerifiedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("IntentId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("MerchantTransactionId")
+                        .IsUnique();
+
+                    b.HasIndex("OperationKey")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasFilter("[OrderId] IS NOT NULL");
+
+                    b.HasIndex("ProviderAppId", "ProviderTransactionId")
+                        .IsUnique()
+                        .HasFilter("[ProviderTransactionId] IS NOT NULL");
+
+                    b.HasIndex("Status", "NextQueryAtUtc");
+
+                    b.ToTable("ZaloPayIntents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ZaloPayIntents_ConfirmedAmount", "[Status] <> N'Succeeded' OR ([ProviderAmountVnd] IS NOT NULL AND [ProviderAmountVnd] = [ExpectedAmountVnd])");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_MerchantId", "LEN([MerchantTransactionId]) = 39 AND SUBSTRING([MerchantTransactionId],1,6) NOT LIKE '%[^0-9]%' AND SUBSTRING([MerchantTransactionId],7,1) = '_' AND SUBSTRING([MerchantTransactionId],8,32) NOT LIKE '%[^0-9a-f]%'");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_QueryLease", "([QueryLeaseToken] IS NULL AND [QueryLeaseUntilUtc] IS NULL) OR ([QueryLeaseToken] IS NOT NULL AND [QueryLeaseUntilUtc] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_Receipt", "([ProviderTransactionId] IS NULL AND [ProviderAmountVnd] IS NULL AND [ProviderOccurredAtUtc] IS NULL AND [VerifiedAtUtc] IS NULL AND [Status] <> N'Succeeded') OR ([ProviderTransactionId] IS NOT NULL AND TRY_CONVERT(bigint,[ProviderTransactionId]) IS NOT NULL AND TRY_CONVERT(bigint,[ProviderTransactionId]) > 0 AND CONVERT(varchar(19),TRY_CONVERT(bigint,[ProviderTransactionId])) = [ProviderTransactionId] AND [ProviderTransactionId] NOT LIKE '%[^0-9]%' AND [ProviderAmountVnd] IS NOT NULL AND [ProviderAmountVnd] > 0 AND [VerifiedAtUtc] IS NOT NULL AND ([Status] = N'Succeeded' OR [RequiresReconciliation] = 1))");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_Source", "([Purpose] = N'TopUp' AND [OrderId] IS NULL) OR ([Purpose] = N'Order' AND [OrderId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_Values", "[CustomerId] > 0 AND [ProviderAppId] > 0 AND [ExpectedAmountVnd] BETWEEN 1 AND 999999999 AND [Status] IN (N'Pending',N'Succeeded',N'Failed',N'Expired') AND LEN([OperationKey]) > 0 AND [ExpiresAtUtc] > [CreatedAtUtc]");
+                        });
+                });
+
             modelBuilder.Entity("CyberManagement.Domain.Entities.AuditLog", b =>
                 {
                     b.HasOne("CyberManagement.Domain.Entities.Employee", "Employee")
@@ -2513,6 +2638,24 @@ namespace CyberManagement.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("CyberManagement.Domain.Entities.ZaloPayIntent", b =>
+                {
+                    b.HasOne("CyberManagement.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CyberManagement.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.Category", b =>
