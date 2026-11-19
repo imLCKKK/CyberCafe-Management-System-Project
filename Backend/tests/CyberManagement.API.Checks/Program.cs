@@ -117,6 +117,15 @@ builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 builder.Services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
+builder.Services.AddScoped<ITeamPreviewRosterReader, CyberManagement.Infrastructure.TeamBalancing.TeamPreviewRosterReader>();
+if (args.Contains("--team-preview-checks") || args.Contains("--team-preview-ml-checks"))
+{
+    builder.Services.AddSingleton<PreviewReadInterleaving>();
+    builder.Services.AddScoped<CyberManagement.Infrastructure.TeamBalancing.TeamPreviewRosterReader>();
+    builder.Services.AddScoped<ITeamPreviewRosterReader, PreviewInterleavedReader>();
+}
+if (args.Contains("--team-preview-ml-checks"))
+    builder.Services.AddSingleton<ITeamBalanceScorer, PreviewFixtureScorer>();
 builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
 builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
 builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
@@ -275,6 +284,13 @@ try
     if (opggChecks)
     {
         await OpggChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken, opggTransport, opggLive);
+        return;
+    }
+
+    if (args.Contains("--team-preview-checks") || args.Contains("--team-preview-ml-checks"))
+    {
+        await TeamPreviewChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken,
+            args.Contains("--team-preview-ml-checks"), databaseFixture.Provider);
         return;
     }
 

@@ -3,6 +3,8 @@ using System.Security.Claims;
 using CyberManagement.API.Security;
 using CyberManagement.Application.DTOs.Tournaments;
 using CyberManagement.Application.Interfaces.Services;
+using CyberManagement.Application.Exceptions;
+using CyberManagement.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -131,6 +133,49 @@ public sealed class TournamentsController(ITournamentService tournaments) : Cont
     {
         await tournaments.RequireActiveEmployeeAsync(GetEmployeeId(), token);
         return Ok(await tournaments.RefreshStatsAsync(tournamentId, registrationId, null, token));
+    }
+
+    [HttpPost("admin/tournaments/{tournamentId:int}/teams/preview")]
+    [Authorize(Policy = ApiPolicies.TeamAssign)]
+    public async Task<ActionResult<TeamPlanDto>> PreviewTeams(int tournamentId, [FromBody] TeamPreviewRequest request,
+        [FromServices] ITeamPreviewRosterReader reader, [FromServices] ITeamBalancingService balancing,
+        [FromServices] TeamPreviewPlans plans, CancellationToken token)
+    {
+        var employee = GetEmployeeId();
+        await tournaments.RequireActiveEmployeeAsync(employee, token);
+        var versionBytes = new byte[8];
+        if (tournamentId <= 0 || request.ExpectedVersion is null || request.ExpectedVersion.Length != 12
+            || !Convert.TryFromBase64String(request.ExpectedVersion, versionBytes, out var written) || written != 8
+            || Convert.ToBase64String(versionBytes) != request.ExpectedVersion)
+            throw new TeamBalanceException("ValidationError", "ID hoặc expectedVersion không hợp lệ.");
+        var strategy = request.Strategy switch
+        {
+            "ML" => "ml", "Balanced" => TeamBalanceVersions.Baseline,
+            _ => throw new TeamBalanceException("ValidationError", "Strategy phải là ML hoặc Balanced.")
+        };
+        var roster = await reader.ReadAsync(tournamentId, strategy, request.ExpectedVersion, token);
+        var proposal = balancing.Propose(roster.Input);
+        var current = await reader.ReadAsync(tournamentId, strategy, request.ExpectedVersion, token);
+        if (current.Input.RosterVersion != proposal.RosterVersion)
+            throw new TeamBalanceException("TeamPlanInvalid", "Danh sách hoặc snapshot đã đổi trong lúc chia đội.");
+        var stats = TeamBalanceValidation.Roster(current.Input);
+        var ids = proposal.Teams.SelectMany(t => t.Members).Select(m => m.RegistrationId).ToArray();
+        if (proposal.Teams.Count != current.Input.TeamCount || proposal.Teams.Any(t => t.Members.Count != current.Input.TeamSize)
+            || ids.Length != stats.Count || !stats.Keys.ToHashSet().SetEquals(ids))
+            throw new TeamBalanceException("TeamPlanInvalid", "Đề xuất không khớp toàn bộ danh sách đăng ký.");
+        var participants = current.Input.Participants.ToDictionary(p => p.RegistrationId);
+        var teams = proposal.Teams.Select(t =>
+        {
+            var members = t.Members.Select(m => new TeamPreviewMember(m.RegistrationId, current.CustomerNames[m.RegistrationId],
+                stats[m.RegistrationId].RankTier, participants[m.RegistrationId].Snapshot.Stats.GetProperty("rank").GetProperty("label").GetString()!,
+                m.AssignedRole)).ToArray();
+            return new TeamPreviewTeam($"Đội {t.TeamKey}", members.Average(m => m.SkillScore), members);
+        }).ToArray();
+        var expiry = DateTimeOffset.UtcNow.AddMinutes(10);
+        var planToken = plans.Issue(new(employee, roster.Input, proposal, expiry));
+        return Ok(new TeamPlanDto(request.ExpectedVersion, proposal.RosterVersion, proposal.ProposalId, planToken, expiry,
+            request.Strategy, proposal.ModelVersion, proposal.BaselineVersion, teams, [], proposal.Quality.RankMeanGap,
+            proposal.Quality, proposal.Warnings));
     }
 
     private int GetOwnCustomerId()
