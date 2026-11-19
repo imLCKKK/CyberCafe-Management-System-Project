@@ -328,7 +328,7 @@ internal static class InvoiceChecks
             }
             var walletRefund=await Read(walletInvoice.Id);
             Check("Wallet refund uses ledger once",walletRefund.PaidAmount==15000&&walletRefund.RefundAmount==5000);
-            var staffSession=await NewSession(customerA,5000);
+            var staffSession=await NewSession(customerA,5000,system:false);
             await using(var scope=app.Services.CreateAsyncScope())
             {var customer=await Db(scope).Customers.SingleAsync(x=>x.CustomerId==customerA);customer.WalletBalance=1;await Db(scope).SaveChangesAsync();}
             await using(var scope=app.Services.CreateAsyncScope())
@@ -444,10 +444,12 @@ internal static class InvoiceChecks
                 Success(payment);Db(scope).Payments.Add(payment);await Uow(scope).SaveChangesAsync();return true;
             });
         }
-        async Task<int> NewSession(int customerId,decimal amount)
+        async Task<int> NewSession(int customerId,decimal amount,bool system=true)
         {
             await using var scope=app.Services.CreateAsyncScope();var db=Db(scope);var now=DateTime.UtcNow;
             var session=new GamingSession{CustomerId=customerId,StartTime=now.AddHours(-1),EndTime=now,Status="Ended",TotalCost=amount,
+                PricePerHourSnapshot=Math.Max(1,amount),ClosedByActorType=system?"System":"Staff",
+                ClosedByEmployeeId=system?null:employeeId,CloseReason=system?"InsufficientBalance":"StaffClosed",
                 Computer=new Computer{ComputerName="INV-PC-"+Guid.NewGuid().ToString("N")[..6],Room=new ComputerRoom{RoomName="Invoice room"},ComputerType=new ComputerType{TypeName="Invoice type",PricePerHour=10000}}};
             db.GamingSessions.Add(session);SessionCharge? charge=null;
             if(amount>0){charge=new SessionCharge{GamingSession=session,StartTime=session.StartTime,EndTime=now,Amount=amount};db.SessionCharges.Add(charge);}

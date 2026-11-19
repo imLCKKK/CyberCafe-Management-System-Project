@@ -29,6 +29,9 @@ internal static class SchemaExport
                 if (column.PropertyMappings.Any(mapping => mapping.Property.FindAnnotation("SqlServer:ValueGenerationStrategy")?.Value?.ToString() == "IdentityColumn")) settings.Add("increment");
                 if (column.DefaultValueSql is not null) settings.Add($"default: `{column.DefaultValueSql}`");
                 else if (column.DefaultValue is not null) settings.Add("default: `" + Convert.ToString(column.DefaultValue, System.Globalization.CultureInfo.InvariantCulture) + "`");
+                if (column.ComputedColumnSql is not null)
+                    settings.Add("note: 'Computed: " + column.ComputedColumnSql.Replace("'", "\\'")
+                        + (column.IsStored == true ? "; PERSISTED" : "") + "'");
                 text.AppendLine($"  {column.Name} {column.StoreType} [{string.Join(", ", settings)}]");
             }
             text.AppendLine("  indexes {");

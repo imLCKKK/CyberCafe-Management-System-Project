@@ -18,7 +18,30 @@ SCRUM-5 đã nối tạo/đọc khách và đọc hồ sơ/ví chính chủ qua 
 SCRUM-21 / S2-M-1 triển khai shared credit/debit/refund và nạp tại quầy qua transaction SQL chung;
 writer không tự SaveChanges/commit. Hai migration bổ sung giữ ledger/Approved lịch sử, tính tiền tặng
 cho Pending và tạo model 39 bảng/bảy migration trên base SCRUM-13. Bảng dự án bên trên mô tả nền gốc.
-Quyết định phiên/đơn ngày 14/11 giữ nguyên; gateway ZaloPay, worker phiên và checkout theo task riêng.
+Quyết định phiên/đơn ngày 14/11 giữ nguyên; worker phiên đã triển khai tại SCRUM-24.
+
+## SCRUM-24: máy, phiên, tiền giờ và Home API
+
+Giữ API CRUD/bảo trì hiện có, gồm GET/POST `computers/{id}/maintenances`, PUT theo maintenanceId và POST `.../{maintenanceId}/complete`. Catalog dùng transaction ReadCommitted với application lock thống nhất để tránh deadlock khi tạo máy đồng thời ở các phòng/loại khác nhau.
+
+`GET/POST /api/admin/sessions` đọc phiên chưa đóng/mở phiên; `POST /api/admin/sessions/{id}/close` đóng phiên với body `{}`. Mở/đóng dùng header `Idempotency-Key`; quyền tương ứng `session.view/start/end`, đóng cần thêm `invoice.create`. Server lấy actor từ JWT, từ chối giá, thời lượng, số tiền hoặc actor do browser tự gửi. `GET /api/client/home` chỉ đọc máy/loại/cấu hình, snapshot, phí và số dư của khách đăng nhập.
+
+Server tính tổng phí `ceil(priceSnapshot * floor(elapsedSeconds) / 3600)`, thu chênh lệch theo khóa Customer → Computer → GamingSession. SessionCharge, ledger GamingCharge, Payment, số dư và mốc thu cùng transaction; đóng liên kết các khoản thu với hóa đơn tiền giờ riêng và giải phóng máy trong cùng transaction. Retry giữ kết quả đã lưu, không thu/phát hành lặp.
+
+Worker chạy khi khởi động và mỗi 10 giây, dùng cùng quyết toán trước debit ví khác. Không đủ trả giây tiếp theo thì chốt tại mốc đủ ngân sách và ghi System, độc lập người mở. Event SessionChanged/WalletChanged/ComputerChanged chỉ phát sau commit, kể cả khi caller ví quyết toán phiên. Rollback không phát event.
+
+Migration PrepareSessionBilling được giữ nguyên. Migration `20261118090000_ComputerSessionsBilling` chỉ bổ sung actor/kết quả đóng và unique hồ sơ bảo trì đang mở; không xóa snapshot, computed open slot hoặc metadata cũ. Phiên mới lưu cả snapshot tương thích cũ và PricePerHourSnapshot, khoản thu lưu OperationKey/liên kết ledger. Sau khi tích hợp SCRUM-22, model có 41 bảng, 18 migration. Không tự áp migration lên DB ứng dụng.
+
+Kiểm tra từ repository root:
+
+```powershell
+dotnet run --project Backend/tests/CyberManagement.API.Checks -- --sessions-only
+dotnet run --project Backend/tests/CyberManagement.API.Checks -- --session-schema
+node --test frontend/tests/session-api.test.mjs frontend/tests/computer-api.test.mjs
+node frontend/tests/run.mjs computers-management sessions-billing realtime
+```
+
+SQL suite dùng `AUTH_CHECKS_SQL_CONNECTION`, luôn tạo/dọn DB thử riêng; gồm 32 tạo máy đồng thời, retry, rollback giữa debit và hóa đơn, nhiều worker/System, outer rollback không event và hai kết nối SignalR. Browser dùng HTTP/SDK fixtures; chưa thay thế kiểm chứng hai máy LAN thật.
 
 ## SCRUM-22: adapter gateway và callback
 
@@ -142,6 +165,19 @@ GET `/api/admin/inventory` đọc Products bằng JWT + `stockreceipt.view`.
 Seed test nằm trong `src/CyberManagement.Infrastructure/DataTest/InventoryReadSeed.sql`.
 SQL/DBML được xuất từ migrations/model hiện tại ở [database](database/).
 Hướng dẫn DB thử, seed, đăng nhập, màn hình và kiểm thử: [SCRUM-13](../docs/scrum-13-inventory-setup.md).
+
+## SCRUM-24 bước 2: schema phiên và khóa quyết toán
+
+`20261114104346_PrepareSessionBilling` bổ sung snapshot giá/actor, khóa mở/đóng/thu, liên kết ledger và unique slot phiên chưa đóng theo máy/khách; giữ 38 bảng tại baseline bước 2. Metadata lịch sử giữ null, không backfill giá hoặc nhân viên giả. Migration dừng nếu có phiên chưa đóng trùng hoặc khoản thu trùng mốc; downgrade dừng khi đã có metadata tiền mới. API phiên/thu tiền hiện đã triển khai ở mục SCRUM-24 phía trên; không tự áp migration lên DB chung.
+
+Kiểm tra schema offline, không cần connection string và không mở kết nối SQL:
+
+```powershell
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --session-schema
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.Inventory.Checks -- --check-schema
+```
+
+Đối chiếu trường/ràng buộc và giới hạn tích hợp tại [contract máy/phiên](docs/002-computer-session-contract.md). Cần phê duyệt DB thử cụ thể trước khi áp migrations/chạy ca SQL; kết quả offline/InMemory không thay thế kiểm chứng SQL Server hoặc hai máy LAN.
 
 ## S1-K-1 / SCRUM-10: danh mục, sản phẩm và menu
 

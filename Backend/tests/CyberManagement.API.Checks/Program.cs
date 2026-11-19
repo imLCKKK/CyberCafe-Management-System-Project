@@ -24,6 +24,18 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
+if (args.Contains("--sessions-only"))
+{
+    Console.WriteLine($"{await SessionBillingChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} session SQL/API checks passed.");
+    return;
+}
+
+if (args.Contains("--session-schema"))
+{
+    SessionSchemaChecks.RunModel();
+    return;
+}
+
 if (args.Contains("--menu-seed-only"))
 {
     await NexoraMenuSeedChecks.RunAsync();
@@ -130,10 +142,13 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     ["SeedAccounts:Technician:Password"] = "Technician-check-password-2026!"
 });
 var realtimeSaveFailure = new RealtimeSaveFailure();
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+builder.Services.AddScoped<SessionCommitEvents>();
+builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+builder.Services.AddDbContext<ApplicationDbContext>((provider, options) =>
 {
     databaseFixture.Configure(options);
     options.AddInterceptors(realtimeSaveFailure);
+    options.AddInterceptors(provider.GetRequiredService<SessionCommitEvents>());
 });
 builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
@@ -310,6 +325,10 @@ try
     {
         checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
         checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+        checks += await ComputerManagementChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+        checks += SessionSchemaChecks.RunModel();
+        await using var sessionSchemaScope = app.Services.CreateAsyncScope();
+        checks += await SessionSchemaChecks.RunSqlAsync(sessionSchemaScope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
         checks += await TournamentChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
     }
     if (!customerOnly && !walletOnly && !gatewayOnly)

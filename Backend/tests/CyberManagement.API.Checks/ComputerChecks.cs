@@ -285,10 +285,15 @@ internal static class ComputerChecks
             ("Free", "Ended", start.AddMinutes(10)), ("Occupied", "Active", null),
             ("ActiveEnded", "Active", start.AddMinutes(10)), ("EndedOpen", "Ended", null)
         })
+        {
+            var sessionCustomer = key == "EndedOpen" ? null : new Customer { FullName = "Computer checks " + key,
+                Phone = "computer-" + key, Status = "Active" };
             database.GamingSessions.Add(new GamingSession
             {
-                Computer = stations[key], CustomerId = customerId, Status = status, StartTime = start, EndTime = end
+                Computer = stations[key], CustomerId = key == "EndedOpen" ? customerId : 0,
+                Customer = sessionCustomer!, Status = status, StartTime = start, EndTime = end
             });
+        }
         database.ComputerMaintenances.AddRange(
             new ComputerMaintenance
             {
