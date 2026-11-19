@@ -30,7 +30,7 @@ Server tính tổng phí `ceil(priceSnapshot * floor(elapsedSeconds) / 3600)`, t
 
 Worker chạy khi khởi động và mỗi 10 giây, dùng cùng quyết toán trước debit ví khác. Không đủ trả giây tiếp theo thì chốt tại mốc đủ ngân sách và ghi System, độc lập người mở. Event SessionChanged/WalletChanged/ComputerChanged chỉ phát sau commit, kể cả khi caller ví quyết toán phiên. Rollback không phát event.
 
-Migration PrepareSessionBilling được giữ nguyên. Migration `20261118090000_ComputerSessionsBilling` chỉ bổ sung actor/kết quả đóng và unique hồ sơ bảo trì đang mở; không xóa snapshot, computed open slot hoặc metadata cũ. Phiên mới lưu cả snapshot tương thích cũ và PricePerHourSnapshot, khoản thu lưu OperationKey/liên kết ledger. Model hiện có 40 bảng, 16 migrations. Không tự áp migration lên DB ứng dụng.
+Migration PrepareSessionBilling được giữ nguyên. Migration `20261118090000_ComputerSessionsBilling` chỉ bổ sung actor/kết quả đóng và unique hồ sơ bảo trì đang mở; không xóa snapshot, computed open slot hoặc metadata cũ. Phiên mới lưu cả snapshot tương thích cũ và PricePerHourSnapshot, khoản thu lưu OperationKey/liên kết ledger. Sau khi tích hợp SCRUM-22, model có 41 bảng, 18 migration. Không tự áp migration lên DB ứng dụng.
 
 Kiểm tra từ repository root:
 
@@ -42,6 +42,17 @@ node frontend/tests/run.mjs computers-management sessions-billing realtime
 ```
 
 SQL suite dùng `AUTH_CHECKS_SQL_CONNECTION`, luôn tạo/dọn DB thử riêng; gồm 32 tạo máy đồng thời, retry, rollback giữa debit và hóa đơn, nhiều worker/System, outer rollback không event và hai kết nối SignalR. Browser dùng HTTP/SDK fixtures; chưa thay thế kiểm chứng hai máy LAN thật.
+
+## SCRUM-22: adapter gateway và callback
+
+[Hợp đồng gateway](docs/007-zalopay-gateway-callbacks.md) mô tả API TopUp/Order, intent/receipt,
+HMAC/callback/Query, cấu hình secret và cách phân biệt fixture với gọi sandbox thật.
+Create lưu ID/số tiền trước HTTP; callback/Query ghi receipt chống lặp. Cộng ví, Payment nghiệp vụ,
+xác nhận Order và realtime hoàn tất thuộc S2-M-3; luồng tiền mặt SCRUM-21 giữ nguyên.
+
+Từ repository root, chạy `.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --zalopay-gateway-checks`;
+chế độ SQL `--gateway-only` yêu cầu `AUTH_CHECKS_SQL_CONNECTION`
+và tạo/dọn DB thử riêng. Chi tiết các lệnh nằm trong hợp đồng; không ghi keys hoặc URL token vào log.
 
 ## SCRUM-21: nạp tiền mặt và tiền tặng
 

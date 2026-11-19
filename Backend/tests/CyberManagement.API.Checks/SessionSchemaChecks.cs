@@ -17,7 +17,7 @@ internal static class SessionSchemaChecks
         var session = model.FindEntityType(typeof(GamingSession))!;
         var charge = model.FindEntityType(typeof(SessionCharge))!;
         Check("Migration snapshot matches the current SQL Server model", !db.Database.HasPendingModelChanges());
-        Check("Billing schema preserves the existing table count", model.GetRelationalModel().Tables.Count() == 40);
+        Check("Integrated schema includes all 41 business tables", model.GetRelationalModel().Tables.Count() == 41);
         Check("Legacy sessions retain unknown rate and actor as null",
             session.FindProperty(nameof(GamingSession.HourlyRateSnapshot))!.IsNullable
             && session.FindProperty(nameof(GamingSession.OpenedByEmployeeId))!.IsNullable

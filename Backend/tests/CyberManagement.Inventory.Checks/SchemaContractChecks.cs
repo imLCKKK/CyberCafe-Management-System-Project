@@ -131,7 +131,7 @@ internal static class SchemaContractChecks
         // Các migration kho/ví đã hạ cấp trước khi guard của migration chứng từ từ chối.
         // Khôi phục schema mới nhất để các test service phía sau có cột OperationKey.
         await db.Database.MigrateAsync();
-        check("Latest integrated migrations are restored after the downgrade guard check", (await db.Database.GetAppliedMigrationsAsync()).Count() == 14);
+        check("Latest integrated migrations are restored after the downgrade guard check", (await db.Database.GetAppliedMigrationsAsync()).Count() == db.Database.GetMigrations().Count());
 
         async Task Reject<T>(string name, T entity, string constraint) where T : class
         {

@@ -21,7 +21,7 @@ namespace CyberManagement.API
             builder.Services.AddApiServices(builder.Configuration);
             builder.Services.AddInfrastructureServices(builder.Configuration);
             builder.Services.AddHostedService<CyberManagement.API.Services.SessionBillingWorker>();
-            builder.Services.AddZaloPaySandboxConfiguration(builder.Configuration, builder.Environment.EnvironmentName);
+            builder.Services.AddZaloPayGateway(builder.Configuration, builder.Environment.EnvironmentName);
 
             // Add services to the container.
 

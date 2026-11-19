@@ -19,7 +19,7 @@ public static class ZaloPaySignatures
         if (amount is <= 0 or > 999_999_999)
             throw new ArgumentOutOfRangeException(nameof(amount), "Amount must be positive and within the application's VND limit.");
         if (appTime <= 0) throw new ArgumentOutOfRangeException(nameof(appTime), "Creation time must be positive Unix milliseconds.");
-        // Conservative application bound for embed_data; the current Create HTML does not specify a maximum.
+        // Keep the application's conservative 1024-character bound (provider documentation allows 2048).
         ValidateText(embedData, 1024, nameof(embedData));
         ValidateText(item, 2048, nameof(item));
         ValidateKey(key1);

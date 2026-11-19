@@ -552,6 +552,38 @@ Table dbo.WalletTransactions {
     (SourceType, SourceId, Type) [name: 'IX_WalletTransactions_SourceType_SourceId_Type', unique]
   }
 }
+Table dbo.ZaloPayIntents {
+  IntentId int [not null, pk, increment]
+  CreatedAtUtc datetimeoffset [not null]
+  CustomerId int [not null]
+  ExpectedAmountVnd decimal(18,0) [not null]
+  ExpiresAtUtc datetimeoffset [not null]
+  FailureReason nvarchar(80) [null]
+  LastQueryAtUtc datetimeoffset [null]
+  MerchantTransactionId nvarchar(40) [not null]
+  NextQueryAtUtc datetimeoffset [null]
+  OperationKey nvarchar(100) [not null]
+  OrderId int [null]
+  PaymentUrl nvarchar(2048) [null]
+  ProviderAmountVnd decimal(18,0) [null]
+  ProviderAppId int [not null]
+  ProviderOccurredAtUtc datetimeoffset [null]
+  ProviderTransactionId nvarchar(19) [null]
+  Purpose nvarchar(10) [not null]
+  QueryLeaseToken uniqueidentifier [null]
+  QueryLeaseUntilUtc datetimeoffset [null]
+  RequiresReconciliation bit [not null]
+  Status nvarchar(10) [not null]
+  VerifiedAtUtc datetimeoffset [null]
+  indexes {
+    (CustomerId) [name: 'IX_ZaloPayIntents_CustomerId']
+    (MerchantTransactionId) [name: 'IX_ZaloPayIntents_MerchantTransactionId', unique]
+    (OperationKey) [name: 'IX_ZaloPayIntents_OperationKey', unique]
+    (OrderId) [name: 'IX_ZaloPayIntents_OrderId', unique]
+    (ProviderAppId, ProviderTransactionId) [name: 'IX_ZaloPayIntents_ProviderAppId_ProviderTransactionId', unique]
+    (Status, NextQueryAtUtc) [name: 'IX_ZaloPayIntents_Status_NextQueryAtUtc']
+  }
+}
 Ref: dbo.AuditLogs.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.ComputerMaintenance.(ComputerId) > dbo.Computers.(ComputerId)
 Ref: dbo.ComputerMaintenance.(EmployeeId) > dbo.Employees.(EmployeeId)
@@ -624,3 +656,5 @@ Ref: dbo.TournamentTransitions.(TournamentId) > dbo.Tournaments.(TournamentId)
 Ref: dbo.WalletTransactions.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.WalletTransactions.(ActorEmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.WalletTransactions.(OriginalDebitId) > dbo.WalletTransactions.(TransactionId)
+Ref: dbo.ZaloPayIntents.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.ZaloPayIntents.(OrderId) > dbo.Orders.(OrderId)
