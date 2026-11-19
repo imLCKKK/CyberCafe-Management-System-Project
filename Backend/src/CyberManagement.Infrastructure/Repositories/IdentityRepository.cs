@@ -93,12 +93,22 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
         AuditLog audit,
         bool preserveAnotherActiveAdmin,
         CancellationToken cancellationToken,
-        Func<Employee, string>? mutationResponse = null)
+        Func<Employee, string>? mutationResponse = null,
+        byte[]? expectedVersion = null)
     {
         var isNewEmployee = database.Entry(employee).State == EntityState.Added;
         await using var transaction = database.Database.IsRelational()
             ? await database.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
             : null;
+
+        // Take the invariant lock before any Serializable receipt reads retain shared/range locks.
+        if (preserveAnotherActiveAdmin && database.Database.IsSqlServer())
+        {
+            const string lockResource = "EmployeeAdminInvariant";
+            await database.Database.ExecuteSqlInterpolatedAsync(
+                $"DECLARE @lockResult int; EXEC @lockResult = sys.sp_getapplock @Resource = {lockResource}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000; IF @lockResult < 0 THROW 51000, 'Could not acquire employee admin invariant lock.', 1;",
+                cancellationToken);
+        }
 
         if (audit.RequestKey is not null)
         {
@@ -133,16 +143,12 @@ public sealed class IdentityRepository(ApplicationDbContext database) : IIdentit
                 throw new ConflictException("Idempotency-Key đã được sử dụng.");
         }
 
+        // A concurrent receipt takes precedence over a stale version for the same request.
+        if (expectedVersion is not null && !employee.Version.SequenceEqual(expectedVersion))
+            throw new BusinessRuleException("VersionConflict: hồ sơ nhân viên đã thay đổi. Vui lòng tải lại.");
+
         if (preserveAnotherActiveAdmin)
         {
-            if (database.Database.IsSqlServer())
-            {
-                const string lockResource = "EmployeeAdminInvariant";
-                await database.Database.ExecuteSqlInterpolatedAsync(
-                    $"DECLARE @lockResult int; EXEC @lockResult = sys.sp_getapplock @Resource = {lockResource}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000; IF @lockResult < 0 THROW 51000, 'Could not acquire employee admin invariant lock.', 1;",
-                    cancellationToken);
-            }
-
             var anotherActiveAdminExists = await database.Employees
                 .AnyAsync(employeeRow =>
                     employeeRow.EmployeeId != employee.EmployeeId

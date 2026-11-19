@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using CyberManagement.API.Realtime;
 using CyberManagement.Application.DTOs.Computers;
+using CyberManagement.Application.DTOs.Employees;
 using CyberManagement.Application.DTOs.Realtime;
 using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Application.Interfaces.Services;
@@ -228,8 +229,10 @@ internal static class RealtimeChecks
         await ExpectNoEvents(noPermission, RealtimeAccountType.Staff, noPermissionId,
             "Staff without permission do not receive tournament events");
 
+        var employeeLockKey = Guid.NewGuid().ToString("D");
         await ExpectStatus("Locking a connected employee succeeds", HttpStatusCode.OK,
-            await SendAsync(HttpMethod.Post, $"/api/employees/{observerId}/lock", adminToken));
+            await SendAsync(HttpMethod.Post, $"/api/employees/{observerId}/lock", adminToken,
+                idempotencyKey: employeeLockKey));
         var locked = await observer.NextAsync();
         Check("An already-open employee connection is notified when access is revoked",
             locked.GetProperty("type").GetInt32() == 1
@@ -245,6 +248,26 @@ internal static class RealtimeChecks
             await observer.TryNextAsync(TimeSpan.FromMilliseconds(250)) is null);
         await ExpectStatus("Realtime fixture employee is restored for later suites", HttpStatusCode.OK,
             await SendAsync(HttpMethod.Post, $"/api/employees/{observerId}/unlock", adminToken));
+
+        await using (var unlockedObserver = await RealtimeTestPeer.ConnectAsync(app.GetTestServer(), staffTokens["Waiter"]))
+        {
+            using var replay = await SendAsync(HttpMethod.Post, $"/api/employees/{observerId}/lock", adminToken,
+                idempotencyKey: employeeLockKey);
+            Check("Old lock replay after unlock returns its original response and replay marker",
+                replay.StatusCode == HttpStatusCode.OK
+                && replay.Headers.TryGetValues("Idempotency-Replayed", out var values)
+                && values.Single() == "true"
+                && (await replay.Content.ReadFromJsonAsync<EmployeeDto>())?.IsActive == false);
+            await ExpectStatus("Old lock replay leaves the unlocked employee active", HttpStatusCode.OK,
+                await SendAsync(HttpMethod.Get, "/api/auth/me", staffTokens["Waiter"]));
+            var afterReplay = NewEvent(RealtimeEvent.ComputerChanged, computerId);
+            await publisher.PublishToPermissionAsync("computer.view", afterReplay, CancellationToken.None);
+            Check("Old lock replay does not send AccountLocked or remove a reconnected employee from event groups",
+                Event(await unlockedObserver.NextAsync(), RealtimeEvent.ComputerChanged)
+                    .GetProperty("eventId").GetGuid() == afterReplay.EventId);
+            await ExpectNoEvents(unlockedObserver, RealtimeAccountType.Staff, observerId,
+                "Old lock replay preserves the reconnected employee's private account group");
+        }
 
         return checks;
 
@@ -269,12 +292,13 @@ internal static class RealtimeChecks
         Task<HttpResponseMessage> PatchAsync(string status, string expectedStatus) =>
             SendAsync(HttpMethod.Patch, $"/api/admin/computers/{computerId}/status", adminToken, new { status, expectedStatus });
 
-        async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, string? token, object? body = null)
+        async Task<HttpResponseMessage> SendAsync(
+            HttpMethod method, string path, string? token, object? body = null, string? idempotencyKey = null)
         {
             using var request = new HttpRequestMessage(method, path);
             if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             if (method == HttpMethod.Put || (method == HttpMethod.Post && path.StartsWith("/api/employees", StringComparison.Ordinal)))
-                request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
+                request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString("D"));
             if (body is not null) request.Content = JsonContent.Create(body);
             return await client.SendAsync(request);
         }

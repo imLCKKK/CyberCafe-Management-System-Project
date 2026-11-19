@@ -113,11 +113,13 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 var realtimeSaveFailure = new RealtimeSaveFailure();
 var employeeAuditSaveFailure = new EmployeeAuditSaveFailure();
 var adminInvariantLockBarrier = new AdminInvariantLockBarrier();
+var employeeMutationReadBarrier = new EmployeeMutationReadBarrier();
 builder.Services.AddSingleton(adminInvariantLockBarrier);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     databaseFixture.Configure(options);
-    options.AddInterceptors(realtimeSaveFailure, employeeAuditSaveFailure, adminInvariantLockBarrier);
+    options.AddInterceptors(realtimeSaveFailure, employeeAuditSaveFailure, adminInvariantLockBarrier,
+        employeeMutationReadBarrier);
 });
 builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
@@ -289,7 +291,8 @@ try
     {
         checks += await EmployeeAccessChecks.RunAsync(
             app.Services, client, staffTokens, customer.AccessToken, adminInvariantLockBarrier);
-        checks += await EmployeeAuditChecks.RunAsync(app.Services, client, staffTokens, employeeAuditSaveFailure);
+        checks += await EmployeeAuditChecks.RunAsync(app.Services, client, staffTokens, employeeAuditSaveFailure,
+            employeeMutationReadBarrier);
     }
     if (!catalogOnly && !customerOnly && !walletOnly && !employeesOnly)
     {

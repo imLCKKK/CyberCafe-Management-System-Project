@@ -46,7 +46,8 @@ public interface IIdentityRepository
         AuditLog audit,
         bool preserveAnotherActiveAdmin,
         CancellationToken cancellationToken,
-        Func<Employee, string>? mutationResponse = null);
+        Func<Employee, string>? mutationResponse = null,
+        byte[]? expectedVersion = null);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }

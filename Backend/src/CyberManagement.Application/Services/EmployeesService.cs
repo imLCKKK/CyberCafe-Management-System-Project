@@ -152,9 +152,6 @@ public sealed class EmployeesService(
         var employee = await repository.GetEmployeeByIdAsync(employeeId, cancellationToken)
             ?? throw new InvalidOperationException("Nhân viên không tồn tại.");
 
-        if (!employee.Version.SequenceEqual(expectedVersion))
-            throw new BusinessRuleException("VersionConflict: hồ sơ nhân viên đã thay đổi. Vui lòng tải lại.");
-
         var preserveAnotherActiveAdmin = false;
         
         if (request.FullName is not null)
@@ -203,7 +200,8 @@ public sealed class EmployeesService(
             cancellationToken,
             preserveAnotherActiveAdmin,
             mutation,
-            saved => JsonSerializer.Serialize(ToDto(saved)));
+            saved => JsonSerializer.Serialize(ToDto(saved)),
+            expectedVersion);
 
         var updatedEmployee = await repository.GetEmployeeByIdAsync(employeeId, cancellationToken)
             ?? throw new InvalidOperationException("Không thể lấy thông tin nhân viên sau cập nhật.");
@@ -362,7 +360,8 @@ public sealed class EmployeesService(
         CancellationToken cancellationToken,
         bool preserveAnotherActiveAdmin = false,
         AuditLog? mutation = null,
-        Func<Employee, string>? mutationResponse = null)
+        Func<Employee, string>? mutationResponse = null,
+        byte[]? expectedVersion = null)
     {
         var audit = mutation ?? new AuditLog();
         audit.EmployeeId = currentEmployeeId;
@@ -374,7 +373,8 @@ public sealed class EmployeesService(
             audit,
             preserveAnotherActiveAdmin,
             cancellationToken,
-            mutationResponse);
+            mutationResponse,
+            expectedVersion);
     }
     
     public async Task<(EmployeeDto Employee, bool Replayed)> CreateEmployeeWithIdempotencyAsync(

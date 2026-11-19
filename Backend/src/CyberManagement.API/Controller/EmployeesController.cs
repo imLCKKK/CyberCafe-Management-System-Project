@@ -120,7 +120,8 @@ public sealed class EmployeesController(
             var result = await employeesService.LockEmployeeWithIdempotencyAsync(
                 employeeId, key, currentEmployeeId, cancellationToken);
             MarkReplay(result.Replayed);
-            await realtimeAccountConnections.RevokeEmployeeAsync(employeeId);
+            if (!result.Replayed)
+                await realtimeAccountConnections.RevokeEmployeeAsync(employeeId);
             return Ok(result.Employee);
         }
         catch (InvalidOperationException ex) when (ex is not BusinessRuleException)

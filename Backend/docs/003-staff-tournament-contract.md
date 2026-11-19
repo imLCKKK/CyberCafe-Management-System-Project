@@ -54,6 +54,13 @@ nhân viên/đổi mật khẩu còn lại nhận `Idempotency-Key`; kết quả
 `expectedVersion` hoặc mật khẩu hiện tại, có header `Idempotency-Replayed: true`; dùng
 cùng key với thao tác/payload khác trả 409. Biên nhận lưu trong dòng audit của chính thao tác trong bảng `AuditLogs`, theo khóa phân biệt của actor; không tăng số bảng đích.
 
+**Sửa cạnh tranh SCRUM-17 (19/11/2026):** PUT kiểm tra lại biên nhận dưới khóa
+idempotency trong transaction trước khi kết luận `VersionConflict`, kể cả khi cả hai
+request ban đầu chưa thấy biên nhận. Thao tác bảo vệ Admin cuối lấy khóa
+`EmployeeAdminInvariant` trước khóa/đọc biên nhận, không giữ khóa đọc Serializable
+trong khi chờ invariant. Replay khóa chỉ trả kết quả gốc, không gửi lại `AccountLocked`
+hay loại kết nối đã mở lại khỏi nhóm realtime.
+
 **Quyết định bổ sung ngày 10/11/2026:** Trưởng nhóm chọn baseline/fallback `rank-snake-v1` theo [SCRUM-9, mục 5](https://github.com/imLCKKK/CyberCafe-Management-System-Project/blob/1b2ceb9b34cf91b81c61d5dc5c30b5918487527b/docs/contracts/ml-team-balancing-pipeline.md#L146-L153), thay cách xếp theo SkillScore tổng hợp trong v0.5 đã merge ở PR #18. Giữ yêu cầu ML; không chờ xác nhận riêng của Minh/Phúc để chốt phương án này. Bản bổ sung vẫn do Trưởng nhóm duyệt cuối.
 
 **Thay đổi v0.7 sau review PR #21:** Confirm giữ nguyên phân đội/vai trò từ đề xuất server; chỉ tên đội được sửa. Swap sau xác nhận chuyển kết quả hiện tại sang `Manual`, giữ đề xuất gốc và lịch sử chỉnh sửa trong snapshot; không gắn nhãn baseline/ML cho đội đã chỉnh tay.

@@ -11,7 +11,7 @@ internal static class EmployeeAuditChecks
 {
     public static async Task<int> RunAsync(
         IServiceProvider services, HttpClient client, IReadOnlyDictionary<string, string> staffTokens,
-        EmployeeAuditSaveFailure failure)
+        EmployeeAuditSaveFailure failure, EmployeeMutationReadBarrier mutationReadBarrier)
     {
         var checks = 0;
         string? passwordToken = null;
@@ -156,6 +156,39 @@ internal static class EmployeeAuditChecks
 
         if (sqlServer)
         {
+            var sameKey = Guid.NewGuid().ToString("D");
+            var sameUpdate = new { fullName = "Identical concurrent edit", expectedVersion = (await ReadEmployeeAsync()).Version };
+            mutationReadBarrier.Arm(sameKey);
+            HttpResponseMessage[] sameKeyResponses;
+            try
+            {
+                sameKeyResponses = await Task.WhenAll(
+                    SendAsync(HttpMethod.Put, targetPath, sameUpdate, idempotencyKey: sameKey),
+                    SendAsync(HttpMethod.Put, targetPath, sameUpdate, idempotencyKey: sameKey));
+            }
+            finally
+            {
+                mutationReadBarrier.Disarm();
+            }
+            try
+            {
+                Check("Identical PUTs replay even when both receipts miss and the second profile read follows commit",
+                    mutationReadBarrier.ProfileReadAfterCommitObserved
+                    && sameKeyResponses.All(response => response.StatusCode == HttpStatusCode.OK));
+                Check("Exactly one concurrent PUT is marked as a replay",
+                    sameKeyResponses.Count(response => response.Headers.TryGetValues("Idempotency-Replayed", out var values)
+                        && values.Single() == "true") == 1);
+                var results = await Task.WhenAll(sameKeyResponses.Select(async response =>
+                    await response.Content.ReadFromJsonAsync<EmployeeDto>()));
+                Check("Concurrent PUT replay returns the original DTO and persists only that version",
+                    results[0] == results[1] && results[0] == await ReadEmployeeAsync());
+                await ExpectAuditAsync("Updated");
+            }
+            finally
+            {
+                foreach (var response in sameKeyResponses) response.Dispose();
+            }
+
             var concurrentCreate = new
             {
                 username = "employee-audit-idempotent-race",
