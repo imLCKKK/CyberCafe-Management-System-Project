@@ -142,25 +142,34 @@ public sealed class SessionRepository(ApplicationDbContext db, IWalletLedgerWrit
         var seconds = (long)Math.Min(elapsed, affordable);
         var through = session.StartTime.AddSeconds(seconds);
         var total = decimal.Ceiling(price.Value * seconds / 3600m);
-        var delta = total - collected;
-        if (delta is < 0 or > 999999999 || session.LastChargedAt > through)
+        if (total < collected || session.LastChargedAt > through)
             throw new BusinessRuleException("Mốc thu phí vượt giới hạn hoặc không khớp sổ.");
         var exhausted = elapsed >= affordable;
-        if (delta > 0)
+        const decimal maximumCharge = 999_999_999m; // Wallet writer limit per debit.
+        var chargeFrom = session.LastChargedAt ?? session.StartTime;
+        while (collected < total)
         {
+            // Find the last whole second that fits this debit's cumulative ceiling.
+            var chargeSeconds = total - collected <= maximumCharge ? seconds
+                : (long)decimal.Floor((collected + maximumCharge) * 3600m / price.Value);
+            var chargeThrough = session.StartTime.AddSeconds(chargeSeconds);
+            var chargeTotal = decimal.Ceiling(price.Value * chargeSeconds / 3600m);
+            var amount = chargeTotal - collected;
             var charge = new SessionCharge { GamingSessionId = session.GamingSessionId,
-                StartTime = session.LastChargedAt ?? session.StartTime, EndTime = through, Amount = delta };
+                StartTime = chargeFrom, EndTime = chargeThrough, Amount = amount };
             db.SessionCharges.Add(charge);
             await db.SaveChangesAsync(ct);
-            var operation = $"SessionCharge:{session.GamingSessionId}:{through.Ticks}";
+            var operation = $"SessionCharge:{session.GamingSessionId}:{chargeThrough.Ticks}";
             var debit = await wallet.RecordAsync(new WalletMutation(session.CustomerId, WalletMutationKind.Debit,
-                delta, "GamingCharge", "SessionCharge", charge.ChargeId.ToString(CultureInfo.InvariantCulture),
+                amount, "GamingCharge", "SessionCharge", charge.ChargeId.ToString(CultureInfo.InvariantCulture),
                 operation, new WalletActor("System"), nowUtc), ct);
             charge.OperationKey = operation;
             charge.WalletTransaction = debit.Entry;
             db.Payments.Add(new Payment { SessionCharge = charge, WalletTransaction = debit.Entry,
-                Amount = delta, Method = "Wallet", Status = "Succeeded", OperationKey = operation,
+                Amount = amount, Method = "Wallet", Status = "Succeeded", OperationKey = operation,
                 CreatedAt = nowUtc, ConfirmedAt = nowUtc, PaymentTime = nowUtc, PaymentTimeBasis = "Confirmation" });
+            collected = chargeTotal;
+            chargeFrom = chargeThrough;
         }
         session.TotalCost = total;
         session.LastChargedAt = through;

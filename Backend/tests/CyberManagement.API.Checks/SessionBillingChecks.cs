@@ -204,6 +204,33 @@ internal static class SessionBillingChecks
             await Status("Browser cannot set actor on close", HttpStatusCode.BadRequest,
                 await Send(HttpMethod.Post, $"/api/admin/sessions/{session.GamingSessionId}/close", admin, new { actorType = "System" }, "bad-close"));
 
+            const decimal largeRate = 999_999_999m;
+            const decimal largeBalance = 3_000_000_000m;
+            await Edit(async db => (await db.ComputerTypes.FindAsync(typeIds[0]))!.PricePerHour = largeRate);
+            var workerSession = await OpenLargeBacklog("Worker");
+            await Bill(workerSession.CustomerId);
+            var workerCheckpoint = await CheckLargeCharges(workerSession.GamingSessionId, "Active");
+            var billed = await Snapshot(workerSession.GamingSessionId);
+            await Settle(workerSession.CustomerId, workerCheckpoint);
+            Check("Retry at the same split billing checkpoint does not debit again",
+                billed == await Snapshot(workerSession.GamingSessionId));
+
+            var staffSession = await OpenLargeBacklog("Staff");
+            var beforeLargeClose = await Snapshot(staffSession.GamingSessionId);
+            fault.FailNextInvoice = 1;
+            await Status("Large close reaches invoice after split debit", HttpStatusCode.InternalServerError,
+                await Send(HttpMethod.Post, $"/api/admin/sessions/{staffSession.GamingSessionId}/close", admin, new { }, "close-large"));
+            Check("Invoice failure rolls back all split debits and session state",
+                fault.FailNextInvoice == 0 && beforeLargeClose == await Snapshot(staffSession.GamingSessionId));
+            var staffClosed = await Close(staffSession.GamingSessionId, "close-large");
+            await CheckLargeCharges(staffSession.GamingSessionId, "Ended");
+            await CheckAccounting(staffSession.GamingSessionId);
+            var afterLargeClose = await Snapshot(staffSession.GamingSessionId);
+            var replayed = await Close(staffSession.GamingSessionId, "close-large");
+            Check("Large staff close retry returns the same invoice and preserves accounting",
+                staffClosed.ClosedByActorType == "Staff" && staffClosed.InvoiceId > 0
+                && replayed.InvoiceId == staffClosed.InvoiceId && afterLargeClose == await Snapshot(staffSession.GamingSessionId));
+
             // A positive remainder may still be insufficient for the next second: P=10000, B=4 -> one second, charge 3, remainder 1.
             await Edit(async db => { var type = await db.ComputerTypes.FindAsync(typeIds[0]); type!.PricePerHour = 10000; });
             var poor = await NewCustomer(4);
@@ -315,6 +342,47 @@ internal static class SessionBillingChecks
             async Task<SessionDto> Open(int computerId, int customerId, string key) => await Read<SessionDto>(await OpenResponse(computerId, customerId, key));
             async Task<SessionDto> Close(int id, string key) => await Read<SessionDto>(
                 await Send(HttpMethod.Post, $"/api/admin/sessions/{id}/close", admin, new { }, key));
+            async Task<SessionDto> OpenLargeBacklog(string scenario)
+            {
+                var id = await NewCustomer(largeBalance);
+                var machine = await CreateComputer($"Large backlog {scenario}");
+                var openedSession = await Open(machine.ComputerId, id, $"large-{scenario}");
+                await Edit(async db => (await db.GamingSessions.FindAsync(openedSession.GamingSessionId))!.StartTime = DateTime.UtcNow.AddHours(-2));
+                return openedSession;
+            }
+            async Task<DateTime> CheckLargeCharges(int id, string expectedStatus)
+            {
+                await using var scope = app.Services.CreateAsyncScope();
+                var db = Db(scope);
+                var row = await db.GamingSessions.Include(x => x.Customer).SingleAsync(x => x.GamingSessionId == id);
+                var charges = await db.SessionCharges.Include(x => x.WalletTransaction)
+                    .Where(x => x.GamingSessionId == id).OrderBy(x => x.EndTime).ToArrayAsync();
+                var payments = await db.Payments.Where(x => x.SessionCharge != null && x.SessionCharge.GamingSessionId == id)
+                    .ToDictionaryAsync(x => x.SessionChargeId!.Value);
+                var checkpoint = row.StartTime;
+                var total = 0m;
+                foreach (var charge in charges)
+                {
+                    total += charge.Amount;
+                    var ticks = (charge.EndTime - row.StartTime).Ticks;
+                    Check("Split charge fits wallet limit, advances the checkpoint and matches cumulative billing",
+                        charge.Amount is > 0 and <= largeRate && charge.StartTime == checkpoint && charge.EndTime > checkpoint
+                        && ticks % TimeSpan.TicksPerSecond == 0
+                        && total == decimal.Ceiling(largeRate * (ticks / TimeSpan.TicksPerSecond) / 3600m));
+                    Check("Split charge has one matching Wallet Payment and ledger debit",
+                        charge.OperationKey == $"SessionCharge:{id}:{charge.EndTime.Ticks}"
+                        && charge.WalletTransaction?.OperationKey == charge.OperationKey
+                        && charge.WalletTransaction?.Amount == -charge.Amount
+                        && payments.TryGetValue(charge.ChargeId, out var payment)
+                        && payment.WalletTransactionId == charge.WalletTransactionId && payment.OperationKey == charge.OperationKey
+                        && payment.Amount == charge.Amount && payment.Method == "Wallet" && payment.Status == "Succeeded");
+                    checkpoint = charge.EndTime;
+                }
+                Check($"Large backlog settles with status {expectedStatus}",
+                    row.Status == expectedStatus && charges.Length >= 2 && checkpoint >= row.StartTime.AddHours(2)
+                    && row.LastChargedAt == checkpoint && row.TotalCost == total && row.Customer.WalletBalance == largeBalance - total);
+                return DateTime.SpecifyKind(checkpoint, DateTimeKind.Utc);
+            }
             async Task<SessionDto?> Bill(int id)
             { await using var scope = app.Services.CreateAsyncScope(); await scope.ServiceProvider.GetRequiredService<ISessionRepository>().BillAsync(id, default); return null; }
             async Task Settle(int id, DateTime now)

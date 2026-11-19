@@ -49,6 +49,7 @@ export function SessionOperations({ computer, permissions, onSaved }) {
   }
   if (!permissions.includes('session.view') && !permissions.includes('session.start')) return null;
   const idle = computer.Status === 'Available' && !computer.HasOpenSession && !computer.HasOpenMaintenance;
+  const needsReconciliation = session?.pricePerHourSnapshot === null;
   return <section className="computer-management maintenance-panel" aria-label="Phiên chơi">
     <h3>Phiên chơi</h3>
     {loading && <p role="status">Đang tải phiên…</p>}
@@ -63,7 +64,8 @@ export function SessionOperations({ computer, permissions, onSaved }) {
       <button className="cafe-button primary" disabled={loading || busy || !customerId}>Mở phiên</button>
     </form>}
     {session && <p>Phiên #{session.gamingSessionId} · Khách #{session.customerId} · Đã thu {session.totalCost.toLocaleString('vi-VN')} đ</p>}
-    {session && permissions.includes('session.end') && permissions.includes('invoice.create') &&
+    {needsReconciliation && <p className="cafe-error" role="alert">Phiên thiếu giá giờ đã lưu, cần đối soát trước khi đóng.</p>}
+    {session && !needsReconciliation && permissions.includes('session.end') && permissions.includes('invoice.create') &&
       <button className="cafe-button primary" disabled={busy}
         onClick={() => void run(signal => closeSession(session.gamingSessionId, key.current, signal))}>Đóng phiên và xuất hóa đơn</button>}
   </section>;

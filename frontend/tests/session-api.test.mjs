@@ -61,6 +61,14 @@ test('Session list uses API and rejects malformed arrays', async () => {
   reply([row()]); assert.equal((await getSessions()).length, 1);
   reply({ items: [row()] }); await assert.rejects(getSessions(), { status: 200 });
 });
+test('Admin list keeps both legacy and billable sessions while Home requires an active snapshot', async () => {
+  const active = row();
+  const legacy = { ...row(), gamingSessionId: 43, computerId: 13, pricePerHourSnapshot: null };
+  reply([legacy, active]);
+  assert.deepEqual(await getSessions(), [legacy, active]);
+  reply({ walletBalance: 50000, session: legacy });
+  await assert.rejects(getSessionHome(), { status: 200 });
+});
 test('API conflict remains an error, with no local success fallback', async () => {
   globalThis.fetch = async () => Response.json({ detail: 'Máy đã có phiên.' }, { status: 409 });
   await assert.rejects(openSession(12, 7, 'conflict'), { status: 409, message: 'Máy đã có phiên.' });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { cdp, evaluate, until, socket, errors, go, input, click, press, screenshot, sleep } from './cdp.mjs';
+import { cdp, evaluate, until, socket, errors, go, input, click, screenshot, sleep } from './cdp.mjs';
 import { computerFixture } from './computer-fixture.mjs';
 
 // UI/SDK fixtures complement the real transaction and SignalR checks in --sessions-only.
@@ -21,6 +21,8 @@ const makeSession = pc => ({ gamingSessionId: 240, computerId: pc.computerId, cu
   startTimeUtc: new Date(Date.now() - 90000).toISOString(), endTimeUtc: null, lastChargedAtUtc: null,
   pricePerHourSnapshot: 12345, totalCost: 321, status: 'Active',
   openedByEmployeeId: 7, closedByActorType: null, closeReason: null, invoiceId: null });
+const legacySession = { ...makeSession(fixture.computers[1]), gamingSessionId: 241,
+  customerId: 8, pricePerHourSnapshot: null, totalCost: 0 };
 
 async function handle({ requestId, request }) {
   if (request.url.includes('microsoft_signalr.js') || request.url.includes('/@microsoft/signalr/')) {
@@ -65,7 +67,7 @@ async function handle({ requestId, request }) {
     if (request.method === 'POST') {
       const pc = fixture.computers.find(row => row.computerId === body.computerId);
       session = makeSession(pc); pc.status = 'Occupied'; pc.hasOpenSession = true; result = session;
-    } else result = session ? [session] : [];
+    } else result = session ? [legacySession, session] : [legacySession];
   } else if (/\/sessions\/\d+\/close$/.test(path)) {
     const pc = fixture.computers.find(row => row.computerId === session.computerId);
     result = { ...session, status: 'Ended', endTimeUtc: new Date().toISOString(), closedByActorType: 'Staff', invoiceId: 19 };
@@ -113,8 +115,13 @@ try {
   await until('!document.querySelector("dialog")');
   assert.equal(session, null);
   const close = requests.find(row => row.path.endsWith('/close'));
+  assert.equal(close.path, '/api/admin/sessions/240/close');
   assert.deepEqual(close.body, {});
   assert.ok(Object.keys(close.headers).some(name => name.toLowerCase() === 'idempotency-key'));
+
+  await open('API-PC-02');
+  await until('document.querySelector("dialog [role=alert]")?.textContent.includes("cần đối soát")');
+  assert.equal(await evaluate('Array.from(document.querySelectorAll("dialog button")).some(button => button.textContent.includes("Đóng phiên và xuất hóa đơn"))'), false);
 
   await evaluate('localStorage.clear()');
   await go('/client/auth', 'document.querySelector(".auth-form")');
@@ -143,7 +150,7 @@ try {
   assert.deepEqual(failures.filter(error => !canceled.has(error.networkId)), []);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ passed: true, source: 'HTTP/SDK fixtures', checks: [
-    'preserved computer UI with server-backed session open/close',
+    'legacy session needs reconciliation while a valid session can still be opened and closed',
     'Home API empty/data/error/retry; authoritative fees and balance; event/reconnect refetch; 320px',
   ] }));
 } finally {
