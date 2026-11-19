@@ -35,6 +35,12 @@ if (args.Contains("--session-schema"))
     return;
 }
 
+if (args.Contains("--menu-seed-only"))
+{
+    await NexoraMenuSeedChecks.RunAsync();
+    return;
+}
+
 if (args.Contains("--voucher-only"))
 {
     Console.WriteLine($"{await VoucherChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} voucher SQL/API checks passed.");

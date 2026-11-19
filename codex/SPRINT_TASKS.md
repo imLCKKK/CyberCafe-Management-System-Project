@@ -1,16 +1,18 @@
 # Backlog Jira — 55 Task, chủ yếu 2–3 Task/người/sprint
 
-Cập nhật nền backend/DB ngày 02/11/2026; giữ lịch baseline ngày 31/10/2026, cập nhật owner S1-U-1 và logo ngày 09/11/2026. Đã gom 100 việc nhỏ thành **53 Task Jira độc lập**, giữ tiêu chí trong checklist, cộng **2 Task UI: S1-U-1 do Trưởng nhóm thực hiện, S2-U-1 do Phúc thực hiện**, tổng cộng **55 Task**. Mỗi thẻ có tên tiếng Anh nối bằng dấu gạch ngang (ví dụ `Build-Admin-Client-Login`), Description tiếng Việt, Dependencies và Done khi để copy lên Jira. Vòng quay vẫn thuộc Task của Khang, không tạo thẻ trùng. Checklist không phải Sub-task và không tạo thêm issue. Phạm vi theo [kế hoạch bàn giao](../planning/team-delivery-plan.md). VNPay trong ví dụ chỉ là mẫu trình bày; cổng của dự án vẫn là **ZaloPay sandbox chính thức**.
+**Danh tính xác nhận ngày 17/11/2026:** người dùng hiện tại là **Khang, đồng thời là Trưởng nhóm**. Khang nhận SCRUM-34 từ Phúc và trực tiếp thực hiện cả phần ảnh/component lẫn điểm nối sản phẩm; quyền duyệt cuối thuộc Khang với vai trò Trưởng nhóm. AI hỗ trợ thực hiện và tự kiểm tra, không tự duyệt Task.
 
-**Reviewer duy nhất: Trưởng nhóm**, người yêu cầu lập kế hoạch và trực tiếp duyệt thay đổi. Chưa có tên/account reviewer để ánh xạ Jira; không tự gán cho thành viên khác. Các tên trong “Phối hợp” hỗ trợ nghiệp vụ/tích hợp. Trước khi làm đọc [PROJECT_GUIDE.md](PROJECT_GUIDE.md); khi review dùng [REVIEW_GUIDE.md](REVIEW_GUIDE.md).
+Cập nhật nền backend/DB ngày 02/11/2026; giữ lịch baseline ngày 31/10/2026, cập nhật owner S1-U-1 và logo ngày 09/11/2026. Đã gom 100 việc nhỏ thành **53 Task Jira độc lập**, giữ tiêu chí trong checklist, cộng **2 Task UI: S1-U-1 do Trưởng nhóm thực hiện, S2-U-1 do Trưởng nhóm thực hiện (nhận lại từ Phúc ngày 17/11/2026)**, tổng cộng **55 Task**. Mỗi thẻ có tên tiếng Anh nối bằng dấu gạch ngang (ví dụ `Build-Admin-Client-Login`), Description tiếng Việt, Dependencies và Done khi để copy lên Jira. Vòng quay vẫn thuộc Task của Khang, không tạo thẻ trùng. Checklist không phải Sub-task và không tạo thêm issue. Phạm vi theo [kế hoạch bàn giao](../planning/team-delivery-plan.md). VNPay trong ví dụ chỉ là mẫu trình bày; cổng của dự án vẫn là **ZaloPay sandbox chính thức**.
 
-| Sprint | Thời gian năm 2026 | Đại | Minh | Phúc | Khang | Trường | Trưởng nhóm | Tổng Task |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| S1 | 31/10–05/11 | 3 | 2 | 3 | 2 | 2 | 1 | 13 |
-| S2 | 06–10/11 | 4 | 3 | 4 | 3 | 4 | 0 | 18 |
-| S3 | 10–15/11 | 3 | 3 | 3 | 2 | 3 | 0 | 14 |
-| S4 | 15–19/11 | 2 | 2 | 2 | 2 | 2 | 0 | 10 |
-| Tổng | Dự phòng 20–21/11 | 12 | 10 | 12 | 9 | 11 | 1 | 55 |
+**Reviewer duy nhất: Trưởng nhóm**, người yêu cầu lập kế hoạch và trực tiếp duyệt thay đổi. Reviewer là Khang (Trưởng nhóm), chưa có account reviewer để ánh xạ Jira; không tự gán cho thành viên khác. Các tên trong “Phối hợp” hỗ trợ nghiệp vụ/tích hợp. Trước khi làm đọc [PROJECT_GUIDE.md](PROJECT_GUIDE.md); khi review dùng [REVIEW_GUIDE.md](REVIEW_GUIDE.md).
+
+| Sprint | Thời gian năm 2026 | Đại | Minh | Phúc | Khang (Trưởng nhóm) | Trường | Tổng Task |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| S1 | 31/10–05/11 | 3 | 2 | 3 | 3 | 2 | 13 |
+| S2 | 06–10/11 | 4 | 3 | 3 | 4 | 4 | 18 |
+| S3 | 10–15/11 | 3 | 3 | 3 | 2 | 3 | 14 |
+| S4 | 15–19/11 | 2 | 2 | 2 | 2 | 2 | 10 |
+| Tổng | Dự phòng 20–21/11 | 12 | 10 | 11 | 11 | 11 | 55 |
 
 Ngày **10/11** và **15/11** được nhóm dùng làm ngày bàn giao chung của hai sprint liền kề: Task hoàn tất của sprint trước được review/bàn giao để sprint sau tích hợp; một Task vẫn chỉ thuộc một sprint.
 
@@ -18,14 +20,14 @@ Ngày **10/11** và **15/11** được nhóm dùng làm ngày bàn giao chung c�
 
 **Bàn giao contract bổ sung 14/11/2026.** Trưởng nhóm đã chọn thanh toán đủ trước nhận món, Cash đã thu khóa hủy và xuất riêng hóa đơn món/tiền giờ. S1-K-2 cập nhật bản 0.5, S1-T-1 cập nhật contract chứng từ 1.9, S1-P-1/S1-M-1 đồng bộ Payment mỗi lần thu và actor System. Các thay đổi này là thiết kế Sprint 1 để owner triển khai S2 theo module.
 
-Theo yêu cầu trực tiếp ngày **09/11/2026**, **S1-U-1 — Apply-Nexora-Branding-Theme** chuyển từ Phúc sang **Trưởng nhóm** (người dùng trực tiếp thực hiện); **S2-U-1 — Add-Food-Images-Menu-Cards** vẫn thuộc **Phúc**. Giữ mã tham chiếu để không đứt liên kết đã dùng; chữ U là mã lịch sử của phần UI. Tổng số Task và lịch sprint giữ nguyên. Trưởng nhóm giữ quyền duyệt cuối; các owner kiểm tra chéo luồng bị ảnh hưởng.
+Theo yêu cầu trực tiếp ngày **09/11/2026**, **S1-U-1 — Apply-Nexora-Branding-Theme** chuyển từ Phúc sang **Trưởng nhóm** (người dùng trực tiếp thực hiện); **S2-U-1 — Add-Food-Images-Menu-Cards / SCRUM-34** chuyển sang **Khang (Trưởng nhóm, người dùng trực tiếp thực hiện)** theo xác nhận ngày **17/11/2026**, sau khi người dùng đã trao đổi nhận lại Task với Phúc. Giữ mã tham chiếu để không đứt liên kết đã dùng; chữ U là mã lịch sử của phần UI. Tổng số Task và lịch sprint giữ nguyên. Trưởng nhóm giữ quyền duyệt cuối; các owner kiểm tra chéo luồng bị ảnh hưởng.
 
 ### Đối chiếu các yêu cầu frontend mới
 
 | Phản hồi của Trưởng nhóm | Xử lý trong backlog |
 | --- | --- |
 | Logo không thống nhất, đổi xanh lá sang xanh–tím–đen | **S1-U-1**, Trưởng nhóm làm; NEXORA CYBER, theme dùng chung và logo do Trưởng nhóm cung cấp ngày 09/11/2026 |
-| Món ăn chưa có ảnh cụ thể | **S2-U-1**, Phúc làm ảnh/component theo theme mới; Khang phối hợp dữ liệu sản phẩm |
+| Món ăn chưa có ảnh cụ thể | **S2-U-1 / SCRUM-34**, Khang (Trưởng nhóm) làm ảnh/component và nối trường ảnh sản phẩm theo theme mới |
 | Vòng quay random chọn món chưa tốt | Đã thuộc phần gợi ý món của Khang; bổ sung tiêu chí trải nghiệm vào **S2-K-3**, hồi quy trong **S3-K-2**, giữ số thẻ của Khang |
 
 Qua đọc code: admin dùng “NET CAFE”, client dùng “TRAM”; `FoodArt` và vòng quay còn lấy emoji từ `productArt`. Đây là căn cứ cho hai Task bổ sung. Các nhận xét “khó nhìn” và “vòng quay chưa tốt” cần ghi ví dụ/ảnh trước–sau khi thực hiện, không tự coi mọi vấn đề thị giác là lỗi đã tái hiện. Auth/API/giá/tồn/thuật toán gợi ý vẫn thuộc owner hiện tại.
@@ -34,7 +36,7 @@ Các ngoại lệ 4 Task/người/sprint có lý do bàn giao cụ thể:
 
 - **Đại có 4 Task:** nhân viên; giải/đăng ký; UI voucher; UI đề xuất đội ML. Danh sách đăng ký phải sẵn sàng cho Phúc trước khi ghép UI ML; voucher dùng API Trường, nên không gộp tất cả thành một thẻ chờ nhiều phía.
 - **Trường có 4 Task:** kho; chứng từ; rule voucher; báo cáo đối chiếu. API tồn/chứng từ/voucher phải bàn giao trước khi Khang/Phúc tích hợp; báo cáo đối chiếu chờ giao dịch thật từ các module đó. Gộp các bước này thành một thẻ sẽ làm mờ phụ thuộc và tăng kích thước lượt review.
-- **Phúc có 4 Task ở S2:** ảnh món S2-U-1 bổ sung cho phần phiên/OP.GG/ML. S1 còn 3 Task, ưu tiên bàn giao contract máy/ML và hook realtime sớm; Trưởng nhóm thực hiện token/theme trong S1-U-1. S2 Phúc bàn giao component ảnh S2-U-1 sớm cho Khang; không đợi hoàn tất model mới bắt đầu UI, không nhận thêm logic vòng quay/checkout.
+- **Cập nhật tải ngày 17/11/2026:** Phúc có 3 Task ở S2 (phiên/OP.GG/ML), S1 có 3 Task; ưu tiên bàn giao contract máy/ML và hook realtime sớm. Khang (Trưởng nhóm) nhận S2-U-1 / SCRUM-34 từ Phúc; logic vòng quay/checkout vẫn thuộc các Task module của Khang.
 
 Số thẻ không phải ước lượng thời gian. Gom thẻ giảm số lần nghiệm thu riêng, không tự giảm khối lượng code. Phúc vẫn phụ trách ML chia đội; đăng nhập vẫn thuộc Đại ở S1; Trưởng nhóm duyệt cuối.
 
@@ -588,7 +590,7 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 **Description:**
 
 - Nối menu, gợi ý, giỏ và xử lý đơn admin/client vào API, voucher, các phương thức thanh toán và event sau commit.
-- Sửa trải nghiệm vòng quay, trạng thái/chuyển động và kết quả trên desktop/mobile; tích hợp theme do Trưởng nhóm bàn giao và component ảnh do Phúc bàn giao, giữ nguyên quy tắc chọn món.
+- Sửa trải nghiệm vòng quay, trạng thái/chuyển động và kết quả trên desktop/mobile; tích hợp theme do Trưởng nhóm bàn giao và component ảnh do Trưởng nhóm bàn giao, giữ nguyên quy tắc chọn món.
 - Kiểm tra xuyên UI–API–SQL và suggestion-checkout: thiếu tiền/tồn, sửa giá, voucher sai, gửi lặp, 0/1 món và tồn thay đổi.
 
 **Dependencies:** `S1-K-1`, `S1-P-2`, `S2-K-2`, `S2-M-3`, `S2-U-1`
@@ -597,7 +599,7 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 
 - [ ] **Nối menu, gợi ý, giỏ và thao tác xử lý đơn.** Các điểm gọi món dùng cùng API, phương thức thu và voucher; admin/client thấy cùng đơn, nhận event sau commit; loading/lỗi không tạo bản ghi giả.
 - [ ] **Kiểm tra đặt món xuyên UI–API–SQL.** Có ca ví/tiền mặt/ZaloPay, thiếu tiền/tồn, sửa giá client, voucher sai và gửi lặp; đối chiếu đơn/tiền/tồn từ SQL.
-- [ ] **Cải thiện trải nghiệm vòng quay đã có.** Cùng Phúc và Trưởng nhóm chỉ rõ điểm chưa tốt ở `TodaySuggestion.jsx`/`SuggestionResultDialog.jsx`; chỉnh bố cục, chuyển động, nút quay và kết quả dễ đọc trên desktop/mobile theo token NEXORA do Trưởng nhóm bàn giao. Trạng thái sẵn sàng/đang quay/kết quả/hết món rõ; không kích hoạt lượt quay chồng nhau, không kẹt khi đổi màn hình/đóng dialog, món dừng ở vùng chọn khớp kết quả; xử lý 0/1 món và tồn thay đổi. Giữ quy tắc chọn món đã chốt, không sửa xác suất chỉ để làm hiệu ứng. Dùng component ảnh từ S2-U-1; kiểm tra `suggestion-checkout` và model liên quan.
+- [ ] **Cải thiện trải nghiệm vòng quay đã có.** Cùng Trưởng nhóm chỉ rõ điểm chưa tốt ở `TodaySuggestion.jsx`/`SuggestionResultDialog.jsx`; chỉnh bố cục, chuyển động, nút quay và kết quả dễ đọc trên desktop/mobile theo token NEXORA do Trưởng nhóm bàn giao. Trạng thái sẵn sàng/đang quay/kết quả/hết món rõ; không kích hoạt lượt quay chồng nhau, không kẹt khi đổi màn hình/đóng dialog, món dừng ở vùng chọn khớp kết quả; xử lý 0/1 món và tồn thay đổi. Giữ quy tắc chọn món đã chốt, không sửa xác suất chỉ để làm hiệu ứng. Dùng component ảnh từ S2-U-1; kiểm tra `suggestion-checkout` và model liên quan.
 
 **Gom từ mã cũ:** `S2-K-05`, `S2-K-06`. Đây là mã tra cứu, không tạo lại các thẻ cũ.
 
@@ -666,27 +668,29 @@ Assignee: **Trường**. Reviewer: **Trưởng nhóm**. Phối hợp: Khang; Min
 
 **Gom từ mã cũ:** `S2-T-05`. Đây là mã tra cứu, không tạo lại các thẻ cũ.
 
-### Phúc — Ảnh món ăn và trình bày menu
+### Khang (Trưởng nhóm) — Ảnh món ăn và trình bày menu
 
-Assignee: **Phúc**. Reviewer: **Trưởng nhóm**. Phối hợp: Khang cung cấp contract sản phẩm và kiểm tra chéo luồng chọn món/giỏ/checkout.
+Assignee: **Khang (Trưởng nhóm, người dùng trực tiếp thực hiện)**, nhận lại từ Phúc theo xác nhận ngày **17/11/2026**. Reviewer: **Trưởng nhóm**; AI hỗ trợ thực hiện và tự kiểm tra, không thay quyết định duyệt. Khang đồng thời sở hữu module sản phẩm; điểm nối trường ảnh được thực hiện trong cùng nhánh, giữ ranh giới nghiệp vụ vòng quay/checkout của S2-K-3.
 
 #### S2-U-1 — Add-Food-Images-Menu-Cards
 
+**Jira:** `SCRUM-34`. Khang (Trưởng nhóm) đã trao đổi nhận lại Task với Phúc và tiếp tục sở hữu module menu/sản phẩm. Cập nhật ngày 17/11/2026: sau khi chưa xác định được DB menu chính, người dùng và AI cùng chuẩn bị danh sách món; người dùng đã chốt danh sách và giá tại [menu NEXORA](../docs/nexora-menu.md). Bộ ảnh và trường ảnh sản phẩm đã triển khai local; Khang đối chiếu mapping khi nạp menu vào SQL dùng thực tế.
+
 **Description:**
 
-- Chuẩn bị ảnh đúng món, mapping theo ID/trường ảnh đã thống nhất với Khang; không tạo nguồn sản phẩm riêng.
+- Chuẩn bị ảnh đúng món, mapping theo ID/trường ảnh sản phẩm; không tạo nguồn sản phẩm riêng.
 - Chuẩn hóa component ảnh/thẻ món theo theme NEXORA cyan–tím–đen của S1-U-1, gồm crop, tải ảnh, fallback và nội dung dễ đọc.
-- Áp dụng Home/menu/giỏ/chi tiết kết quả, bàn giao component cho Khang tích hợp vòng quay; kiểm tra ảnh hỏng, món mới và mobile.
+- Áp dụng Home/menu/giỏ/chi tiết kết quả và phần hiển thị ảnh của teaser/vòng quay; kiểm tra ảnh hỏng, món mới và mobile. Logic vòng quay/checkout giữ phạm vi S2-K-3.
 
-**Dependencies:** `S1-U-1`, `S1-K-1`. Chốt với Khang trường ảnh và cách cung cấp URL/asset; không chờ hoàn tất thanh toán để làm phần trình bày.
+**Dependencies:** `S1-U-1`, `S1-K-1`. Trường ảnh và URL/asset dùng cùng sản phẩm do Khang sở hữu; không chờ hoàn tất thanh toán để làm phần trình bày.
 
-**Căn cứ và nơi bắt đầu:** `frontend/src/client/shared/ClientUI.jsx` đang vẽ `FoodArt` bằng emoji `productArt` trong `demoData.js`; teaser/vòng quay cũng dùng emoji. Xem các nơi gọi `FoodArt`, không tạo bộ ảnh/tên món riêng lệch với sản phẩm.
+**Căn cứ và nơi bắt đầu:** trước SCRUM-34, `frontend/src/client/shared/ClientUI.jsx` vẽ `FoodArt` bằng emoji `productArt` trong `demoData.js`; teaser/vòng quay cũng dùng emoji. Bản triển khai local đã tách `frontend/src/shared/food/FoodArt.jsx` dùng URL ảnh và ô thay thế, áp dụng admin/Home/menu/giỏ/teaser/vòng quay/chi tiết kết quả; bảng asset tại [nexora-menu-assets.json](../docs/nexora-menu-assets.json). Backend đã có `Products.ImageUrl`, API/form quản lý ảnh và migration mới; bộ kiểm tra SQL riêng xác minh lưu/đọc/xóa ảnh. Theo yêu cầu tiếp tục ngày 17/11/2026, DB `localhost / CyberManagement_Dev` đã được áp đủ 15 migration và nạp 7 danh mục/62 sản phẩm với giá/ảnh đã chốt, tồn mới bằng 0. Script [NexoraMenuSeed.sql](../Backend/database/NexoraMenuSeed.sql) nạp lại không ghi đè sản phẩm đã có. Xem các nơi gọi `FoodArt`, không tạo nguồn sản phẩm riêng lệch với API.
 
 **Done khi:**
 
-- [ ] **Gắn ảnh đúng sản phẩm.** Chuẩn bị ảnh khớp từng món trong bộ demo, có mapping theo ID/trường ảnh rõ ràng; thống nhất đường dẫn/URL với Khang. Khang sở hữu entity/API/form dữ liệu sản phẩm cần bổ sung; Phúc sở hữu ảnh và component hiển thị, không tạo API ảnh riêng trùng việc.
+- [ ] **Gắn ảnh đúng sản phẩm.** Chuẩn bị ảnh khớp từng món trong bộ menu đã chốt tại [menu NEXORA](../docs/nexora-menu.md), đối chiếu với sản phẩm SQL khi tích hợp và có mapping theo ID/trường ảnh rõ ràng. Khang (Trưởng nhóm) sở hữu entity/API/form sản phẩm lẫn ảnh và component hiển thị, không tạo API ảnh riêng trùng việc.
 - [ ] **Chuẩn hóa thẻ ảnh món.** Thẻ dùng token NEXORA cyan–tím–đen từ S1-U-1. Ảnh giữ tỉ lệ, kích thước/crop nhất quán và tên/giá dễ đọc; có fallback khi thiếu/tải lỗi, không gây vòng lặp lỗi; tải ảnh phù hợp kích thước, không làm layout nhảy. Có mô tả ảnh phù hợp; giữ nút, tồn, giá và hành vi giỏ hiện có.
-- [ ] **Áp dụng cùng bộ ảnh vào các điểm hiển thị.** Home/menu/giỏ/chi tiết kết quả dùng chung component hoặc quy ước; Phúc bàn giao component và asset, Khang nối vào teaser/vòng quay/kết quả trong S2-K-3. Kiểm tra ảnh đúng món, URL hỏng, danh sách dài, mobile và món mới chưa có ảnh; build và các luồng gọi món bị ảnh hưởng đạt, có ảnh trước–sau.
+- [ ] **Áp dụng cùng bộ ảnh vào các điểm hiển thị.** Home/menu/giỏ/teaser/vòng quay/chi tiết kết quả dùng chung component hoặc quy ước; Khang (Trưởng nhóm) thực hiện phần ảnh, còn nghiệp vụ vòng quay/checkout nghiệm thu trong S2-K-3. Kiểm tra ảnh đúng món, URL hỏng, danh sách dài, mobile và món mới chưa có ảnh; build và các luồng gọi món bị ảnh hưởng đạt, có ảnh trước–sau.
 
 **Ranh giới:** Task này nghiệm thu ảnh/component/menu và bàn giao giao diện dùng chung. Việc hoàn tất vòng quay/checkout là phần nghiệm thu của Khang ở S2-K-3, tránh hai Task chờ nhau hoặc cùng sửa state/animation.
 
@@ -876,7 +880,7 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 
 - Hoàn thiện tìm/lọc, gợi ý, giỏ và chặn thao tác sai trạng thái/gửi lặp trên desktop/mobile.
 - Đối chiếu đơn–hóa đơn–event admin/client, chạy đủ gợi ý → checkout → hủy/hoàn.
-- Hồi quy ảnh món/component của Phúc và vòng quay sau tích hợp, kiểm tra món được chọn, kết quả và món vào giỏ khớp nhau.
+- Hồi quy ảnh món/component của Trưởng nhóm và vòng quay sau tích hợp, kiểm tra món được chọn, kết quả và món vào giỏ khớp nhau.
 
 **Dependencies:** `S2-K-3`, `S3-K-1`, `S3-T-2`
 

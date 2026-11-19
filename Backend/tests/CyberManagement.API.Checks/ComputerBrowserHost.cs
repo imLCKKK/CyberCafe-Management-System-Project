@@ -48,10 +48,12 @@ internal static class ComputerBrowserHost
         builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
         builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
         builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
+        builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
         builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
         builder.Services.AddScoped<SessionCommitEvents>();
         builder.Services.AddScoped<ISessionRepository, SessionRepository>();
         builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
+        builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
         builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
         builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
         builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
@@ -86,7 +88,7 @@ internal static class ComputerBrowserHost
                 {
                     var category = new Category { CategoryName = "TEST_Catalog", IsActive = true };
                     database.Products.AddRange(
-                        new Product { ProductName = "TEST_Menu_Stocked", Category = category, Price = 30000, Stock = 7 },
+                        new Product { ProductName = "TEST_Menu_Stocked", Category = category, Price = 30000, Stock = 7, ImageUrl = "/food/com-ga-xoi-mo-v1.640.jpg" },
                         new Product { ProductName = "TEST_Menu_Empty", Category = category, Price = 10000, Stock = 0 },
                         new Product { ProductName = "TEST_Menu_Inactive", Category = category, Price = 20000, Stock = 9, IsActive = false },
                         new Product { ProductName = "TEST_Category_Inactive", Category = new Category { CategoryName = "TEST_Hidden", IsActive = false }, Price = 20000, Stock = 9 });

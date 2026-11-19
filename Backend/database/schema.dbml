@@ -332,6 +332,7 @@ Table dbo.Permissions {
 Table dbo.Products {
   ProductId int [not null, pk, increment]
   CategoryId int [not null]
+  ImageUrl nvarchar(500) [null]
   IsActive bit [not null]
   Price decimal(18,0) [not null]
   ProductName nvarchar(150) [not null]
