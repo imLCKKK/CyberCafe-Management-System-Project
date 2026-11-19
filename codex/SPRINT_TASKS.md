@@ -560,7 +560,10 @@ API tạo/đọc đơn Wallet/Cash, thu Cash và nhận từng món đã đượ
 `SCRUM-27-Implement-Food-Orders-Voucher-Checkout`; tích hợp ví/phí phiên/kho/voucher/chứng từ
 cùng transaction, rowversion và khóa HTTP lưu bền. SQL/API checks chạy bằng `--orders-only`
 trong DB thử riêng; hướng dẫn tại [Backend README](../Backend/README.md#scrum-27--s2-k-1-đặt-món-voucher-và-thanh-toán).
-Chưa commit hoặc áp migration vào DB ứng dụng; checklist bên dưới giữ chờ Trưởng nhóm review.
+Commit đầu `13bb492` thiếu 11 file mới do lệch casing thư mục `backend`/`Backend` trên Windows.
+Bổ sung bàn giao ngày 19/11/2026 đưa đủ file triển khai vào Git theo đường dẫn chuẩn `Backend`
+và kiểm tra lại từ source xuất riêng commit. Chưa áp migration vào DB ứng dụng;
+checklist bên dưới giữ chờ Trưởng nhóm review.
 UI, ZaloPay và hủy/hoàn tiếp tục theo S2-K-3, S2-K-2 và S3-K-1.
 
 **Description:**
