@@ -27,6 +27,7 @@ export function getPrincipalDestination(principal) {
     ['customer.view', '/admin/customers'],
     ['wallet.topup', '/admin/topups'],
     ['product.view', '/admin/products'],
+    ['promotion.view', '/admin/promotions'],
     ['stockreceipt.view', '/admin/inventory'],
     ['invoice.view', '/admin/invoices'],
     ['tournament.view', '/admin/tournaments'],

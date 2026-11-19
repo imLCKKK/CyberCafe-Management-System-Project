@@ -23,7 +23,9 @@
     "test:admin:render": "node src/admin/shared/render-smoke.mjs",
     "test:inventory:sql": "node tests/run.mjs inventory-sql",
     "test:invoices:sql": "node tests/run-invoices-live.mjs",
-    "test:invoices": "node --test src/shared/invoices/invoiceApi.test.js"
+    "test:invoices": "node --test src/shared/invoices/invoiceApi.test.js",
+    "test:vouchers": "node --test src/admin/promotions/voucherApi.test.js",
+    "test:vouchers:sql": "node tests/run-vouchers-live.mjs"
   },
   "dependencies": {
     "@microsoft/signalr": "^10.0.11",

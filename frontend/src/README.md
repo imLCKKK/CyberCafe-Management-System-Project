@@ -46,8 +46,9 @@ Suite cũng kiểm tra sidebar khách ở 1440×600/650: cuộn bằng bánh xe,
 ## Đi từ đâu?
 
 `main.jsx` → `app/routes.jsx` → `AdminLayout` hoặc `ClientLayout` → trang của
-từng chức năng. Router là nơi kiểm tra màn hình nào thực sự được sử dụng;
-`/admin/auth`, `/client/auth` và `/admin/promotions` hiện vẫn là placeholder.
+từng chức năng. Router là nơi kiểm tra màn hình nào thực sự được sử dụng.
+Auth đã nối API; `/admin/promotions` dùng màn hình voucher thật tại
+`admin/promotions/` (SCRUM-19), theo [contract API voucher](../../Backend/docs/voucher-api.md).
 
 | Thư mục | Vai trò hiện tại |
 | --- | --- |

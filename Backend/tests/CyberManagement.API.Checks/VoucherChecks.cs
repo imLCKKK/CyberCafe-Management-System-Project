@@ -4,6 +4,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using CyberManagement.API;
 using CyberManagement.API.Controller;
+using CyberManagement.API.Realtime;
+using CyberManagement.Application.DTOs.Realtime;
 using CyberManagement.Application;
 using CyberManagement.Application.DTOs.Identity;
 using CyberManagement.Application.DTOs.Vouchers;
@@ -99,6 +101,7 @@ internal static class VoucherChecks
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+            app.MapHub<RealtimeHub>(RealtimeHub.Endpoint);
             await app.StartAsync();
             using var client = app.GetTestClient();
             client.BaseAddress = new Uri("https://localhost");
@@ -124,6 +127,60 @@ internal static class VoucherChecks
             foreach (var user in new[] { "cashier01", "waiter01", "tech01" })
                 await ExpectHttp(user + " cannot create", HttpStatusCode.Forbidden, HttpMethod.Post, route, tokens[user], Body("DENIED"));
             await ExpectHttp("Customer cannot create", HttpStatusCode.Forbidden, HttpMethod.Post, route, customerToken, Body("DENIED"));
+
+            {
+                await using var adminPeer = await RealtimeTestPeer.ConnectAsync(app.GetTestServer(), admin);
+                await using var cashierPeer = await RealtimeTestPeer.ConnectAsync(app.GetTestServer(), tokens["cashier01"]);
+                await using var waiterPeer = await RealtimeTestPeer.ConnectAsync(app.GetTestServer(), tokens["waiter01"]);
+                await using var customerPeer = await RealtimeTestPeer.ConnectAsync(app.GetTestServer(), customerToken);
+                var created = await Create(Body("EVENTCHECK"));
+                await Changed(created.Id);
+                await ExpectHttp("Update emits after commit", HttpStatusCode.OK, HttpMethod.Put,
+                    route + "/" + created.Id, admin, Body(created.Code) with { Name = "Event saved" });
+                await Changed(created.Id);
+                await ExpectHttp("Toggle emits after commit", HttpStatusCode.OK, HttpMethod.Put,
+                    route + "/" + created.Id + "/status", admin, new { isActive = false });
+                await Changed(created.Id);
+                await using (var scope = app.Services.CreateAsyncScope())
+                    Check("Toggle persisted in fresh DbContext",
+                        await Db(scope).Promotions.AsNoTracking().AnyAsync(x => x.PromotionId == created.Id && !x.IsActive && x.PromoName == "Event saved"));
+                await ExpectHttp("Duplicate emits no event", HttpStatusCode.Conflict,
+                    HttpMethod.Post, route, admin, Body(created.Code));
+                await ExpectHttp("Invalid input emits no event", HttpStatusCode.BadRequest,
+                    HttpMethod.Post, route, admin, Body("INVALIDEVENT") with { DiscountValue = 101 });
+                await ExpectHttp("Forbidden write emits no event", HttpStatusCode.Forbidden,
+                    HttpMethod.Put, route + "/" + created.Id + "/status", tokens["cashier01"], new { isActive = true });
+                await Quiet(adminPeer, RealtimeAccountType.Staff, employeeId);
+                var cashierId = int.Parse(new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(tokens["cashier01"]).Subject);
+                var waiterId = int.Parse(new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(tokens["waiter01"]).Subject);
+                await Quiet(cashierPeer, RealtimeAccountType.Staff, cashierId);
+                await Quiet(waiterPeer, RealtimeAccountType.Staff, waiterId);
+                await Quiet(customerPeer, RealtimeAccountType.Customer, customerA);
+
+                async Task Changed(int id)
+                {
+                    var message = await adminPeer.NextAsync();
+                    var other = await cashierPeer.NextAsync();
+                    Check("Admin and read-only cashier receive permission-scoped invalidation",
+                        message.GetProperty("target").GetString() == RealtimeEvent.PromotionChanged
+                        && other.GetProperty("target").GetString() == RealtimeEvent.PromotionChanged);
+                    var payload = message.GetProperty("arguments")[0];
+                    Check("Voucher event has only invalidation metadata",
+                        payload.EnumerateObject().Select(x => x.Name).ToHashSet().SetEquals(["eventId", "type", "entityId", "occurredAtUtc"])
+                        && payload.GetProperty("entityId").GetInt32() == id
+                        && payload.GetProperty("eventId").GetGuid() == other.GetProperty("arguments")[0].GetProperty("eventId").GetGuid());
+                    await using var scope = app.Services.CreateAsyncScope();
+                    Check("Voucher is visible after event", await Db(scope).Promotions.AsNoTracking().AnyAsync(x => x.PromotionId == id));
+                }
+                async Task Quiet(RealtimeTestPeer peer, RealtimeAccountType type, int id)
+                {
+                    await using var scope = app.Services.CreateAsyncScope();
+                    await scope.ServiceProvider.GetRequiredService<IRealtimePublisher>().PublishToAccountAsync(type, id,
+                        new RealtimeEvent(Guid.NewGuid(), "VoucherCheckBarrier", id, DateTimeOffset.UtcNow), default);
+                    Check("Failed writes emit nothing; non-viewers receive no voucher event",
+                        (await peer.NextAsync()).GetProperty("target").GetString() == "VoucherCheckBarrier");
+                }
+            }
 
             var voucher = await Create(Body(" sale10 "));
             Check("Code normalized; null caps preserved", voucher.Code == "SALE10" && voucher.MaxDiscountAmount is null && voucher.TotalUsageLimit is null);

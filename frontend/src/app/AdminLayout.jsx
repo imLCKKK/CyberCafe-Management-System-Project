@@ -14,6 +14,7 @@ import {
   ChevronRight,
   LogOut,
   Banknote,
+  Ticket,
 } from 'lucide-react';
 import './layout.css';
 import { AdminProvider } from '../admin/shared/AdminContext';
@@ -27,6 +28,7 @@ const menu = [
   ['/admin/topups', 'Nạp tại quầy', Banknote],
   ['/admin/orders', 'Order', ShoppingCart],
   ['/admin/products', 'Sản phẩm', Package],
+  ['/admin/promotions', 'Voucher', Ticket],
   ['/admin/inventory', 'Kho', Package],
   ['/admin/invoices', 'Hóa đơn & thanh toán', Receipt],
   ['/admin/tournaments', 'Giải đấu', Trophy],
@@ -48,6 +50,7 @@ function AdminShell() {
       const permissions = {
         '/admin/computers': ['computer.view'], '/admin/customers': ['customer.view'], '/admin/orders': ['order.view'],
         '/admin/products': ['product.view'], '/admin/inventory': ['stockreceipt.view'],
+        '/admin/promotions': ['promotion.view'],
         '/admin/invoices': ['invoice.view'], '/admin/tournaments': ['tournament.view'], '/admin/staff': ['employee.view'],
         '/admin/reports': ['report.view'],
         '/admin/topups': ['wallet.topup'],
