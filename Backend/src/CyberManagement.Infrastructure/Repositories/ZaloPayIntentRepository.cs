@@ -39,6 +39,8 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
         }
         var amount = topUpAmount ?? 0;
         var expiresAt = now.AddMinutes(15);
+        string? orderMerchant = null;
+        var createdAt = now;
         if (purpose == "Order")
         {
             var order = await LockOrderAsync(orderId!.Value, cancellationToken);
@@ -51,8 +53,8 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
             var orderCreatedAt = new DateTimeOffset(DateTime.SpecifyKind(order.OrderTime, DateTimeKind.Utc));
             if (orderCreatedAt > now.AddMinutes(5))
                 throw new BusinessRuleException("Mốc thời gian đơn hàng không hợp lệ.");
-            var orderDeadline = orderCreatedAt.AddMinutes(15);
-            expiresAt = orderDeadline < expiresAt ? orderDeadline : expiresAt;
+            var orderDeadline = order.ReservedUntilUtc ?? orderCreatedAt.AddMinutes(15);
+            expiresAt = orderDeadline;
             if (expiresAt - now < TimeSpan.FromSeconds(300))
                 throw new BusinessRuleException("Đơn hàng không còn đủ thời hạn để mở thanh toán gateway.");
             amount = order.TotalAmount;
@@ -60,13 +62,21 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
             if (await database.Payments.AnyAsync(row => row.OrderId == orderId && row.Type == "Payment"
                     && row.Status == "Succeeded", cancellationToken))
                 throw new BusinessRuleException("Đơn hàng đã có khoản thanh toán thành công.");
+            if (order.ReservedUntilUtc is not null)
+            {
+                createdAt = orderCreatedAt;
+                var payment = await database.Payments.SingleAsync(p => p.OrderId == orderId && p.Type == "Payment", cancellationToken);
+                if (payment.Method != "ZaloPay" || payment.Status != "Pending" || payment.Amount != amount)
+                    throw new BusinessRuleException("Khoản chờ thu không khớp đơn ZaloPay.");
+                orderMerchant = payment.MerchantTransactionId;
+            }
         }
         var intent = new ZaloPayIntent
         {
             CustomerId = customerId, Customer = customer, OrderId = orderId, Purpose = purpose,
             OperationKey = operationKey, ExpectedAmountVnd = amount, ProviderAppId = appId,
-            MerchantTransactionId = now.ToOffset(TimeSpan.FromHours(7)).ToString("yyMMdd", CultureInfo.InvariantCulture) + "_" + Guid.NewGuid().ToString("N"),
-            CreatedAtUtc = now, ExpiresAtUtc = expiresAt, NextQueryAtUtc = now.AddSeconds(20)
+            MerchantTransactionId = orderMerchant ?? now.ToOffset(TimeSpan.FromHours(7)).ToString("yyMMdd", CultureInfo.InvariantCulture) + "_" + Guid.NewGuid().ToString("N"),
+            CreatedAtUtc = createdAt, ExpiresAtUtc = expiresAt, NextQueryAtUtc = now.AddSeconds(20)
         };
         Intents.Add(intent);
         await database.SaveChangesAsync(cancellationToken);
@@ -349,7 +359,10 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
     public async Task<IReadOnlyList<int>> GetDueIdsAsync(DateTimeOffset now, int take, CancellationToken cancellationToken)
     {
         if (take <= 0) return [];
-        return await Intents.AsNoTracking().Where(row => row.Status == "Pending" && row.ProviderTransactionId == null
+        return await Intents.AsNoTracking().Where(row => (row.Status == "Pending"
+                || ((row.Status == "Failed" || row.Status == "Expired") && row.Purpose == "Order"
+                    && database.Orders.Any(o => o.OrderId == row.OrderId && o.ReservedUntilUtc != null)))
+                && row.ProviderTransactionId == null
                 && (row.NextQueryAtUtc == null || row.NextQueryAtUtc <= now)
                 && (row.QueryLeaseUntilUtc == null || row.QueryLeaseUntilUtc <= now)
                 && (row.FailureReason == null || !ManualReasons.Contains(row.FailureReason)))

@@ -592,6 +592,15 @@ UI, ZaloPay và hủy/hoàn tiếp tục theo S2-K-3, S2-K-2 và S3-K-1.
 
 #### S2-K-2 — Integrate-ZaloPay-Checkout-Reservations
 
+**Triển khai local ngày 20/11/2026:** nhánh `S2-K-2-Integrate-ZaloPay-Checkout-Reservations`,
+base `f238d5f`. Tạo đơn ZaloPay lưu khoản chờ thu/mã merchant và hạn giữ chỗ 15 phút trước HTTP;
+dùng adapter SCRUM-22, đọc receipt đã xác minh để hoàn tất đơn, worker trả tồn/lượt khi hết hạn.
+Thu muộn giữ đơn đóng, ghi khoản thực thu và nghĩa vụ hoàn Pending chưa duyệt; không cộng ví.
+Điểm nối phía Order là `IOrderZaloPaySettlement`; nạp ví, gửi hoàn, UI và bằng chứng sandbox thật
+vẫn theo các Task liên quan. Có suite `--order-zalopay-only` trên SQL thử riêng với fixture gateway,
+không phải bằng chứng thanh toán provider thật. Chưa đánh dấu Done hoặc thay quyết định duyệt của Trưởng nhóm.
+Hướng dẫn tại [Backend README](../Backend/README.md#s2-k-2-checkout-zalopay-và-giữ-chỗ).
+
 **Description:**
 
 - Tạo payment Order qua adapter Minh, trả dữ liệu thanh toán theo contract và giữ tồn/lượt voucher có hạn.
