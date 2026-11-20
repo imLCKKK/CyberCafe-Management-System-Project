@@ -1,5 +1,7 @@
 using System.Reflection;
+using CyberManagement.Application.DTOs.Realtime;
 using CyberManagement.Application.Interfaces.Repositories;
+using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Domain.Entities;
 using CyberManagement.Infrastructure.Persistance;
 using CyberManagement.Infrastructure.Repositories;
@@ -70,6 +72,8 @@ internal static class RevenueQueryChecks
             Require(data.WalletTransactions.Any(x => x.TransactionId == 102), "Keep refund through its original debit even when source text is invalid");
         });
         var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IRealtimePublisher, NoOpRealtimePublisher>();
         services.AddInfrastructureServices(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>
         {
             ["ConnectionStrings:DefaultConnection"] = "Server=localhost;Database=RevenueDiOnly;Integrated Security=True;TrustServerCertificate=True"
@@ -125,5 +129,12 @@ internal static class RevenueQueryChecks
             return await (Task<RevenueReadSet>)method.Invoke(new RevenueQueries(db), new object[] { new[]{1}, from, to, CancellationToken.None })!;
         }
         static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
+    }
+
+    private sealed class NoOpRealtimePublisher : IRealtimePublisher
+    {
+        public Task PublishToPermissionAsync(string permission, RealtimeEvent message, CancellationToken ct) => Task.CompletedTask;
+        public Task PublishToAccountAsync(RealtimeAccountType type, int id, RealtimeEvent message, CancellationToken ct) => Task.CompletedTask;
+        public Task PublishTournamentChangedAsync(RealtimeEvent message, CancellationToken ct) => Task.CompletedTask;
     }
 }

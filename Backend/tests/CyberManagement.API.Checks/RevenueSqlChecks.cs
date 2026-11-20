@@ -44,6 +44,9 @@ internal static class RevenueSqlChecks
         services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
         services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
         services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
+        services.AddScoped<SessionCommitEvents>();
+        services.AddScoped<ISessionRepository, SessionRepository>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<ISessionSettlement, SessionSettlement>();
         services.AddScoped<IVoucherRepository, VoucherRepository>();
         services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
