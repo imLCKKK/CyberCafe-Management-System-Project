@@ -76,6 +76,7 @@ internal static class RealtimeIntegrationHost
                 builder.Services.AddScoped<SessionCommitEvents>();
                 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
                 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
+                builder.Services.AddScoped<IRevenueQueries, RevenueQueries>();
                 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
                 builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
                 builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();

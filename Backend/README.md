@@ -378,3 +378,7 @@ Create, callback từ khoản thanh toán thật và ghi tiền vẫn thuộc lu
 ## Hóa đơn SCRUM-31
 
 [API, phát hành/in và điểm gọi transaction](docs/invoice-api.md).
+
+## SCRUM-33: doanh thu và đối soát
+
+API, quyền, nguồn tính tiền và cách chạy kiểm tra nằm trong [hướng dẫn doanh thu](docs/revenue-api.md).

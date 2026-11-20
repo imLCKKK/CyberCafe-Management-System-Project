@@ -71,6 +71,31 @@ if (args.Contains("--invoice-only") || args.Contains("--invoice-browser-host"))
     Console.WriteLine($"{await InvoiceChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"), args.Contains("--invoice-browser-host"))} invoice SQL/API checks passed.");
     return;
 }
+
+if (args.Contains("--revenue-api-checks") || args.Contains("--revenue-api-di-checks"))
+{
+    await RevenueApiChecks.RunAsync(validateOnly: args.Contains("--revenue-api-di-checks"));
+    return;
+}
+
+if (args.Contains("--revenue-sql-checks"))
+{
+    await RevenueSqlChecks.RunAsync();
+    return;
+}
+
+if (args.Contains("--revenue-service-checks"))
+{
+    await RevenueServiceChecks.RunAsync();
+    return;
+}
+
+if (args.Contains("--revenue-query-checks"))
+{
+    await RevenueQueryChecks.RunAsync();
+    return;
+}
+
 if (args.Contains("--counter-demo-seed"))
 {
     await CounterDemoSeed.RunAsync();
@@ -167,6 +192,7 @@ builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
 builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
+builder.Services.AddScoped<IRevenueQueries, RevenueQueries>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
 builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
