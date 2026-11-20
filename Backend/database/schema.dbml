@@ -26,7 +26,7 @@ Table dbo.ComputerMaintenance {
   StartTime datetime2 [not null]
   Status nvarchar(50) [not null]
   indexes {
-    (ComputerId) [name: 'IX_ComputerMaintenance_ComputerId']
+    (ComputerId) [name: 'IX_ComputerMaintenance_ComputerId', unique]
     (EmployeeId) [name: 'IX_ComputerMaintenance_EmployeeId']
   }
 }
@@ -139,17 +139,30 @@ Table dbo.Games {
 }
 Table dbo.GamingSessions {
   GamingSessionId int [not null, pk, increment]
+  CloseOperationKey nvarchar(100) [null]
+  CloseReason nvarchar(250) [null]
+  ClosedByActorType nvarchar(20) [null]
+  ClosedByEmployeeId int [null]
+  ClosingInvoiceId int [null]
   ComputerId int [not null]
   CustomerId int [not null]
   EndTime datetime2 [null]
+  HourlyRateSnapshot decimal(18,0) [null]
   LastChargedAt datetime2 [null]
+  OpenOperationKey nvarchar(100) [null]
+  OpenSessionSlot int [not null, note: 'Computed: CASE WHEN [Status] = N\'Active\' OR [EndTime] IS NULL THEN 0 ELSE [GamingSessionId] END; PERSISTED']
+  OpenedByEmployeeId int [null]
   PricePerHourSnapshot decimal(18,0) [null]
   StartTime datetime2 [not null]
   Status nvarchar(50) [not null]
   TotalCost decimal(18,0) [not null]
   indexes {
-    (ComputerId) [name: 'IX_GamingSessions_ComputerId']
-    (CustomerId) [name: 'IX_GamingSessions_CustomerId']
+    (ClosedByEmployeeId) [name: 'IX_GamingSessions_ClosedByEmployeeId']
+    (CloseOperationKey) [name: 'IX_GamingSessions_CloseOperationKey', unique]
+    (OpenedByEmployeeId) [name: 'IX_GamingSessions_OpenedByEmployeeId']
+    (OpenOperationKey) [name: 'IX_GamingSessions_OpenOperationKey', unique]
+    (ComputerId, OpenSessionSlot) [name: 'UX_GamingSessions_OpenComputer', unique]
+    (CustomerId, OpenSessionSlot) [name: 'UX_GamingSessions_OpenCustomer', unique]
   }
 }
 Table dbo.InventoryTransactions {
@@ -233,7 +246,10 @@ Table dbo.Invoices {
 }
 Table dbo.OrderDetails {
   OrderDetailId int [not null, pk, increment]
+  ConfirmedAtUtc datetime2 [null]
+  ConfirmedByEmployeeId int [null]
   DiscountAmount decimal(18,0) [not null]
+  LineNumber int [not null]
   OrderId int [not null]
   ProductId int [not null]
   ProductNameSnapshot nvarchar(150) [not null]
@@ -241,19 +257,38 @@ Table dbo.OrderDetails {
   Status nvarchar(30) [not null, default: `Pending`]
   UnitPrice decimal(18,0) [not null]
   indexes {
+    (ConfirmedByEmployeeId) [name: 'IX_OrderDetails_ConfirmedByEmployeeId']
     (OrderId) [name: 'IX_OrderDetails_OrderId']
     (ProductId) [name: 'IX_OrderDetails_ProductId']
   }
 }
+Table dbo.OrderOperations {
+  Id int [not null, pk, increment]
+  ActorId int [not null]
+  ActorType nvarchar(10) [not null]
+  CreatedAtUtc datetime2 [not null]
+  Key nvarchar(100) [not null]
+  OrderId int [not null]
+  RequestHash nchar(64) [not null]
+  Route nvarchar(100) [not null]
+  indexes {
+    (ActorType, ActorId, Route, Key) [name: 'IX_OrderOperations_ActorType_ActorId_Route_Key', unique]
+    (OrderId) [name: 'IX_OrderOperations_OrderId']
+  }
+}
 Table dbo.Orders {
   OrderId int [not null, pk, increment]
+  ActorType nvarchar(10) [not null]
   CustomerId int [not null]
   DiscountAmount decimal(18,0) [not null]
-  EmployeeId int [not null]
+  EmployeeId int [null]
   GamingSessionId int [null]
+  LastChangedAtUtc datetime2 [not null]
   OrderTime datetime2 [not null]
+  PaymentMethod nvarchar(10) [null]
   Status nvarchar(50) [not null]
   TotalAmount decimal(18,0) [not null]
+  Version rowversion [not null]
   VoucherCodeSnapshot nvarchar(50) [null]
   VoucherDiscountTypeSnapshot nvarchar(10) [null]
   VoucherDiscountValueSnapshot decimal(18,2) [null]
@@ -265,13 +300,17 @@ Table dbo.Orders {
 }
 Table dbo.OrderStatusHistory {
   HistoryId int [not null, pk, increment]
+  ActorType nvarchar(10) [not null]
   ChangedAt datetime2 [not null]
-  ChangedBy int [not null]
+  ChangedBy int [null]
   NewStatus nvarchar(50) [not null]
   OldStatus nvarchar(50) [null]
+  OrderDetailId int [null]
   OrderId int [not null]
+  Reason nvarchar(250) [null]
   indexes {
     (ChangedBy) [name: 'IX_OrderStatusHistory_ChangedBy']
+    (OrderDetailId) [name: 'IX_OrderStatusHistory_OrderDetailId']
     (OrderId) [name: 'IX_OrderStatusHistory_OrderId']
   }
 }
@@ -319,6 +358,7 @@ Table dbo.Permissions {
 Table dbo.Products {
   ProductId int [not null, pk, increment]
   CategoryId int [not null]
+  ImageUrl nvarchar(500) [null]
   IsActive bit [not null]
   Price decimal(18,0) [not null]
   ProductName nvarchar(150) [not null]
@@ -396,9 +436,13 @@ Table dbo.SessionCharges {
   Amount decimal(18,0) [not null]
   EndTime datetime2 [not null]
   GamingSessionId int [not null]
+  OperationKey nvarchar(100) [null]
   StartTime datetime2 [not null]
+  WalletTransactionId int [null]
   indexes {
-    (GamingSessionId) [name: 'IX_SessionCharges_GamingSessionId']
+    (GamingSessionId, EndTime) [name: 'IX_SessionCharges_GamingSessionId_EndTime', unique]
+    (OperationKey) [name: 'IX_SessionCharges_OperationKey', unique]
+    (WalletTransactionId) [name: 'IX_SessionCharges_WalletTransactionId', unique]
   }
 }
 Table dbo.Shifts {
@@ -534,6 +578,38 @@ Table dbo.WalletTransactions {
     (SourceType, SourceId, Type) [name: 'IX_WalletTransactions_SourceType_SourceId_Type', unique]
   }
 }
+Table dbo.ZaloPayIntents {
+  IntentId int [not null, pk, increment]
+  CreatedAtUtc datetimeoffset [not null]
+  CustomerId int [not null]
+  ExpectedAmountVnd decimal(18,0) [not null]
+  ExpiresAtUtc datetimeoffset [not null]
+  FailureReason nvarchar(80) [null]
+  LastQueryAtUtc datetimeoffset [null]
+  MerchantTransactionId nvarchar(40) [not null]
+  NextQueryAtUtc datetimeoffset [null]
+  OperationKey nvarchar(100) [not null]
+  OrderId int [null]
+  PaymentUrl nvarchar(2048) [null]
+  ProviderAmountVnd decimal(18,0) [null]
+  ProviderAppId int [not null]
+  ProviderOccurredAtUtc datetimeoffset [null]
+  ProviderTransactionId nvarchar(19) [null]
+  Purpose nvarchar(10) [not null]
+  QueryLeaseToken uniqueidentifier [null]
+  QueryLeaseUntilUtc datetimeoffset [null]
+  RequiresReconciliation bit [not null]
+  Status nvarchar(10) [not null]
+  VerifiedAtUtc datetimeoffset [null]
+  indexes {
+    (CustomerId) [name: 'IX_ZaloPayIntents_CustomerId']
+    (MerchantTransactionId) [name: 'IX_ZaloPayIntents_MerchantTransactionId', unique]
+    (OperationKey) [name: 'IX_ZaloPayIntents_OperationKey', unique]
+    (OrderId) [name: 'IX_ZaloPayIntents_OrderId', unique]
+    (ProviderAppId, ProviderTransactionId) [name: 'IX_ZaloPayIntents_ProviderAppId_ProviderTransactionId', unique]
+    (Status, NextQueryAtUtc) [name: 'IX_ZaloPayIntents_Status_NextQueryAtUtc']
+  }
+}
 Ref: dbo.AuditLogs.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.ComputerMaintenance.(ComputerId) > dbo.Computers.(ComputerId)
 Ref: dbo.ComputerMaintenance.(EmployeeId) > dbo.Employees.(EmployeeId)
@@ -548,6 +624,8 @@ Ref: dbo.Employees.(RoleId) > dbo.Roles.(RoleId)
 Ref: dbo.GameRanks.(GameId) > dbo.Games.(GameId)
 Ref: dbo.GamingSessions.(ComputerId) > dbo.Computers.(ComputerId)
 Ref: dbo.GamingSessions.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.GamingSessions.(ClosedByEmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.GamingSessions.(OpenedByEmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.InventoryTransactions.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.InventoryTransactions.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)
 Ref: dbo.InventoryTransactions.(OrderId) > dbo.Orders.(OrderId)
@@ -563,12 +641,15 @@ Ref: dbo.Invoices.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.Invoices.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.Invoices.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
 Ref: dbo.Invoices.(PromotionId) > dbo.Promotions.(PromotionId)
+Ref: dbo.OrderDetails.(ConfirmedByEmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.OrderDetails.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.OrderDetails.(ProductId) > dbo.Products.(ProductId)
+Ref: dbo.OrderOperations.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.Orders.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.Orders.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.Orders.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
 Ref: dbo.OrderStatusHistory.(ChangedBy) > dbo.Employees.(EmployeeId)
+Ref: dbo.OrderStatusHistory.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)
 Ref: dbo.OrderStatusHistory.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.Payments.(InvoiceId) > dbo.Invoices.(InvoiceId)
 Ref: dbo.Payments.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)
@@ -584,6 +665,7 @@ Ref: dbo.RefundAttempts.(PaymentId) > dbo.Payments.(PaymentId)
 Ref: dbo.RolePermissions.(PermissionId) > dbo.Permissions.(PermissionId)
 Ref: dbo.RolePermissions.(RoleId) > dbo.Roles.(RoleId)
 Ref: dbo.SessionCharges.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
+Ref: dbo.SessionCharges.(WalletTransactionId) > dbo.WalletTransactions.(TransactionId)
 Ref: dbo.Shifts.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.StockReceiptDetails.(ProductId) > dbo.Products.(ProductId)
 Ref: dbo.StockReceiptDetails.(ReceiptId) > dbo.StockReceipts.(ReceiptId)
@@ -603,3 +685,5 @@ Ref: dbo.TournamentTransitions.(TournamentId) > dbo.Tournaments.(TournamentId)
 Ref: dbo.WalletTransactions.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.WalletTransactions.(ActorEmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.WalletTransactions.(OriginalDebitId) > dbo.WalletTransactions.(TransactionId)
+Ref: dbo.ZaloPayIntents.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.ZaloPayIntents.(OrderId) > dbo.Orders.(OrderId)

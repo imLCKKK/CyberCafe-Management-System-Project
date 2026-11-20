@@ -73,6 +73,8 @@ internal static class RealtimeIntegrationHost
                 builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
                 builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
                 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
+                builder.Services.AddScoped<SessionCommitEvents>();
+                builder.Services.AddScoped<ISessionRepository, SessionRepository>();
                 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
                 builder.Services.AddScoped<IRevenueQueries, RevenueQueries>();
                 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
@@ -80,6 +82,7 @@ internal static class RealtimeIntegrationHost
                 builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
                 builder.Services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
                 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+                builder.Services.AddScoped<IOrderRepository, OrderRepository>();
                 builder.Services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
                 builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
                 builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();

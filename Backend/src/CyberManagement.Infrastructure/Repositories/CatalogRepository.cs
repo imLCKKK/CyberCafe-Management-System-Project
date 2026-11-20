@@ -17,7 +17,7 @@ public sealed class CatalogRepository(ApplicationDbContext database) : ICatalogR
         await database.Products.AsNoTracking()
             .Where(p => !menuOnly || (p.IsActive && p.Category.IsActive))
             .OrderBy(p => p.ProductId)
-            .Select(p => new ProductDto(p.ProductId, p.ProductName, p.CategoryId, p.Price, p.Stock, p.IsActive)).ToListAsync(ct);
+            .Select(p => new ProductDto(p.ProductId, p.ProductName, p.CategoryId, p.Price, p.Stock, p.IsActive, p.ImageUrl)).ToListAsync(ct);
 
     public async Task<CategoryDto> SaveCategoryAsync(int? id, SaveCategoryCommand command, CancellationToken ct)
     {
@@ -38,10 +38,11 @@ public sealed class CatalogRepository(ApplicationDbContext database) : ICatalogR
         product.CategoryId = command.CategoryId;
         product.Price = command.CurrentPrice;
         product.IsActive = command.IsActive;
+        if (id is null || command.ImageUrlSpecified) product.ImageUrl = command.ImageUrl;
         // Stock belongs to inventory. A catalog edit never writes a quantity or historical order price.
         if (id is null) database.Products.Add(product);
         await database.SaveChangesAsync(ct);
-        return new(product.ProductId, product.ProductName, product.CategoryId, product.Price, product.Stock, product.IsActive);
+        return new(product.ProductId, product.ProductName, product.CategoryId, product.Price, product.Stock, product.IsActive, product.ImageUrl);
     }
 
     public async Task DisableCategoryAsync(int id, CancellationToken ct)

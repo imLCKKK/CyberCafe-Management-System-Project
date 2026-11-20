@@ -1,0 +1,2 @@
+.catalog-product-cell { display: flex; align-items: center; gap: 10px; }
+.catalog-product-cell > div:last-child { min-width: 0; }

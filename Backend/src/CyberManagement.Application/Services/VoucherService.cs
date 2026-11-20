@@ -225,7 +225,7 @@ public sealed class VoucherService(
         return Math.Clamp(decimal.Round(discount, 0, MidpointRounding.AwayFromZero), 0m, subtotal);
     }
 
-    // Chia nguyên đồng theo tỷ lệ; phần dư ưu tiên phần lẻ lớn, hòa theo ID dòng.
+    // Chia nguyên đồng theo tỷ lệ; hòa theo thứ tự đặt, dữ liệu cũ theo ID dòng.
     // BigInteger giữ phép chia chính xác khi tiền lớn, không tràn phép nhân decimal.
     private static Dictionary<int, decimal> AllocateDiscount(Order order, decimal subtotal, decimal discount)
     {
@@ -243,7 +243,8 @@ public sealed class VoucherService(
             remainders.Add((detail.OrderDetailId, remainder));
         }
         var remaining = (int)(discount - allocated);
-        foreach (var line in remainders.OrderByDescending(x => x.Remainder).ThenBy(x => x.Id).Take(remaining))
+        foreach (var line in remainders.OrderByDescending(x => x.Remainder)
+            .ThenBy(x => order.Details.Single(d => d.OrderDetailId == x.Id).LineNumber).ThenBy(x => x.Id).Take(remaining))
             result[line.Id]++;
         return result;
     }

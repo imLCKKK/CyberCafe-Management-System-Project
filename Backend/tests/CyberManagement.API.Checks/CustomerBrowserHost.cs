@@ -50,13 +50,18 @@ internal static class CustomerBrowserHost
         builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
         builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
         builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
+        builder.Services.AddScoped<SessionCommitEvents>();
+        builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+        builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
         builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
         builder.Services.AddScoped<IRevenueQueries, RevenueQueries>();
+        builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
         builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
         builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
         builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
         builder.Services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
         builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        builder.Services.AddScoped<IOrderRepository, OrderRepository>();
         builder.Services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
         builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
         builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();

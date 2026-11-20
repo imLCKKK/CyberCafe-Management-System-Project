@@ -20,4 +20,9 @@
     <ProjectReference Include="..\..\src\CyberManagement.API\CyberManagement.API.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\database\NexoraMenuSeed.sql" Link="Assets\NexoraMenuSeed.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\docs\nexora-menu-assets.json" Link="Assets\nexora-menu-assets.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

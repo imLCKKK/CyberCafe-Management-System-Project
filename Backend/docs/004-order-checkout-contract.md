@@ -20,6 +20,14 @@ hoàn thiện cạnh tranh/hủy/hoàn thuộc S3-K-1. Không tick Done chỉ v�
 
 ## 1. Căn cứ và giới hạn hiện trạng
 
+**Cập nhật triển khai S2-K-1 / SCRUM-27 ngày 19/11/2026:** đã bổ sung OrderService,
+API tạo/đọc đơn Wallet/Cash, thu Cash và confirm từng dòng; dùng chung writer ví, settlement phiên,
+InventoryService, VoucherService và ApplyFinancialChange. Khóa HTTP lưu tại OrderOperations,
+Order.Version là SQL rowversion. Migration mới giữ đơn lịch sử với PaymentMethod null và actor Staff;
+đơn khách mới dùng EmployeeId null, ledger actor Customer chỉ hợp lệ cho OrderPayment.
+Các route gateway thuộc S2-K-2, UI thuộc S2-K-3 và hủy/hoàn thuộc S3-K-1 chưa triển khai trong task này.
+Các ghi chú base/ảnh chụp bên dưới là lịch sử thiết kế; dùng code hiện tại để xác định trạng thái triển khai.
+
 - [PROJECT_GUIDE](../../codex/PROJECT_GUIDE.md), [task S1-K-2](../../codex/SPRINT_TASKS.md#s1-k-2--define-order-checkout-contracts)
   và [lịch sử quyết định trong kế hoạch bàn giao](../../planning/team-delivery-plan.md#11-quyết-định-nghiệp-vụ-cần-nhóm-chốt-trong-s1).
 - Nhánh làm việc: `SCRUM-11-Define-Order-Checkout-Contracts`; base từ `dev` tại
@@ -440,7 +448,10 @@ caller khóa Customer → Computer → GamingSession/SessionCharge, gọi logic 
 mốc now phía server; sau đó mới xét số dư còn lại cho đơn. Điểm gọi logic
 `SessionSettlement.BeforeWalletDebit(customerId, gamingSessionId?, nowUtc)` trả số dư sau quyết toán
 và trạng thái phiên; dùng cùng DbContext/transaction, không tự commit. Ngày 15/11, `ISessionSettlement.BeforeWalletDebitAsync`
-đã được nối cho phí giải; checkout vẫn chưa nối và phải kiểm tra tích hợp riêng theo contract này.
+đã được nối cho phí giải; checkout hiện được nối trong S2-K-1. Cập nhật 20/11/2026:
+`ISessionRepository.SettleInTransactionAsync` trả trạng thái phiên sau quyết toán ngay trong khóa/transaction;
+adapter `SessionSettlement` từ chối chi ví nếu phiên không còn Active hoặc đã có EndTime.
+Worker gọi quyết toán trực tiếp nên vẫn được chốt phí/đóng phiên độc lập; không dùng số dư lẻ để suy rằng phiên còn hoạt động.
 Khách đặt tại quầy không truyền GamingSessionId nhưng vẫn đang có phiên thì tìm/khóa phiên thuộc khách;
 không bỏ qua nghĩa vụ phí chỉ vì đơn không gắn phiên. Không có phiên đang mở thì bước này không ghi phí.
 Không đọc số dư trước quyết toán để chấp nhận đơn; nếu phiên phải kết thúc hoặc số dư sau quyết toán
@@ -581,7 +592,7 @@ Không tự giải phóng khoản đang xử lý ở provider, che khoản thự
 ### 8.2. Lỗi HTTP
 
 Giữ dạng ProblemDetails có title/status/detail/instance/traceId như ApiExceptionHandler hiện có.
-Đề xuất bổ sung `code` cho module đơn; code này chưa được handler nền xuất ra. 401/403 từ middleware
+S2-K-1 bổ sung `code` từ OrderRuleException cho lỗi nghiệp vụ đơn; các module nền giữ dạng lỗi hiện có. 401/403 từ middleware
 có thể chưa có ProblemDetails; client phải xử lý được bằng HTTP status.
 
 | HTTP / code | Điều kiện |

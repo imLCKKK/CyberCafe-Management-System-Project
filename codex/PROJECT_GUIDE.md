@@ -1,8 +1,10 @@
 # Hướng dẫn AI làm việc với dự án CyberCafe
 
+**Danh tính xác nhận ngày 17/11/2026:** người dùng hiện tại là **Khang, đồng thời là Trưởng nhóm**. Khang nhận SCRUM-34 từ Phúc và trực tiếp thực hiện cả phần ảnh/component lẫn điểm nối sản phẩm; quyền duyệt cuối thuộc Khang với vai trò Trưởng nhóm. AI hỗ trợ thực hiện và tự kiểm tra, không tự duyệt Task.
+
 Cập nhật 02/11/2026 theo quyết định dùng backend 35 bảng; giữ lịch/phân công baseline 31/10/2026. Đọc file này trước khi sửa code, sau đó đọc đúng task trong [SPRINT_TASKS.md](SPRINT_TASKS.md). File này đủ để nắm hướng đi; các liên kết giúp kiểm tra chi tiết. Luôn đối chiếu trạng thái code/nhánh hiện tại, không coi ngày ghi trong tài liệu là bằng chứng chức năng đã hoàn thành.
 
-Cập nhật UI ngày 09/11/2026: Trưởng nhóm trực tiếp thực hiện `S1-U-1 — Apply-Nexora-Branding-Theme` và cung cấp logo NEXORA CYBER; `S2-U-1` (ảnh món/component thẻ món) vẫn thuộc Phúc.
+Cập nhật UI ngày 09/11/2026: Trưởng nhóm trực tiếp thực hiện `S1-U-1 — Apply-Nexora-Branding-Theme` và cung cấp logo NEXORA CYBER; `S2-U-1` (ảnh món/component thẻ món, Jira `SCRUM-34`) chuyển từ Phúc sang Trưởng nhóm theo xác nhận trực tiếp ngày 17/11/2026; người dùng đã trao đổi nhận lại Task với Phúc.
 
 Quyết định ngày 14/11/2026 giao **Trưởng nhóm trực tiếp hoàn thiện các phần dang dở của Sprint 1**, gồm chốt và đồng bộ contract phiên/ví/chứng từ tại S1-P-1, S1-M-1 và S1-T-1. Actor tự đóng/phát hành khi hết tiền là System, người mở phiên được lưu riêng. Trưởng nhóm tự hoàn tất phần thiết kế/bàn giao Sprint 1. Phúc thực hiện phiên/worker ở S2-P-1, Minh thực hiện ví ở S2-M-1 và Trường thực hiện hóa đơn ở S2-T-2. Contract hiện hành nằm ở [phiên mục 5.1](../Backend/docs/002-computer-session-contract.md#51-quyết-định-tự-đóng-phiên-và-người-thực-hiện--14112026) và [chứng từ mục 6.3.2](../docs/contracts/inventory-invoice-voucher.md#632-phát-hành-tự-động-với-actor-system--quyết-định-14112026).
 
@@ -24,10 +26,10 @@ Hệ thống quản lý phòng máy: admin/nhân viên quản lý máy, phiên, 
 | Giải đấu | Quản lý giải/đăng ký/đội, thống kê OP.GG; bắt buộc có ML hỗ trợ chia đội, Phúc phụ trách |
 | Nhận diện | NEXORA CYBER; nền đen `#0B0F14`, tím `#A855F7`, cyan `#22D3EE`, chữ `#E5F0FF`. Logo do Trưởng nhóm cung cấp ngày 09/11/2026: [nexora-cyber.png](../frontend/public/branding/nexora-cyber.png), biểu tượng N neon cyan–tím trên nền đen kèm chữ NEXORA CYBER. Trưởng nhóm thực hiện logo/theme chung trong S1-U-1 |
 | Hạn nộp | 21/11/2026; S1 31/10–05/11, S2 06–10/11, S3 10–15/11, S4 15–19/11; ngày 10/11 và 15/11 là mốc bàn giao giữa hai sprint; dự phòng 20–21/11 |
-| Cách giao việc | 55 Task Jira độc lập: 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI: S1-U-1 do Trưởng nhóm thực hiện, S2-U-1 do Phúc thực hiện; các bước nhỏ là checklist, không tạo Task cha/Sub-task |
+| Cách giao việc | 55 Task Jira độc lập: 53 Task đã gom, chủ yếu 2–3 Task/người/sprint, và 2 Task UI: S1-U-1 do Trưởng nhóm thực hiện, S2-U-1 do Trưởng nhóm thực hiện (nhận lại từ Phúc ngày 17/11/2026); các bước nhỏ là checklist, không tạo Task cha/Sub-task |
 | Reviewer | **Trưởng nhóm**, chính là người yêu cầu lập bộ tài liệu này và trực tiếp duyệt thay đổi |
 
-Chưa có tên/account Jira hoặc GitHub của reviewer trong tài liệu. Không tự suy ra đó là Đại, Minh hay tài khoản đang chạy AI trên máy khác. Các thành viên hỗ trợ đối chiếu nghiệp vụ; quyền duyệt cuối thuộc Trưởng nhóm. AI hỗ trợ thực hiện hoặc review theo yêu cầu, không tự nhận là người đã duyệt.
+Reviewer được xác nhận là Khang (Trưởng nhóm); chưa có account Jira hoặc GitHub của reviewer trong tài liệu. Không tự suy ra đó là Đại, Minh hay tài khoản đang chạy AI trên máy khác. Các thành viên hỗ trợ đối chiếu nghiệp vụ; quyền duyệt cuối thuộc Trưởng nhóm. AI hỗ trợ thực hiện hoặc review theo yêu cầu, không tự nhận là người đã duyệt.
 
 ## 2. Hiện trạng cần hiểu trước khi code
 
@@ -123,14 +125,14 @@ Người dùng thao tác React
 | --- | --- |
 | Đại | Auth/quyền/nhân viên, luồng giải đấu/đăng ký/UI xác nhận/lưu đội; UI CRUD voucher; điều phối tích hợp |
 | Minh | Khách/hồ sơ, ví/ledger, nạp tại quầy, ZaloPay; thao tác tiền dùng chung |
-| Phúc | Máy/phiên/tiền giờ/Home, SignalR, OP.GG, **ML chia đội**, ảnh món/component thẻ món |
+| Phúc | Máy/phiên/tiền giờ/Home, SignalR, OP.GG, **ML chia đội** |
 | Khang | Danh mục/sản phẩm/menu/gợi ý/đơn/checkout/hủy; tích hợp voucher và gateway vào đơn |
 | Trường | Kho/chứng từ/hóa đơn/báo cáo; API/rule voucher; điều phối thứ tự migration |
-| Trưởng nhóm | Trực tiếp thực hiện S1-U-1 và hoàn thiện các phần dang dở/contract liên module của Sprint 1 theo quyết định 14/11/2026, giữ quyền review và duyệt cuối |
+| Trưởng nhóm | Trực tiếp thực hiện S1-U-1, S2-U-1 / SCRUM-34 (nhận lại từ Phúc ngày 17/11/2026) và hoàn thiện các phần dang dở/contract liên module của Sprint 1 theo quyết định 14/11/2026, giữ quyền review và duyệt cuối |
 
 Owner không đồng nghĩa reviewer. Tất cả Task gửi **Trưởng nhóm** duyệt. Trường điều phối migration nhưng từng owner viết entity/config của mình; Phúc cung cấp realtime chung nhưng từng owner tự nối event/UI module mình.
 
-Theo quyết định ngày 09/11/2026, **S1-U-1** (NEXORA CYBER/logo/theme cyan–tím–đen) do **Trưởng nhóm** trực tiếp thực hiện; **S2-U-1** (ảnh món/component thẻ món) vẫn do **Phúc** thực hiện. Giữ mã U để tra cứu. Phúc có 3 Task ở S1 và 4 Task ở S2, ưu tiên bàn giao contract/hook và component ảnh sớm cho người tích hợp; không gộp UI vào ML để che tải công việc. Khang giữ logic vòng quay/checkout trong **S2-K-3**, hồi quy ở **S3-K-2**; Trưởng nhóm cung cấp token/theme, Phúc cung cấp component/asset ảnh món, không tạo Task trùng. Trưởng nhóm review cuối, các owner kiểm tra chéo module của mình.
+Theo quyết định ngày 09/11/2026, **S1-U-1** (NEXORA CYBER/logo/theme cyan–tím–đen) do **Trưởng nhóm** trực tiếp thực hiện; **S2-U-1 / SCRUM-34** (ảnh món/component thẻ món) chuyển sang **Khang (Trưởng nhóm, người dùng trực tiếp thực hiện)** theo xác nhận ngày 17/11/2026, đã trao đổi với Phúc. Giữ mã U để tra cứu. Phúc có 3 Task ở S1 và 3 Task ở S2, ưu tiên bàn giao contract/hook cho người tích hợp. Khang (Trưởng nhóm) trực tiếp tích hợp component ảnh S2-U-1 với menu/sản phẩm. Khang giữ logic vòng quay/checkout trong **S2-K-3**, hồi quy ở **S3-K-2**; Trưởng nhóm cung cấp token/theme và component/asset ảnh món, không tạo Task trùng. Trưởng nhóm review cuối, các owner kiểm tra chéo module của mình.
 
 ## 6. Quy trình khi AI nhận một Task
 
