@@ -26,7 +26,7 @@ Table dbo.ComputerMaintenance {
   StartTime datetime2 [not null]
   Status nvarchar(50) [not null]
   indexes {
-    (ComputerId) [name: 'IX_ComputerMaintenance_ComputerId']
+    (ComputerId) [name: 'IX_ComputerMaintenance_ComputerId', unique]
     (EmployeeId) [name: 'IX_ComputerMaintenance_EmployeeId']
   }
 }
@@ -139,17 +139,30 @@ Table dbo.Games {
 }
 Table dbo.GamingSessions {
   GamingSessionId int [not null, pk, increment]
+  CloseOperationKey nvarchar(100) [null]
+  CloseReason nvarchar(250) [null]
+  ClosedByActorType nvarchar(20) [null]
+  ClosedByEmployeeId int [null]
+  ClosingInvoiceId int [null]
   ComputerId int [not null]
   CustomerId int [not null]
   EndTime datetime2 [null]
+  HourlyRateSnapshot decimal(18,0) [null]
   LastChargedAt datetime2 [null]
+  OpenOperationKey nvarchar(100) [null]
+  OpenSessionSlot int [not null, note: 'Computed: CASE WHEN [Status] = N\'Active\' OR [EndTime] IS NULL THEN 0 ELSE [GamingSessionId] END; PERSISTED']
+  OpenedByEmployeeId int [null]
   PricePerHourSnapshot decimal(18,0) [null]
   StartTime datetime2 [not null]
   Status nvarchar(50) [not null]
   TotalCost decimal(18,0) [not null]
   indexes {
-    (ComputerId) [name: 'IX_GamingSessions_ComputerId']
-    (CustomerId) [name: 'IX_GamingSessions_CustomerId']
+    (ClosedByEmployeeId) [name: 'IX_GamingSessions_ClosedByEmployeeId']
+    (CloseOperationKey) [name: 'IX_GamingSessions_CloseOperationKey', unique]
+    (OpenedByEmployeeId) [name: 'IX_GamingSessions_OpenedByEmployeeId']
+    (OpenOperationKey) [name: 'IX_GamingSessions_OpenOperationKey', unique]
+    (ComputerId, OpenSessionSlot) [name: 'UX_GamingSessions_OpenComputer', unique]
+    (CustomerId, OpenSessionSlot) [name: 'UX_GamingSessions_OpenCustomer', unique]
   }
 }
 Table dbo.InventoryTransactions {
@@ -423,9 +436,13 @@ Table dbo.SessionCharges {
   Amount decimal(18,0) [not null]
   EndTime datetime2 [not null]
   GamingSessionId int [not null]
+  OperationKey nvarchar(100) [null]
   StartTime datetime2 [not null]
+  WalletTransactionId int [null]
   indexes {
-    (GamingSessionId) [name: 'IX_SessionCharges_GamingSessionId']
+    (GamingSessionId, EndTime) [name: 'IX_SessionCharges_GamingSessionId_EndTime', unique]
+    (OperationKey) [name: 'IX_SessionCharges_OperationKey', unique]
+    (WalletTransactionId) [name: 'IX_SessionCharges_WalletTransactionId', unique]
   }
 }
 Table dbo.Shifts {
@@ -607,6 +624,8 @@ Ref: dbo.Employees.(RoleId) > dbo.Roles.(RoleId)
 Ref: dbo.GameRanks.(GameId) > dbo.Games.(GameId)
 Ref: dbo.GamingSessions.(ComputerId) > dbo.Computers.(ComputerId)
 Ref: dbo.GamingSessions.(CustomerId) > dbo.Customers.(CustomerId)
+Ref: dbo.GamingSessions.(ClosedByEmployeeId) > dbo.Employees.(EmployeeId)
+Ref: dbo.GamingSessions.(OpenedByEmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.InventoryTransactions.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.InventoryTransactions.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)
 Ref: dbo.InventoryTransactions.(OrderId) > dbo.Orders.(OrderId)
@@ -646,6 +665,7 @@ Ref: dbo.RefundAttempts.(PaymentId) > dbo.Payments.(PaymentId)
 Ref: dbo.RolePermissions.(PermissionId) > dbo.Permissions.(PermissionId)
 Ref: dbo.RolePermissions.(RoleId) > dbo.Roles.(RoleId)
 Ref: dbo.SessionCharges.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
+Ref: dbo.SessionCharges.(WalletTransactionId) > dbo.WalletTransactions.(TransactionId)
 Ref: dbo.Shifts.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.StockReceiptDetails.(ProductId) > dbo.Products.(ProductId)
 Ref: dbo.StockReceiptDetails.(ReceiptId) > dbo.StockReceipts.(ReceiptId)

@@ -50,6 +50,8 @@ internal static class CustomerBrowserHost
         builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
         builder.Services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
         builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
+        builder.Services.AddScoped<SessionCommitEvents>();
+        builder.Services.AddScoped<ISessionRepository, SessionRepository>();
         builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
         builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
         builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();

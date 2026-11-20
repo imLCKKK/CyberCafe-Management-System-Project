@@ -50,6 +50,8 @@ internal static class ComputerBrowserHost
         builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
         builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
         builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
+        builder.Services.AddScoped<SessionCommitEvents>();
+        builder.Services.AddScoped<ISessionRepository, SessionRepository>();
         builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
         builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
         builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();

@@ -3,17 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, ChevronRight, Clock3, Cpu, Gamepad2, History, Info, Monitor, Plus, ReceiptText, Trophy, Users, Utensils, WalletCards, Zap } from 'lucide-react';
 import { useClientDemo } from '../shared/ClientDemoContext';
 import { Badge, DemoStrip, Empty, FoodArt, OrderDetail } from '../shared/ClientUI';
-import { dateTime, getReceipts, minutesLabel, money, orderStatus, transactionLabels } from '../shared/demoModel';
+import { dateTime, money, orderStatus } from '../shared/demoModel';
 import { useCatalog } from '../../shared/catalog/useCatalog';
 import { useAuth } from '../../shared/auth/AuthContext';
 import { getTournaments, getTournamentRegistrations } from '../../shared/tournamentApi';
 import { useRealtime } from '../../shared/realtime/useRealtime';
+import { useSessionHome } from './useSessionHome';
+import { HomeSessionPanels } from './HomeSessionPanels';
 import './home.css';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const catalog = useCatalog();
-  const { db, account, customer, session, computer, type } = useClientDemo();
+  const { db, account, customer } = useClientDemo();
+  const home = useSessionHome();
   const { principal, accessToken } = useAuth();
   const [tournament, setTournament] = useState(null);
   const [registered, setRegistered] = useState(false);
@@ -25,8 +28,6 @@ export default function HomePage() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 30000); return () => clearInterval(timer); }, []);
   const firstName = account.display_name.split(' ').slice(-2).join(' ');
-  const receipt = getReceipts(db).find((r) => r.id === session?.id);
-  const remaining = session ? customer.wallet_balance / session.hourly_rate_snapshot : 0;
   const reloadTournament = useCallback(() => setTournamentRefresh((version) => version + 1), []);
   useRealtime({
     enabled: principal?.type === 'customer',
@@ -56,8 +57,8 @@ export default function HomePage() {
   }, [accessToken, tournamentRefresh]);
   const activities = [
     ...db.orders.filter((r) => r.customer_id === customer.id).map((r) => ({ key: `order-${r.id}`, id: r.id, kind: 'order', title: `Đơn món #GM${r.id}`, subtitle: `${db.order_items.filter((i) => i.order_id === r.id).reduce((s, i) => s + i.quantity, 0)} phần · Phục vụ tại máy`, time: r.placed_at, amount: r.total_amount, status: orderStatus(db, r.id), Icon: Utensils })),
-    ...db.wallet_transactions.filter((r) => r.customer_id === customer.id).map((r) => ({ key: `wallet-${r.id}`, id: r.id, kind: 'wallet', title: transactionLabels[r.transaction_type], subtitle: `Giao dịch #GD${r.id} · Số dư ${money(r.balance_after)}`, time: r.recorded_at, amount: r.amount, status: 'Paid', Icon: WalletCards })),
-    ...getReceipts(db).filter((r) => r.session.status === 'Ended').map((r) => ({ key: `invoice-${r.id}`, id: r.id, kind: 'invoice', title: `Bảng kê #PC${r.id}`, subtitle: `${r.computer?.code} · Phiên đã kết thúc`, time: r.session.ended_at, amount: r.total, status: 'Ended', Icon: ReceiptText })),
+    ...home.transactions.map((r) => ({ key: `wallet-${r.transactionId}`, id: r.transactionId, kind: 'wallet', title: r.type === 'GamingCharge' ? 'Tiền giờ' : r.type, subtitle: `Giao dịch #${r.transactionId}`, time: r.createdAtUtc, amount: r.amount, status: 'Paid', Icon: WalletCards })),
+    ...home.invoices.map((r) => ({ key: `invoice-${r.id}`, id: r.id, kind: 'invoice', title: `Hóa đơn #${r.id}`, subtitle: r.gamingSessionId ? `Phiên #${r.gamingSessionId}` : 'Đơn món', time: r.issuedAt, amount: r.grossAmount, status: r.status, Icon: ReceiptText })),
   ].sort((a, b) => new Date(b.time) - new Date(a.time));
   const filtered = activities.filter((r) => filter === 'all' || filter === r.kind);
   function goToOrdering(product) { navigate('/client/ordering', { state: { openCart: Boolean(product), initialCartItems: product ? [{ ProductId: product.id, Quantity: 1 }] : [] } }); }
@@ -65,8 +66,7 @@ export default function HomePage() {
   return <div className="cafe-home"><DemoStrip/>
     <div className="home-heading"><div><div className="home-eyebrow">PLAY. CONNECT. REPEAT.</div><h1>Chào {firstName}, sẵn sàng vào trận<span>?</span></h1><p>Mọi thứ bạn cần cho buổi chơi hôm nay, ngay tại đây.</p></div><button className="home-button" onClick={() => goToOrdering()}><Utensils size={16}/> Gọi món tại máy</button></div>
     <div className="home-dashboard-grid">
-      <section className="home-panel home-session" aria-labelledby="session-title"><div className="home-session-content"><div className="home-card-top"><h2 id="session-title"><Monitor size={19}/>{computer?.code || 'Phiên chơi của bạn'}</h2><Badge status={session ? 'Active' : 'Ended'}/></div>{session ? <><div className="home-eyebrow home-timer-label">THỜI GIAN ĐÃ CHƠI</div><div className="home-timer home-timer-minutes" aria-label="Thời gian đã chơi">{minutesLabel(session.started_at, now)}</div><p className="home-start"><Clock3 size={13}/> Bắt đầu {dateTime(session.started_at)}</p><div className="home-machine-meta"><span>Không gian thi đấu · Khu máy {type?.name}</span><span><Cpu size={13}/>Sẵn sàng cho những trận đấu của bạn</span></div></> : <Empty title="Chưa có phiên chơi">Liên hệ nhân viên tại quầy để bắt đầu.</Empty>}</div><div className="home-rig" aria-hidden="true"><div className="home-rig-orbit"/><div className="home-rig-screen"><Gamepad2 size={60} strokeWidth={1}/><span>READY TO PLAY</span><div className="home-rig-line"/></div><div className="home-rig-stand"/><div className="home-rig-keyboard"/></div><div className="home-session-footer"><span>Đơn giá phiên <strong>{money(session?.hourly_rate_snapshot)}<small> / giờ</small></strong></span><span>Tiền máy đã trừ ví <strong>{money(session?.charged_amount)}</strong></span><button onClick={() => navigate('/client/invoices')}>Chi tiết phiên <ChevronRight size={14}/></button></div></section>
-      <section className="home-panel home-wallet" aria-labelledby="wallet-title"><div className="home-card-top"><h2 id="wallet-title">Ví của bạn</h2><WalletCards size={20}/></div><span className="home-muted">Số dư hiện tại</span><div className="home-balance">{money(customer.wallet_balance)}</div><button className="home-button primary" onClick={() => navigate('/client/wallet')}><Plus size={16}/> Nạp tiền vào ví</button><div className="home-balance-row"><span>Đơn món phiên này · ghi nhận</span><strong>{money(receipt?.food || 0)}</strong></div><div className="home-balance-row"><span>Tổng phiên · đã ghi nhận</span><strong>{money(receipt?.total || 0)}</strong></div>{session && <div className={`home-remaining ${remaining < 1 ? 'low' : ''}`}><Clock3 size={13}/>Dự kiến còn {Math.floor(remaining)} giờ {Math.floor(remaining * 60) % 60} phút<span title="Ước tính theo số dư hiện tại và đơn giá phiên, chưa tính đơn món mới."><Info size={13}/></span></div>}</section>
+      <HomeSessionPanels home={home} now={now} navigate={navigate}/>
       <section className="home-food-section" aria-labelledby="food-title"><div className="home-section-heading"><div><span className="home-eyebrow">NEXORA KITCHEN</span><h2 id="food-title">Nạp năng lượng, tiếp trận</h2></div><button className="home-text-button" onClick={() => goToOrdering()}>Xem thực đơn <ArrowUpRight size={15}/></button></div><div className="home-food-grid">{catalog.loading ? <p role="status">Đang tải thực đơn…</p> : catalog.error ? <div className="home-alert" role="alert">{catalog.error}<button className="home-button" onClick={catalog.reload}>Thử lại thực đơn</button></div> : catalog.db.products.filter(product => product.is_active && product.stock_quantity > 0).slice(0, 3).map((product) => <article className="home-food-card" key={product.id}><FoodArt product={product}/><div className="home-food-body"><span className="home-food-category">{catalog.db.product_categories.find((r) => r.id === product.category_id)?.name}</span><h3>{product.name}</h3><div className="home-food-bottom"><strong>{money(product.current_price)}</strong><button className="home-add" aria-label={`Thêm ${product.name} vào giỏ`} onClick={() => goToOrdering(product)}><Plus size={18}/></button></div></div></article>)}</div></section>
       <section className="home-panel home-tournament" aria-labelledby="tournament-title"><Trophy className="home-trophy-art" size={145} strokeWidth={.7} aria-hidden="true"/><div className="home-tournament-content"><span className="home-badge"><i/>{registered ? 'BẠN ĐÃ ĐĂNG KÝ' : 'GIẢI ĐẤU SẮP TỚI'}</span><h2 id="tournament-title">{tournament?.name || 'Hẹn bạn ở giải đấu tới'}</h2>{tournament ? <><p><Gamepad2 size={15}/> {tournament.gameName} <span>·</span><Users size={15}/> Đội {tournament.teamSize} người</p><p><Clock3 size={15}/>{dateTime(tournament.startTimeUtc)}</p><div className="home-tournament-fee">{tournament.entryFee === 0 ? 'Miễn phí tham gia' : money(tournament.entryFee)}<span> / người chơi</span></div><button className="home-button tournament" onClick={() => navigate(`/client/tournaments?tournament=${tournament.id}`)}>{registered ? 'Xem đăng ký của bạn' : 'Chi tiết & đăng ký'}<ArrowUpRight size={16}/></button></> : <p role={tournamentError ? 'alert' : undefined}>{tournamentError || 'Giải đấu mới sẽ xuất hiện khi lịch được công bố.'}</p>}</div></section>
     </div>

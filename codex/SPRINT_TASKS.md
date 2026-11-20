@@ -569,6 +569,8 @@ và kiểm tra lại từ source xuất riêng commit. Chưa áp migration vào 
 checklist bên dưới giữ chờ Trưởng nhóm review.
 Tích hợp `dev` tại `bc984cf` ngày 19/11/2026: giữ cả module gateway SCRUM-22 và checkout SCRUM-27,
 đồng bộ EF/SQL/DBML thành 42 bảng/17 migration; adapter gateway chặn mở bill cho đơn đã chọn Cash/Wallet.
+Tích hợp tiếp `dev` tại `412af59` ngày 20/11/2026 sau SCRUM-24: giữ chung dịch vụ quyết toán phiên,
+xác minh checkout thất bại rollback cả tự đóng phiên/chứng từ/event; EF/SQL/DBML có 42 bảng/19 migration.
 UI, ZaloPay và hủy/hoàn tiếp tục theo S2-K-3, S2-K-2 và S3-K-1.
 
 **Description:**

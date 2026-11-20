@@ -23,9 +23,12 @@ public static class DependencyInjection
                 "Configure ConnectionStrings:DefaultConnection with User Secrets or an environment variable for the 35-table database.");
         }
 
-        services.AddDbContext<ApplicationDbContext>(options =>
+        services.AddScoped<SessionCommitEvents>();
+        services.AddScoped<ISessionRepository, SessionRepository>();
+        services.AddDbContext<ApplicationDbContext>((provider, options) =>
             options.UseSqlServer(connectionString, b =>
-                b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+                b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName))
+                .AddInterceptors(provider.GetRequiredService<SessionCommitEvents>()));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<IInventoryQueries, InventoryQueries>();
         services.AddScoped<IInventoryRepository, InventoryRepository>();

@@ -64,7 +64,8 @@ internal static class OrderChecks
                 var food = new Product { ProductName = "Order food", Category = category, Price = 10000, Stock = 100 };
                 var second = new Product { ProductName = "Second food", Category = category, Price = 5000, Stock = 100 };
                 var session = new GamingSession { Customer = customers[0], StartTime = DateTime.UtcNow.AddSeconds(-60),
-                    PricePerHourSnapshot = 10000, Computer = new Computer { ComputerName = "Order PC",
+                    PricePerHourSnapshot = 10000, HourlyRateSnapshot = 10000,
+                    Computer = new Computer { ComputerName = "Order PC", Status = "Occupied",
                         Room = new ComputerRoom { RoomName = "Order room" },
                         ComputerType = new ComputerType { TypeName = "Order type", PricePerHour = 10000 } } };
                 db.AddRange(customers); db.AddRange(food, second, session);
@@ -131,13 +132,23 @@ internal static class OrderChecks
             {
                 var db = Db(scope); var owner = (await db.Customers.FindAsync(customerA))!;
                 savedBalance = owner.WalletBalance; owner.WalletBalance = 10000;
-                (await db.GamingSessions.FindAsync(sessionId))!.StartTime = DateTime.UtcNow.AddHours(-1);
                 await db.SaveChangesAsync();
             }
+            // Accrue a completed second without corrupting the saved session/charge timeline.
+            await Task.Delay(TimeSpan.FromMilliseconds(1100));
             var beforeFeeFailure = await Snapshot();
+            var beforeFeeFailureEvents = events.Messages.Count;
             await Expect("Counter wallet order accounts for active session fees", HttpStatusCode.Conflict, HttpMethod.Post,
                 "/api/admin/orders", admin, Staff(customerA, "Wallet"), "insufficient-after-fees");
             Check("Insufficient balance after fees rolls back fee and checkout", beforeFeeFailure == await Snapshot());
+            Check("Rolled-back session settlement publishes no events", beforeFeeFailureEvents == events.Messages.Count);
+            await using (var scope = app.Services.CreateAsyncScope())
+            { var db = Db(scope); (await db.Customers.FindAsync(customerA))!.WalletBalance = 1; await db.SaveChangesAsync(); }
+            var beforeAutoCloseFailure = await Snapshot();
+            await Expect("Exhausted session cannot fund an order", HttpStatusCode.Conflict, HttpMethod.Post,
+                "/api/admin/orders", admin, Staff(customerA, "Wallet"), "exhausted-session-order");
+            Check("Rejected order rolls back auto-close, invoice, fees and stock", beforeAutoCloseFailure == await Snapshot());
+            Check("Rolled-back auto-close publishes no events", beforeFeeFailureEvents == events.Messages.Count);
             await using (var scope = app.Services.CreateAsyncScope())
             { var db = Db(scope); (await db.Customers.FindAsync(customerA))!.WalletBalance = savedBalance; await db.SaveChangesAsync(); }
 
@@ -294,7 +305,10 @@ internal static class OrderChecks
                 payments = await db.Payments.CountAsync(), usages = await db.PromotionUsages.CountAsync(),
                 ledger = await db.WalletTransactions.CountAsync(), movements = await db.InventoryTransactions.CountAsync(),
                 charges = await db.SessionCharges.CountAsync(), histories = await db.OrderStatusHistories.CountAsync(),
-                sessions = await db.GamingSessions.OrderBy(x => x.GamingSessionId).Select(x => new { x.TotalCost, x.LastChargedAt }).ToListAsync(),
+                sessions = await db.GamingSessions.OrderBy(x => x.GamingSessionId).Select(x => new {
+                    x.TotalCost, x.LastChargedAt, x.EndTime, x.Status, x.ClosingInvoiceId }).ToListAsync(),
+                invoices = await db.Invoices.CountAsync(), audit = await db.AuditLogs.CountAsync(),
+                computers = await db.Computers.OrderBy(x => x.ComputerId).Select(x => x.Status).ToListAsync(),
                 operations = await db.Set<OrderOperation>().CountAsync(), stocks = await db.Products.OrderBy(x => x.ProductId).Select(x => x.Stock).ToListAsync(),
                 balances = await db.Customers.OrderBy(x => x.CustomerId).Select(x => x.WalletBalance).ToListAsync() });
         }

@@ -89,7 +89,12 @@ public sealed class InvoiceService(IInvoiceRepository repository, IInvoiceUnitOf
         var sources = await repository.LockSourcesAsync(identity.CustomerId, sessionId, [], ct);
         var replay = await ReplayAsync(key, hash, ct);
         if (replay is not null) return replay;
-        if (sources.Customer.WalletBalance > 0)
+        var session = sources.Session;
+        // Insufficient funds means unable to fund the next second, even with a positive residual balance.
+        if (session?.ClosedByActorType != "System" || session.CloseReason != AutoIssueReason
+            || session.Status != "Ended" || session.EndTime is null || session.PricePerHourSnapshot is not > 0
+            || decimal.Floor((session.TotalCost + decimal.Floor(sources.Customer.WalletBalance)) * 3600m
+                / session.PricePerHourSnapshot.Value) > decimal.Floor((decimal)(session.EndTime.Value - session.StartTime).TotalSeconds))
             throw new BusinessRuleException("Chỉ tự phát hành theo ngữ cảnh hết số dư đã được worker xác minh.");
         return await CreateAsync("Session", sources, null, key, hash, system: true, ct);
     }
