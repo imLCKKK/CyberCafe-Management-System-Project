@@ -25,7 +25,13 @@ API tạo/đọc đơn Wallet/Cash, thu Cash và confirm từng dòng; dùng chu
 InventoryService, VoucherService và ApplyFinancialChange. Khóa HTTP lưu tại OrderOperations,
 Order.Version là SQL rowversion. Migration mới giữ đơn lịch sử với PaymentMethod null và actor Staff;
 đơn khách mới dùng EmployeeId null, ledger actor Customer chỉ hợp lệ cho OrderPayment.
-Các route gateway thuộc S2-K-2, UI thuộc S2-K-3 và hủy/hoàn thuộc S3-K-1 chưa triển khai trong task này.
+**Bổ sung S2-K-2 ngày 20/11/2026 (local, chưa nghiệm thu provider thật):** tạo đơn ZaloPay và giữ chỗ
+15 phút đã nối adapter SCRUM-22. `IOrderZaloPaySettlement` đọc receipt đã xác minh, hoàn tất khoản thu/đơn
+trong transaction riêng; worker phục hồi receipt chưa áp dụng, hết hạn trả tồn/lượt một lần.
+Thu muộn ghi nghĩa vụ hoàn Pending chưa duyệt; không tự gửi hoàn hoặc hồi sinh đơn. Migration
+`20261120081752_AddZaloPayOrderReservations` thêm ReservedUntilUtc và cột duyệt hoàn nullable.
+API tạo/đọc đơn trả URL/hạn/trạng thái; UI thuộc S2-K-3, route hủy/duyệt/gửi hoàn thuộc S3-K-1/S3-M-2.
+Xem [hướng dẫn chạy và giới hạn](../README.md#s2-k-2-checkout-zalopay-và-giữ-chỗ).
 Các ghi chú base/ảnh chụp bên dưới là lịch sử thiết kế; dùng code hiện tại để xác định trạng thái triển khai.
 
 - [PROJECT_GUIDE](../../codex/PROJECT_GUIDE.md), [task S1-K-2](../../codex/SPRINT_TASKS.md#s1-k-2--define-order-checkout-contracts)

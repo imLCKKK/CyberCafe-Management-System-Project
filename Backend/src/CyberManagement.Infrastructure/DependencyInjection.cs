@@ -16,6 +16,8 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructureServices(
         this IServiceCollection services, IConfiguration configuration)
     {
+        if (configuration["Checkout:ReservationMinutes"] is { } reservationMinutes && reservationMinutes != "15")
+            throw new InvalidOperationException("Checkout:ReservationMinutes must be 15 under the agreed checkout contract.");
         var connectionString = configuration.GetConnectionString("DefaultConnection");
         if (string.IsNullOrWhiteSpace(connectionString))
         {

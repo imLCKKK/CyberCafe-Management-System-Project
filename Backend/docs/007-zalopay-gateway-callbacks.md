@@ -14,6 +14,13 @@ giữ/trừ tồn, phát hành hóa đơn hoặc phát event hoàn tất nghiệ
 `S2-M-3` và caller checkout. `Succeeded` của intent không có nghĩa ví đã được cộng hoặc đơn đã được làm.
 Luồng tiền mặt và tiền tặng SCRUM-21 giữ theo [hợp đồng ví](003-customer-wallet-contract.md).
 
+**Điểm nối S2-K-2 bổ sung local ngày 20/11/2026:** Order mới có ReservedUntilUtc và Payment Pending
+giữ sẵn mã merchant; intent dùng lại mã, thời điểm tạo và hạn nguồn. Callback/Query sau receipt commit
+gọi `IOrderZaloPaySettlement` để hoàn tất nghiệp vụ Order, chỉ ACK sau khi thao tác/replay thành công.
+Worker Order phục hồi receipt đã commit nhưng chưa áp dụng; worker query tiếp tục truy vấn Failed/Expired
+cho Order có reservation. Các tác động Order này thuộc S2-K-2, không thay phạm vi TopUp của S2-M-3
+hoặc suy diễn dữ liệu Order lịch sử thành giữ chỗ. Bộ gateway fixture vẫn kiểm tra tương thích nguồn cũ.
+
 Nguồn áp dụng: [cấu hình S1-M-2](005-zalopay-sandbox-contract.md),
 [checkout](004-order-checkout-contract.md), [chứng từ](../../docs/contracts/inventory-invoice-voucher.md).
 `Zalosandbox.pdf` là hướng dẫn quy trình tham khảo; giữ stack .NET/EF/SQL Server và contract của dự án.

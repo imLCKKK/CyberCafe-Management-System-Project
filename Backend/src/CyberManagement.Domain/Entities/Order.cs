@@ -13,6 +13,7 @@ public class Order
     public string ActorType { get; set; } = "Staff";
     // Null chỉ dành cho đơn lịch sử trước khi tích hợp checkout.
     public string? PaymentMethod { get; set; }
+    public DateTimeOffset? ReservedUntilUtc { get; set; }
     public DateTime LastChangedAtUtc { get; set; } = DateTime.UtcNow;
     public byte[] Version { get; set; } = [];
 

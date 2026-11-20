@@ -17,6 +17,10 @@ public interface IOrderRepository
     Task<OrderDto> ReadAsync(int orderId, int? customerId, CancellationToken ct);
     Task<OrderPageDto> ReadPageAsync(int? customerId, string? status, int page, int pageSize, CancellationToken ct);
     Task<IReadOnlyList<Payment>> PaymentsAsync(int orderId, CancellationToken ct);
+    Task<Payment> LockZaloPayPaymentAsync(int orderId, CancellationToken ct);
+    Task<ZaloPayIntent?> GatewayIntentAsync(int orderId, CancellationToken ct);
+    Task<IReadOnlyList<int>> CheckoutWorkAsync(CancellationToken ct);
+    void AddAudit(AuditLog audit);
     Task<IReadOnlyList<WalletTransaction>> LedgersAsync(int orderId, CancellationToken ct);
     void Add(Order order);
     void AddPayment(Payment payment);

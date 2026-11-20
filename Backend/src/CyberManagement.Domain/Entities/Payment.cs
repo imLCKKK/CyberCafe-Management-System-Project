@@ -18,6 +18,8 @@ public class Payment
     public string? MerchantTransactionId { get; set; }
     public string? GatewayTransactionId { get; set; }
     public string? Reason { get; set; }
+    public int? ApprovedByEmployeeId { get; set; }
+    public DateTimeOffset? ApprovedAtUtc { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? PaymentTime { get; set; }
     public DateTimeOffset? ConfirmedAt { get; set; }

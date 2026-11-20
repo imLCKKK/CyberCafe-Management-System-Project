@@ -3557,3 +3557,64 @@ END;
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261120081752_AddZaloPayOrderReservations'
+)
+BEGIN
+    ALTER TABLE [Payments] ADD [ApprovedAtUtc] datetimeoffset NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261120081752_AddZaloPayOrderReservations'
+)
+BEGIN
+    ALTER TABLE [Payments] ADD [ApprovedByEmployeeId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261120081752_AddZaloPayOrderReservations'
+)
+BEGIN
+    ALTER TABLE [Orders] ADD [ReservedUntilUtc] datetimeoffset NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261120081752_AddZaloPayOrderReservations'
+)
+BEGIN
+    CREATE INDEX [IX_Payments_ApprovedByEmployeeId] ON [Payments] ([ApprovedByEmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261120081752_AddZaloPayOrderReservations'
+)
+BEGIN
+    CREATE INDEX [IX_Orders_Status_ReservedUntilUtc] ON [Orders] ([Status], [ReservedUntilUtc]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261120081752_AddZaloPayOrderReservations'
+)
+BEGIN
+    ALTER TABLE [Payments] ADD CONSTRAINT [FK_Payments_Employees_ApprovedByEmployeeId] FOREIGN KEY ([ApprovedByEmployeeId]) REFERENCES [Employees] ([EmployeeId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261120081752_AddZaloPayOrderReservations'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261120081752_AddZaloPayOrderReservations', N'10.0.14');
+END;
+
+COMMIT;
+GO

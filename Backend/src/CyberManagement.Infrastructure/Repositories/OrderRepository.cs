@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CyberManagement.Infrastructure.Repositories;
 
-public sealed class OrderRepository(ApplicationDbContext db) : IOrderRepository
+public sealed class OrderRepository(ApplicationDbContext db, TimeProvider clock) : IOrderRepository
 {
     public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, CancellationToken ct)
     {
@@ -172,12 +172,16 @@ public sealed class OrderRepository(ApplicationDbContext db) : IOrderRepository
         var collected = payments.Where(x => x.Type == "Payment" && x.Status == "Succeeded").Sum(x => x.Amount);
         var refunded = payments.Where(x => x.Type == "Refund" && x.Status == "Succeeded").Sum(x => x.Amount);
         var pending = payments.Where(x => x.Type == "Refund" && x.Status == "Pending").Sum(x => x.Amount);
+        var intent = await GatewayIntentAsync(orderId, ct);
+        var waitingGateway = order.PaymentMethod == "ZaloPay" && order.TotalAmount > 0 && collected == 0;
         var payable = order.TotalAmount - cancelled;
         var outstanding = Math.Max(0, payable - collected + refunded);
         var unresolved = Math.Max(0, Math.Min(cancelled, collected) - refunded);
         var status = unresolved > 0 ? "RefundPending" : refunded > 0
             ? (refunded == collected ? "Refunded" : "PartiallyRefunded")
             : collected > 0 && outstanding == 0 ? "Paid"
+            : waitingGateway ? (payments.Any(x => x.Type == "Payment" && x.Status == "Failed") ? "Failed"
+                : order.Status == "Expired" ? "Expired" : "Pending")
             : payable == 0 && collected == 0 ? "NotRequired"
             : order.PaymentMethod == "Cash" ? "PendingCollection" : "Pending";
         VoucherSnapshotDto? voucher = null;
@@ -194,8 +198,29 @@ public sealed class OrderRepository(ApplicationDbContext db) : IOrderRepository
                 x.OrderDetailId, x.ProductId, x.ProductNameSnapshot, x.Quantity, x.UnitPrice, x.DiscountAmount,
                 x.UnitPrice * x.Quantity - x.DiscountAmount, x.Status, null)).ToArray(),
             new(order.PaymentMethod, status, collected, refunded, pending, unresolved, outstanding,
-                payments.SingleOrDefault(x => x.Type == "Payment")?.PaymentId));
+                payments.SingleOrDefault(x => x.Type == "Payment")?.PaymentId,
+                order.Status == "AwaitingPayment" && order.ReservedUntilUtc > clock.GetUtcNow()
+                    && intent?.Status == "Pending" ? intent.PaymentUrl : null,
+                order.ReservedUntilUtc,
+                intent?.RequiresReconciliation == true || waitingGateway && (intent is null || intent.PaymentUrl is null
+                    || order.ReservedUntilUtc <= clock.GetUtcNow())
+                    || unresolved > 0));
     }
+
+    public Task<Payment> LockZaloPayPaymentAsync(int orderId, CancellationToken ct) => db.Payments.FromSqlInterpolated(
+        $"SELECT * FROM [Payments] WITH (UPDLOCK, HOLDLOCK) WHERE [OrderId] = {orderId} AND [Type] = 'Payment' AND [Method] = 'ZaloPay'")
+        .SingleAsync(ct);
+
+    public Task<ZaloPayIntent?> GatewayIntentAsync(int orderId, CancellationToken ct) => db.Set<ZaloPayIntent>()
+        .AsNoTracking().SingleOrDefaultAsync(x => x.OrderId == orderId, ct);
+
+    public async Task<IReadOnlyList<int>> CheckoutWorkAsync(CancellationToken ct) =>
+        await db.Orders.AsNoTracking().Where(x => x.PaymentMethod == "ZaloPay" && x.TotalAmount > 0 && x.ReservedUntilUtc != null
+            && (x.Status == "AwaitingPayment" || db.Set<ZaloPayIntent>().Any(i => i.OrderId == x.OrderId && i.Status == "Succeeded"))
+            && db.Payments.Any(p => p.OrderId == x.OrderId && p.Type == "Payment" && p.Status != "Succeeded"))
+            .OrderBy(x => x.OrderId).Select(x => x.OrderId).ToListAsync(ct);
+
+    public void AddAudit(AuditLog audit) => db.AuditLogs.Add(audit);
 
     public async Task<IReadOnlyList<Payment>> PaymentsAsync(int orderId, CancellationToken ct) =>
         await db.Payments.AsNoTracking().Where(x => x.OrderId == orderId).ToListAsync(ct);
