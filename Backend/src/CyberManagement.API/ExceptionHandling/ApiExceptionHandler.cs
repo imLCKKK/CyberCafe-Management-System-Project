@@ -36,10 +36,12 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         if (status == 500)
             logger.LogError(exception, "Lỗi xử lý API {Path}; TraceId: {TraceId}", context.Request.Path, context.TraceIdentifier);
 
+        var extensions = new Dictionary<string, object?> { ["traceId"] = context.TraceIdentifier };
+        if (exception is OrderRuleException orderError) extensions["code"] = orderError.Code;
         await Results.Problem(statusCode: status, title: title,
             detail: status == 500 ? "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau." : exception.Message,
             instance: context.Request.Path,
-            extensions: new Dictionary<string, object?> { ["traceId"] = context.TraceIdentifier })
+            extensions: extensions)
             .ExecuteAsync(context);
         return true;
     }

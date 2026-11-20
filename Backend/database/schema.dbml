@@ -246,7 +246,10 @@ Table dbo.Invoices {
 }
 Table dbo.OrderDetails {
   OrderDetailId int [not null, pk, increment]
+  ConfirmedAtUtc datetime2 [null]
+  ConfirmedByEmployeeId int [null]
   DiscountAmount decimal(18,0) [not null]
+  LineNumber int [not null]
   OrderId int [not null]
   ProductId int [not null]
   ProductNameSnapshot nvarchar(150) [not null]
@@ -254,19 +257,38 @@ Table dbo.OrderDetails {
   Status nvarchar(30) [not null, default: `Pending`]
   UnitPrice decimal(18,0) [not null]
   indexes {
+    (ConfirmedByEmployeeId) [name: 'IX_OrderDetails_ConfirmedByEmployeeId']
     (OrderId) [name: 'IX_OrderDetails_OrderId']
     (ProductId) [name: 'IX_OrderDetails_ProductId']
   }
 }
+Table dbo.OrderOperations {
+  Id int [not null, pk, increment]
+  ActorId int [not null]
+  ActorType nvarchar(10) [not null]
+  CreatedAtUtc datetime2 [not null]
+  Key nvarchar(100) [not null]
+  OrderId int [not null]
+  RequestHash nchar(64) [not null]
+  Route nvarchar(100) [not null]
+  indexes {
+    (ActorType, ActorId, Route, Key) [name: 'IX_OrderOperations_ActorType_ActorId_Route_Key', unique]
+    (OrderId) [name: 'IX_OrderOperations_OrderId']
+  }
+}
 Table dbo.Orders {
   OrderId int [not null, pk, increment]
+  ActorType nvarchar(10) [not null]
   CustomerId int [not null]
   DiscountAmount decimal(18,0) [not null]
-  EmployeeId int [not null]
+  EmployeeId int [null]
   GamingSessionId int [null]
+  LastChangedAtUtc datetime2 [not null]
   OrderTime datetime2 [not null]
+  PaymentMethod nvarchar(10) [null]
   Status nvarchar(50) [not null]
   TotalAmount decimal(18,0) [not null]
+  Version rowversion [not null]
   VoucherCodeSnapshot nvarchar(50) [null]
   VoucherDiscountTypeSnapshot nvarchar(10) [null]
   VoucherDiscountValueSnapshot decimal(18,2) [null]
@@ -278,13 +300,17 @@ Table dbo.Orders {
 }
 Table dbo.OrderStatusHistory {
   HistoryId int [not null, pk, increment]
+  ActorType nvarchar(10) [not null]
   ChangedAt datetime2 [not null]
-  ChangedBy int [not null]
+  ChangedBy int [null]
   NewStatus nvarchar(50) [not null]
   OldStatus nvarchar(50) [null]
+  OrderDetailId int [null]
   OrderId int [not null]
+  Reason nvarchar(250) [null]
   indexes {
     (ChangedBy) [name: 'IX_OrderStatusHistory_ChangedBy']
+    (OrderDetailId) [name: 'IX_OrderStatusHistory_OrderDetailId']
     (OrderId) [name: 'IX_OrderStatusHistory_OrderId']
   }
 }
@@ -615,12 +641,15 @@ Ref: dbo.Invoices.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.Invoices.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.Invoices.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
 Ref: dbo.Invoices.(PromotionId) > dbo.Promotions.(PromotionId)
+Ref: dbo.OrderDetails.(ConfirmedByEmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.OrderDetails.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.OrderDetails.(ProductId) > dbo.Products.(ProductId)
+Ref: dbo.OrderOperations.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.Orders.(CustomerId) > dbo.Customers.(CustomerId)
 Ref: dbo.Orders.(EmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.Orders.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
 Ref: dbo.OrderStatusHistory.(ChangedBy) > dbo.Employees.(EmployeeId)
+Ref: dbo.OrderStatusHistory.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)
 Ref: dbo.OrderStatusHistory.(OrderId) > dbo.Orders.(OrderId)
 Ref: dbo.Payments.(InvoiceId) > dbo.Invoices.(InvoiceId)
 Ref: dbo.Payments.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)

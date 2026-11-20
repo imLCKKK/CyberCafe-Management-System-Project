@@ -164,7 +164,7 @@ internal static class ZaloPayPaymentChecks
         await Expect("Other customer cannot sync the intent", HttpStatusCode.NotFound, await Post(own + "/" + topUp.Id + "/sync", otherToken, new { }));
         await Expect("Staff cannot bypass customer ownership for gateway read", HttpStatusCode.Forbidden, await Get(own + "/" + topUp.Id, staffTokens["Admin"]));
 
-        var orderId = await CreateOrder(owner, 43210);
+        var orderId = await CreateOrder(owner, 43210, paymentMethod: "ZaloPay");
         var orderKey = Guid.NewGuid().ToString();
         await Expect("Browser cannot replace the Order's server price", HttpStatusCode.BadRequest,
             await Post(own + "/orders/" + orderId, token, new { amountVnd = 1 }, orderKey));
@@ -179,6 +179,19 @@ internal static class ZaloPayPaymentChecks
             await Post(own + "/orders/" + orderId, token, new { }, Guid.NewGuid().ToString()));
         await Expect("Order source ownership is checked on the server", HttpStatusCode.NotFound,
             await Post(own + "/orders/" + orderId, otherToken, new { }, Guid.NewGuid().ToString()));
+
+        // SCRUM-27 stores the chosen method; the shared adapter cannot change Cash/Wallet orders.
+        foreach (var method in new[] { "Cash", "Wallet" })
+        {
+            var fixedMethodOrderId = await CreateOrder(owner, 43213, "Pending", method);
+            var createsBeforeFixedMethod = gateway.CreateCount;
+            await Expect(method + " checkout cannot open a ZaloPay bill", HttpStatusCode.Conflict,
+                await Post(own + "/orders/" + fixedMethodOrderId, token, new { }, Guid.NewGuid().ToString()));
+            await using var scope = app.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Check(method + " rejection leaves no intent or provider request", gateway.CreateCount == createsBeforeFixedMethod
+                && !await db.Set<ZaloPayIntent>().AnyAsync(row => row.OrderId == fixedMethodOrderId));
+        }
 
         // Creation failures are classified without pretending that a timeout means no provider order exists.
         gateway.UnknownNextCreate = 1;
@@ -698,11 +711,11 @@ internal static class ZaloPayPaymentChecks
             await using var scope = app.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             (await db.Customers.SingleAsync(row => row.CustomerId == id)).Status = status; await db.SaveChangesAsync();
         }
-        async Task<int> CreateOrder(int customerId, decimal amount, string status = "AwaitingPayment")
+        async Task<int> CreateOrder(int customerId, decimal amount, string status = "AwaitingPayment", string? paymentMethod = null)
         {
             await using var scope = app.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var employee = await db.Employees.Where(row => row.Username == "admin").Select(row => row.EmployeeId).SingleAsync();
-            var row = new Order { CustomerId = customerId, EmployeeId = employee, TotalAmount = amount, Status = status };
+            var row = new Order { CustomerId = customerId, EmployeeId = employee, TotalAmount = amount, Status = status, PaymentMethod = paymentMethod };
             db.Orders.Add(row); await db.SaveChangesAsync(); return row.OrderId;
         }
         async Task ExpireLease(int id)

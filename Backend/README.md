@@ -43,6 +43,46 @@ node frontend/tests/run.mjs computers-management sessions-billing realtime
 
 SQL suite dùng `AUTH_CHECKS_SQL_CONNECTION`, luôn tạo/dọn DB thử riêng; gồm 32 tạo máy đồng thời, retry, rollback giữa debit và hóa đơn, nhiều worker/System, outer rollback không event và hai kết nối SignalR. Browser dùng HTTP/SDK fixtures; chưa thay thế kiểm chứng hai máy LAN thật.
 
+## SCRUM-27 / S2-K-1: đặt món, voucher và thanh toán
+
+API đơn món dùng SQL thật: `POST/GET /api/client/orders`, `GET /api/client/orders/{id}`;
+nhân viên dùng các route tương ứng tại `/api/admin/orders`. Tạo đơn chỉ nhận ID món/số lượng,
+phương thức `Wallet` hoặc `Cash`, phiên và mã voucher tùy chọn. Server lấy giá, snapshot tên/giá/giảm,
+trừ tồn qua InventoryService và dùng lượt qua VoucherService trong cùng transaction.
+Wallet quyết toán phí phiên qua ISessionSettlement trước debit và ghi Payment; Cash chờ thực thu.
+Nếu quyết toán buộc đóng phiên, checkout trả 409 và rollback toàn bộ, kể cả số dư lẻ còn đủ trả món.
+Áp dụng cả đơn tại quầy không truyền phiên; worker tính tiền giờ xử lý độc lập sau đó.
+
+Nhân viên xác nhận tiền mặt tại `POST /api/admin/orders/{id}/cash-collections` với
+`{"expectedVersion":"<base64 từ GET>","cashReceived":true}` và quyền `payment.create`.
+Nhận món tại `POST /api/admin/orders/{id}/items/{detailId}/confirm` với `expectedVersion` và
+`order.status.update`; server chặn khi chưa thanh toán đủ. Waiter chỉ được đặt Cash và nhận món đã trả tiền.
+Mọi POST cần `Idempotency-Key` 8–100 ký tự ASCII chữ/số hoặc `._:-`; retry giữ nguyên body/key.
+Replay trả 200, cùng OrderId và header `Idempotency-Replayed: true`; payload khác trả 409.
+Cash phải giữ bằng chứng tiếp nhận tại quầy theo contract mục 7.1.1, không thu lại chỉ vì timeout.
+
+Migration `20261119050701_ImplementFoodOrderCheckout` thêm rowversion, phương thức/actor,
+audit nhận món và bảng OrderOperations (model sau tích hợp SCRUM-22/SCRUM-24 có 42 bảng/19 migration,
+trên nền CyberManagement 35 bảng).
+EmployeeId/ChangedBy nullable cho khách, ledger Customer chỉ cho debit OrderPayment; không dùng nhân viên giả.
+Đơn lịch sử giữ PaymentMethod null, tiền và người thực hiện cũ; không tự suy phương thức thanh toán.
+SQL/DBML được xuất lại từ EF; downgrade bị chặn nếu đã có lịch sử checkout mới.
+
+Hóa đơn tiếp tục phát hành riêng qua module hóa đơn: checkout lưu Payment theo OrderId,
+ApplyFinancialChange cập nhật hóa đơn đã có cùng transaction, không tự phát hành hoặc thu thêm.
+Event OrderChanged/WalletChanged gửi sau commit tới nhóm được phép. UI đặt món thuộc S2-K-3,
+ZaloPay/giữ chỗ thuộc S2-K-2, hủy/hoàn tiền thuộc S3-K-1; các route đó chưa triển khai ở task này.
+Adapter gateway SCRUM-22 từ chối tạo bill ZaloPay cho đơn đã chọn Cash/Wallet; phương thức đơn không đổi sau tạo.
+
+Kiểm tra SQL/API, harness chỉ tạo và dọn DB `CyberManagement_AuthChecks_<ngẫu nhiên>`:
+
+```powershell
+$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;TrustServerCertificate=True'
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --orders-only
+```
+
+Contract: [004-order-checkout-contract.md](docs/004-order-checkout-contract.md).
+
 ## SCRUM-22: adapter gateway và callback
 
 [Hợp đồng gateway](docs/007-zalopay-gateway-callbacks.md) mô tả API TopUp/Order, intent/receipt,

@@ -81,6 +81,7 @@ internal static class RealtimeIntegrationHost
                 builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
                 builder.Services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
                 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+                builder.Services.AddScoped<IOrderRepository, OrderRepository>();
                 builder.Services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
                 builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
                 builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();

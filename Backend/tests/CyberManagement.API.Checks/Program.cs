@@ -24,6 +24,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
+if (args.Contains("--orders-only"))
+{
+    Console.WriteLine($"{await OrderChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} order SQL/API checks passed.");
+    return;
+}
+
 if (args.Contains("--sessions-only"))
 {
     Console.WriteLine($"{await SessionBillingChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} session SQL/API checks passed.");
@@ -161,6 +167,7 @@ builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
 builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
 builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
 builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();

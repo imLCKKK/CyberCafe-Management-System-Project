@@ -10,5 +10,6 @@ public interface ISessionRepository
     Task<SessionDto> CloseAsync(int sessionId, int employeeId, string key, CancellationToken ct);
     Task<IReadOnlyList<int>> GetActiveCustomersAsync(CancellationToken ct);
     Task BillAsync(int customerId, CancellationToken ct);
-    Task SettleInTransactionAsync(int customerId, DateTime nowUtc, CancellationToken ct);
+    // Null when the customer has no open session; otherwise returns its state after settlement.
+    Task<SessionSettlementResult?> SettleInTransactionAsync(int customerId, DateTime nowUtc, CancellationToken ct);
 }

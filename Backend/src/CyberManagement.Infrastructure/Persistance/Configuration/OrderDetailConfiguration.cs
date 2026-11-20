@@ -15,6 +15,7 @@ public class OrderDetailConfiguration : IEntityTypeConfiguration<OrderDetail>
         });
         builder.Property(x => x.ProductNameSnapshot).HasMaxLength(150).IsRequired();
         builder.Property(x => x.DiscountAmount).HasPrecision(18, 0);
+        builder.HasOne<Employee>().WithMany().HasForeignKey(x => x.ConfirmedByEmployeeId).OnDelete(DeleteBehavior.NoAction);
         builder.ToTable("OrderDetails", t => t.HasCheckConstraint("CK_OrderDetails_Status", "[Status] IN ('Pending','Confirmed','Cancelled')"));
         builder.Property(x => x.Status).HasMaxLength(30).HasDefaultValue("Pending").IsRequired();
         builder.HasKey(x => x.OrderDetailId);

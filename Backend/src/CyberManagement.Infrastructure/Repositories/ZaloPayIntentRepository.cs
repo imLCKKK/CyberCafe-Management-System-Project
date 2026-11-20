@@ -43,6 +43,8 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
         {
             var order = await LockOrderAsync(orderId!.Value, cancellationToken);
             if (order.CustomerId != customerId) throw new EntityNotFoundException("Không tìm thấy đơn hàng của tài khoản.");
+            if (order.PaymentMethod is "Cash" or "Wallet")
+                throw new BusinessRuleException("Đơn đã chọn tiền mặt hoặc ví, không được đổi sang ZaloPay.");
             if (await Intents.AnyAsync(row => row.OrderId == orderId, cancellationToken))
                 throw new BusinessRuleException("Đơn hàng đã có ý định thanh toán. Hãy kiểm tra giao dịch đã lưu.");
             if (order.Status is not ("Pending" or "AwaitingPayment")) throw new BusinessRuleException("Đơn hàng không còn chờ thanh toán.");
@@ -108,6 +110,7 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
             {
                 var order = await LockOrderAsync(orderId, cancellationToken);
                 if (order.CustomerId != row.CustomerId || order.Status is not ("Pending" or "AwaitingPayment")
+                    || order.PaymentMethod is "Cash" or "Wallet"
                     || order.TotalAmount != row.ExpectedAmountVnd
                     || new DateTimeOffset(DateTime.SpecifyKind(order.OrderTime, DateTimeKind.Utc)).AddMinutes(15) < row.ExpiresAtUtc
                     || await database.Payments.AnyAsync(payment => payment.OrderId == orderId

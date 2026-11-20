@@ -348,14 +348,14 @@ internal static class InvoiceChecks
             {
                 var db=Db(scope);
                 var latestMigrations=(await db.Database.GetAppliedMigrationsAsync()).ToArray();
-                // Exercise the invoice-owned downgrade guard before any later, empty feature migrations.
-                await db.GetService<IMigrator>().MigrateAsync("20261115145716_TrackOrderDetailCancellation");
-                var migrationCount=(await db.Database.GetAppliedMigrationsAsync()).Count();
+                // Any integrated financial guard may stop the downgrade first: these fixtures
+                // now contain native System session metadata which must never be discarded.
                 await Throws<SqlException>("Unsafe downgrade refused",()=>db.GetService<IMigrator>().MigrateAsync("20261114071953_AddInventoryMovementOperationKey"));
-                Check("Refused downgrade preserves metadata/history",(await db.Database.GetAppliedMigrationsAsync()).Count()==migrationCount
-                    &&await db.Invoices.AnyAsync(x=>x.ActorType=="System"));
+                Check("Refused downgrade preserves metadata/history",await db.Invoices.AnyAsync(x=>x.ActorType=="System")
+                    && await db.GamingSessions.AnyAsync(x=>x.ClosedByActorType=="System" && x.CloseReason=="InsufficientBalance"));
                 await db.Database.MigrateAsync();
-                Check("Latest merged schema is restored after the invoice downgrade guard",(await db.Database.GetAppliedMigrationsAsync()).SequenceEqual(latestMigrations));
+                Check("Latest merged schema is restored after the invoice downgrade guard",(await db.Database.GetAppliedMigrationsAsync()).SequenceEqual(latestMigrations)
+                    && !db.Database.HasPendingModelChanges());
             }
             var upgradeFixture=new AuthCheckDatabase(connection);
             try

@@ -99,19 +99,20 @@ public sealed class SessionRepository(ApplicationDbContext db, IWalletLedgerWrit
     public Task BillAsync(int customerId, CancellationToken ct) => SqlWork.RunAsync(db, async () =>
     { await SettleInTransactionAsync(customerId, DateTime.UtcNow, ct); return true; }, ct);
 
-    public async Task SettleInTransactionAsync(int customerId, DateTime nowUtc, CancellationToken ct)
+    public async Task<SessionSettlementResult?> SettleInTransactionAsync(int customerId, DateTime nowUtc, CancellationToken ct)
     {
         if (nowUtc.Kind != DateTimeKind.Utc) throw new ArgumentException("Thời điểm quyết toán phải là UTC.");
         await wallet.LockCustomerAsync(customerId, ct);
         var candidates = await db.GamingSessions.AsNoTracking()
             .Where(x => x.CustomerId == customerId && (x.Status == "Active" || x.EndTime == null))
             .Select(x => new { x.GamingSessionId, x.ComputerId }).ToListAsync(ct);
-        if (candidates.Count == 0) return;
+        if (candidates.Count == 0) return null;
         if (candidates.Count != 1) throw new BusinessRuleException("Khách có nhiều phiên chưa đóng, cần đối soát.");
         var candidate = candidates[0];
         var computer = await LockComputerAsync(candidate.ComputerId, ct);
         var session = await LockSessionAsync(candidate.GamingSessionId, ct);
         await SettleLockedAsync(session, computer, nowUtc, false, null, null, ct);
+        return new(session.GamingSessionId, session.Status, session.EndTime);
     }
 
     private async Task SettleLockedAsync(GamingSession session, Computer computer, DateTime nowUtc,

@@ -22,3 +22,6 @@ public sealed record SessionDto(int GamingSessionId, int ComputerId, int Custome
 public sealed record SessionHomeDto(decimal WalletBalance, SessionDto? Session);
 
 public sealed record SessionChange(int CustomerId, int ComputerId, int GamingSessionId);
+
+// Internal result captured under the session lock, in the caller's transaction.
+public sealed record SessionSettlementResult(int GamingSessionId, string Status, DateTime? EndTime);

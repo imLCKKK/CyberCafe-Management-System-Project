@@ -558,6 +558,23 @@ Assignee: **Khang**. Reviewer: **Trưởng nhóm**. Phối hợp: Trường; Min
 
 #### S2-K-1 — Implement-Food-Orders-Voucher-Checkout
 
+**Jira:** `SCRUM-27` (người dùng xác nhận). Cập nhật triển khai local ngày 19/11/2026:
+API tạo/đọc đơn Wallet/Cash, thu Cash và nhận từng món đã được bổ sung trên nhánh
+`SCRUM-27-Implement-Food-Orders-Voucher-Checkout`; tích hợp ví/phí phiên/kho/voucher/chứng từ
+cùng transaction, rowversion và khóa HTTP lưu bền. SQL/API checks chạy bằng `--orders-only`
+trong DB thử riêng; hướng dẫn tại [Backend README](../Backend/README.md#scrum-27--s2-k-1-đặt-món-voucher-và-thanh-toán).
+Commit đầu `13bb492` thiếu 11 file mới do lệch casing thư mục `backend`/`Backend` trên Windows.
+Bổ sung bàn giao ngày 19/11/2026 đưa đủ file triển khai vào Git theo đường dẫn chuẩn `Backend`
+và kiểm tra lại từ source xuất riêng commit. Chưa áp migration vào DB ứng dụng;
+checklist bên dưới giữ chờ Trưởng nhóm review.
+Tích hợp `dev` tại `bc984cf` ngày 19/11/2026: giữ cả module gateway SCRUM-22 và checkout SCRUM-27,
+đồng bộ EF/SQL/DBML thành 42 bảng/17 migration; adapter gateway chặn mở bill cho đơn đã chọn Cash/Wallet.
+Tích hợp tiếp `dev` tại `412af59` ngày 20/11/2026 sau SCRUM-24: giữ chung dịch vụ quyết toán phiên,
+xác minh checkout thất bại rollback cả tự đóng phiên/chứng từ/event; EF/SQL/DBML có 42 bảng/19 migration.
+Sửa P1 sau tích hợp ngày 20/11/2026: quyết toán trả trạng thái phiên và chặn chi ví nếu buộc đóng phiên,
+kể cả ví 4đ thu phí 3đ vẫn còn đủ trả món 1đ; áp dụng cả đơn tại quầy không truyền phiên.
+UI, ZaloPay và hủy/hoàn tiếp tục theo S2-K-3, S2-K-2 và S3-K-1.
+
 **Description:**
 
 - Triển khai tạo/đọc/xử lý đơn với giá/tổng do server tính và snapshot dữ liệu món/giảm giá.
