@@ -571,6 +571,8 @@ Tích hợp `dev` tại `bc984cf` ngày 19/11/2026: giữ cả module gateway SC
 đồng bộ EF/SQL/DBML thành 42 bảng/17 migration; adapter gateway chặn mở bill cho đơn đã chọn Cash/Wallet.
 Tích hợp tiếp `dev` tại `412af59` ngày 20/11/2026 sau SCRUM-24: giữ chung dịch vụ quyết toán phiên,
 xác minh checkout thất bại rollback cả tự đóng phiên/chứng từ/event; EF/SQL/DBML có 42 bảng/19 migration.
+Sửa P1 sau tích hợp ngày 20/11/2026: quyết toán trả trạng thái phiên và chặn chi ví nếu buộc đóng phiên,
+kể cả ví 4đ thu phí 3đ vẫn còn đủ trả món 1đ; áp dụng cả đơn tại quầy không truyền phiên.
 UI, ZaloPay và hủy/hoàn tiếp tục theo S2-K-3, S2-K-2 và S3-K-1.
 
 **Description:**

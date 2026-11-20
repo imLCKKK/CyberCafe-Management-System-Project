@@ -152,6 +152,9 @@ internal static class OrderChecks
             await using (var scope = app.Services.CreateAsyncScope())
             { var db = Db(scope); (await db.Customers.FindAsync(customerA))!.WalletBalance = savedBalance; await db.SaveChangesAsync(); }
 
+            await CheckClosingSessionRemainder(atCounter: true);
+            await CheckClosingSessionRemainder(atCounter: false);
+
             // Issue an unpaid food invoice through the existing module, then collect once.
             var cash = await CreateStaff(Staff(customerB), "create-cash");
             await Expect("Unpaid cash cannot be confirmed", HttpStatusCode.Conflict, HttpMethod.Post, ConfirmRoute(cash), waiter,
@@ -264,6 +267,50 @@ internal static class OrderChecks
             StaffCreateOrderRequest Staff(int id, string method = "Cash", string? code = null) => new(id, null, [new(productId, 1)], method, code);
             string CashRoute(OrderDto value) => $"/api/admin/orders/{value.Id}/cash-collections";
             string ConfirmRoute(OrderDto value) => $"/api/admin/orders/{value.Id}/items/{value.Items[0].Id}/confirm";
+            async Task CheckClosingSessionRemainder(bool atCounter)
+            {
+                var label = atCounter ? "Counter" : "Session-attached";
+                var phone = atCounter ? "0900091010" : "0900091011";
+                int ownerId, sourceSessionId, foodId;
+                await using (var scope = app.Services.CreateAsyncScope())
+                {
+                    var db = Db(scope);
+                    var owner = new Customer { FullName = label + " remainder", Phone = phone, WalletBalance = 4 };
+                    owner.PasswordHash = scope.ServiceProvider.GetRequiredService<ICustomerPasswordHasher>().HashPassword(owner, password);
+                    var food = new Product { ProductName = label + " one dong", Price = 1, Stock = 5,
+                        Category = new Category { CategoryName = label + " remainder food" } };
+                    var source = new GamingSession { Customer = owner, StartTime = DateTime.UtcNow.AddSeconds(-10),
+                        PricePerHourSnapshot = 10000, HourlyRateSnapshot = 10000,
+                        Computer = new Computer { ComputerName = label + " remainder PC", Status = "Occupied",
+                            Room = new ComputerRoom { RoomName = label + " remainder room" },
+                            ComputerType = new ComputerType { TypeName = label + " remainder type", PricePerHour = 10000 } } };
+                    db.AddRange(food, source); await db.SaveChangesAsync();
+                    ownerId = owner.CustomerId; sourceSessionId = source.GamingSessionId; foodId = food.ProductId;
+                }
+                var token = atCounter ? admin : await Login(phone, customer: true);
+                var before = await Snapshot(); var eventCount = events.Messages.Count;
+                object request = atCounter
+                    ? new StaffCreateOrderRequest(ownerId, null, [new(foodId, 1)], "Wallet", "ORDER25")
+                    : new CreateOrderRequest(sourceSessionId, [new(foodId, 1)], "Wallet", "ORDER25");
+                await Expect(label + " rejects checkout after auto-close despite affordable one-dong food",
+                    HttpStatusCode.Conflict, HttpMethod.Post, atCounter ? "/api/admin/orders" : "/api/client/orders",
+                    token, request, "closed-session-remainder-" + (atCounter ? "counter" : "client"));
+                Check(label + " rollback preserves session, wallet, stock, voucher, invoice and HTTP key", before == await Snapshot());
+                Check(label + " rejected checkout emits no events", events.Messages.Count == eventCount);
+                // The normal worker may commit the same auto-close independently of a failed debit.
+                await using (var scope = app.Services.CreateAsyncScope())
+                    await scope.ServiceProvider.GetRequiredService<CyberManagement.Application.Interfaces.Repositories.ISessionRepository>()
+                        .BillAsync(ownerId, default);
+                await using (var scope = app.Services.CreateAsyncScope())
+                {
+                    var db = Db(scope); var source = (await db.GamingSessions.FindAsync(sourceSessionId))!;
+                    Check(label + " independent worker bills three dong, closes and retains one dong",
+                        source.Status == "Ended" && source.TotalCost == 3 && source.ClosingInvoiceId != null
+                        && (await db.Customers.FindAsync(ownerId))!.WalletBalance == 1
+                        && (await db.Products.FindAsync(foodId))!.Stock == 5
+                        && !await db.Orders.AnyAsync(x => x.CustomerId == ownerId));
+                }
+            }
             async Task<OrderDto> CreateStaff(StaffCreateOrderRequest request, string key)
             {
                 using var response = await Send(HttpMethod.Post, "/api/admin/orders", admin, request, key);

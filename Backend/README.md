@@ -50,6 +50,8 @@ nhân viên dùng các route tương ứng tại `/api/admin/orders`. Tạo đơ
 phương thức `Wallet` hoặc `Cash`, phiên và mã voucher tùy chọn. Server lấy giá, snapshot tên/giá/giảm,
 trừ tồn qua InventoryService và dùng lượt qua VoucherService trong cùng transaction.
 Wallet quyết toán phí phiên qua ISessionSettlement trước debit và ghi Payment; Cash chờ thực thu.
+Nếu quyết toán buộc đóng phiên, checkout trả 409 và rollback toàn bộ, kể cả số dư lẻ còn đủ trả món.
+Áp dụng cả đơn tại quầy không truyền phiên; worker tính tiền giờ xử lý độc lập sau đó.
 
 Nhân viên xác nhận tiền mặt tại `POST /api/admin/orders/{id}/cash-collections` với
 `{"expectedVersion":"<base64 từ GET>","cashReceived":true}` và quyền `payment.create`.

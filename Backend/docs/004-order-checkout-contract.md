@@ -448,7 +448,10 @@ caller khóa Customer → Computer → GamingSession/SessionCharge, gọi logic 
 mốc now phía server; sau đó mới xét số dư còn lại cho đơn. Điểm gọi logic
 `SessionSettlement.BeforeWalletDebit(customerId, gamingSessionId?, nowUtc)` trả số dư sau quyết toán
 và trạng thái phiên; dùng cùng DbContext/transaction, không tự commit. Ngày 15/11, `ISessionSettlement.BeforeWalletDebitAsync`
-đã được nối cho phí giải; checkout vẫn chưa nối và phải kiểm tra tích hợp riêng theo contract này.
+đã được nối cho phí giải; checkout hiện được nối trong S2-K-1. Cập nhật 20/11/2026:
+`ISessionRepository.SettleInTransactionAsync` trả trạng thái phiên sau quyết toán ngay trong khóa/transaction;
+adapter `SessionSettlement` từ chối chi ví nếu phiên không còn Active hoặc đã có EndTime.
+Worker gọi quyết toán trực tiếp nên vẫn được chốt phí/đóng phiên độc lập; không dùng số dư lẻ để suy rằng phiên còn hoạt động.
 Khách đặt tại quầy không truyền GamingSessionId nhưng vẫn đang có phiên thì tìm/khóa phiên thuộc khách;
 không bỏ qua nghĩa vụ phí chỉ vì đơn không gắn phiên. Không có phiên đang mở thì bước này không ghi phí.
 Không đọc số dư trước quyết toán để chấp nhận đơn; nếu phiên phải kết thúc hoặc số dư sau quyết toán
