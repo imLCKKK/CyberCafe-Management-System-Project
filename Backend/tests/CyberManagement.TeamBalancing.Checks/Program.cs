@@ -5,8 +5,12 @@ using System.Text;
 using System.Text.Json;
 using CyberManagement.Application.DTOs.Tournaments;
 using CyberManagement.Application.Exceptions;
+using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Services;
+using CyberManagement.Infrastructure;
 using CyberManagement.TeamBalancing.Training;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 // All data in this executable is generated test-only data, never a training dataset.
 var checks = 0;
@@ -229,6 +233,20 @@ void CliChecks()
     invocation = Run("train", output, "fixture-check.v1", trainedOutput);
     Check("CLI trains actual ML.NET model on generated fixtures", invocation.Exit == 0 && File.Exists(Path.Combine(trainedOutput, "model.zip")));
     checks += TeamBalanceMlChecks.Run(output, trainedOutput);
+    var fixtureHash = HashFile(Path.Combine(trainedOutput, "model-manifest.json"));
+    invocation = Run("verify", trainedOutput, fixtureHash);
+    Check("CLI verify rejects generated fixture even with its correct manifest hash",
+        invocation.Exit == 1 && invocation.Error.Contains("MODEL_UNAVAILABLE", StringComparison.Ordinal));
+    var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["ConnectionStrings:DefaultConnection"] = "Server=unused;Database=unused",
+        ["TeamBalancing:ModelDirectory"] = trainedOutput,
+        ["TeamBalancing:ManifestSha256"] = fixtureHash
+    }).Build();
+    using var provider = new ServiceCollection().AddLogging().AddInfrastructureServices(config).BuildServiceProvider();
+    var configuredService = provider.GetRequiredService<ITeamBalancingService>();
+    Reject("production DI rejects ML when configured with a fixture", () => configuredService.Propose(roster with { Strategy = "ml" }), "MODEL_UNAVAILABLE");
+    Check("Balanced remains available after artifact rejection", configuredService.Propose(roster).ProposalId == proposal.ProposalId);
     invocation = Run("train", output, "fixture-check.v2", Path.Combine(folder, "repeat-model"));
     Check("CLI rejects repeated holdout evaluation", invocation.Exit == 1 && invocation.Error.Contains("EVALUATION_ALREADY_USED", StringComparison.Ordinal));
     invocation = Run("train", output, "bad/version", Path.Combine(folder, "bad-model-version"));

@@ -1,13 +1,17 @@
+using CyberManagement.Application.Exceptions;
 using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Application.Interfaces.Services;
+using CyberManagement.Application.Services;
 using CyberManagement.Infrastructure.Persistance;
 using CyberManagement.Infrastructure.Repositories;
 using CyberManagement.Infrastructure.Security;
+using CyberManagement.Infrastructure.TeamBalancing;
 using CyberManagement.Application.Wallets;
 using CyberManagement.Infrastructure.Wallets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace CyberManagement.Infrastructure;
 
@@ -36,19 +40,30 @@ public static class DependencyInjection
         services.AddScoped<IComputerRepository, ComputerRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<ITournamentRepository, TournamentRepository>();
-        services.AddScoped<ITeamPreviewRosterReader, TeamBalancing.TeamPreviewRosterReader>();
-        services.AddSingleton<ITeamBalancingService>(_ =>
+        services.AddScoped<ITeamPreviewRosterReader, TeamPreviewRosterReader>();
+        services.AddSingleton<ITeamBalancingService>(provider =>
         {
+            var logger = provider.GetService<ILogger<TeamBalancingService>>();
             var directory = configuration["TeamBalancing:ModelDirectory"];
             var hash = configuration["TeamBalancing:ManifestSha256"];
-            TeamBalancing.TeamBalanceModelArtifact? artifact = null;
-            if (!string.IsNullOrWhiteSpace(directory) && !string.IsNullOrWhiteSpace(hash))
+            if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(hash))
             {
-                try { artifact = TeamBalancing.TeamBalanceModelArtifact.Load(directory, hash); }
-                catch (CyberManagement.Application.Exceptions.TeamBalanceException)
-                { /* ML requests report MODEL_UNAVAILABLE while Balanced remains available. */ }
+                logger?.LogWarning("Team balancing ML is unavailable. Configure TeamBalancing:ModelDirectory and TeamBalancing:ManifestSha256.");
+                return new TeamBalancingService(null);
             }
-            return new CyberManagement.Application.Services.TeamBalancingService(artifact);
+
+            try
+            {
+                var artifact = TeamBalanceModelArtifact.Load(directory, hash);
+                logger?.LogInformation("Loaded team balancing model {ModelVersion} from dataset {DatasetVersion}.",
+                    artifact.ModelVersion, artifact.DatasetVersion);
+                return new TeamBalancingService(artifact);
+            }
+            catch (TeamBalanceException error) when (error.Code == "MODEL_UNAVAILABLE")
+            {
+                logger?.LogWarning("Team balancing ML is unavailable. The configured artifact could not be loaded: {Reason}", error.Message);
+                return new TeamBalancingService(null);
+            }
         });
         services.AddScoped<ICounterTopUpRepository, CounterTopUpRepository>();
         services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();

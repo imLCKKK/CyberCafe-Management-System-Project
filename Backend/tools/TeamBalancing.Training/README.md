@@ -18,9 +18,9 @@ dotnet run --project Backend/tools/TeamBalancing.Training -- train .tools/team-b
 ```
 
 Đầu vào phải là dữ liệu được phép sử dụng, có nguồn được người phụ trách xác minh.
-Tool không tải provider, không sửa SQL và từ chối output đã tồn tại. Exit code:
-`0` prepare/train hoàn thành (không đồng nghĩa model đạt gate); `1` dữ liệu/I/O
-không hợp lệ hoặc holdout đã dùng; `2` sai cú pháp lệnh.
+Tool không tải provider, không sửa SQL và từ chối output đã tồn tại. Exit code
+`0` báo lệnh hoàn thành, `1` báo dữ liệu/artifact/I/O không hợp lệ hoặc holdout
+đã dùng, và `2` báo sai cú pháp. Dùng `verify` để kiểm tra gate phục vụ model sau train.
 Không tạo output khi validation/data gate thất bại. Lỗi ghi đĩa có thể để lại output
 chưa hoàn chỉnh; chỉ sử dụng output có đủ `artifact-hashes.json` và kiểm tra mọi hash.
 
@@ -117,6 +117,7 @@ sau đó thứ tự RegistrationId. `Balanced` hỗ trợ từ hai đội VALORA
 Đặt `TeamBalancing__ModelDirectory` và `TeamBalancing__ManifestSha256` trong cấu hình
 máy API rồi khởi động lại để sử dụng artifact đã được đối chiếu. Khi thiếu model đạt gate,
 yêu cầu ML trả 503 `MODEL_UNAVAILABLE`. Người vận hành có thể chủ động chọn Balanced.
+API ghi trạng thái tải model khi service được resolve lần đầu.
 
 HTTP 200 trả `teams[].members[].registrationId`, tên khách, tier/rank OP.GG,
 vai trò, `scoreSpread`, `quality`, `warnings`, nguồn/version model hoặc baseline,
@@ -200,7 +201,29 @@ server tin cậy, kiểm tra hash/version/gate/schema, từ chối fixture hoặ
 bằng `MODEL_UNAVAILABLE`. Hash manifest cần được ghim ngoài artifact bởi người vận hành;
 file hash đặt cùng artifact không tự chứng minh artifact đáng tin.
 Scorer dùng batch IDataView riêng từng lượt, không dùng chung PredictionEngine mutable;
-không tự đổi model hoặc cài vào DI production ở bước 2.
+API giữ model đã tải trong suốt vòng đời của tiến trình.
+
+## Kiểm tra artifact và preview với dữ liệu thật
+
+1. Chạy `prepare` và `train` trên `observed-matches` đã xác minh theo phần đầu vào.
+   Lưu phiên bản dataset/model, kết quả M1/B1/B2 và các gate trong `metrics.json`,
+   cùng hash manifest và danh sách hash artifact. Giữ split manifest và dữ liệu
+   đối chiếu trong nơi lưu trữ có kiểm soát truy cập.
+2. Trên máy API, chạy kiểm tra bằng cùng loader mà API sử dụng. Lấy hash đã đối chiếu
+   từ cấu hình tin cậy tách khỏi thư mục artifact. Exit code `0` xác nhận loader đã
+   tải model đáp ứng gate phục vụ.
+
+   ```powershell
+   dotnet run --project Backend/tools/TeamBalancing.Training -- verify "$env:TeamBalancing__ModelDirectory" "$env:TeamBalancing__ManifestSha256"
+   ```
+
+3. Trên API dùng SQL Server, lấy `version` và danh sách đăng ký của giải VALORANT
+   ở trạng thái `RegistrationClosed`, có đúng 10 đăng ký hợp lệ với snapshot OP.GG
+   thật và đủ vai trò. Gọi preview với `strategy: "ML"` và JWT nhân viên có quyền
+   `team.assign`. Ghi nhận HTTP 200, `modelSource: "ML"`, `modelVersion`, `rosterVersion`,
+   `proposalId` và `quality.predictedWinProbabilityA`. Đối chiếu phiên bản model với
+   kết quả `verify`, kiểm tra hai đội đều có 5 người và tập `registrationId` khớp đủ
+   10 đăng ký, mỗi ID đúng một lần.
 
 **Giới hạn hiện tại:** repo chưa có dữ liệu trận thật đủ gate. Model `.zip` sinh bởi
 suite chỉ là artifact kiểm thử. Chưa có kết quả AUC/Brier thực tế để nghiệm thu,

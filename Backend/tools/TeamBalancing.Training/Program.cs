@@ -2,17 +2,25 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using CyberManagement.Application.Exceptions;
+using CyberManagement.Infrastructure.TeamBalancing;
 using CyberManagement.TeamBalancing.Training;
 
-if (args.Length != 4 || args[0] is not ("prepare" or "train"))
+if (args is not (["prepare" or "train", _, _, _] or ["verify", _, _]))
 {
     Console.Error.WriteLine("Usage: TeamBalancing.Training prepare <source.json> <matches.jsonl> <new-output-directory>");
     Console.Error.WriteLine("       TeamBalancing.Training train <prepared-directory> <model-version> <new-output-directory>");
+    Console.Error.WriteLine("       TeamBalancing.Training verify <model-directory> <trusted-manifest-sha256>");
     return 2;
 }
 
 try
 {
+    if (args[0] == "verify")
+    {
+        var artifact = TeamBalanceModelArtifact.Load(args[1], args[2]);
+        Console.WriteLine($"Model {artifact.ModelVersion}; dataset={artifact.DatasetVersion}; model={artifact.ModelSha256}; manifest={args[2]}");
+        return 0;
+    }
     var output = Path.GetFullPath(args[3]);
     if (Directory.Exists(output) || File.Exists(output))
         throw new TeamBalanceException("OUTPUT_EXISTS", "Chọn thư mục output mới để giữ nguyên artifact trước đó.");
