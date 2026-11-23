@@ -1,4 +1,7 @@
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { captureStats } from './capture.js';
 import assert from 'node:assert/strict';
 import { createOpggService, findStatsAction, flightRecords, normalizeStatistics, parseProfile } from './opgg.js';
 import { createStatsMiddleware } from './statsMiddleware.js';
@@ -114,4 +117,13 @@ test('HTTP handler returns normalized JSON, validation errors, and disallows mut
   const invalid = response();
   await createStatsMiddleware()({ url: '/api/valorant/opgg/stats', method: 'GET' }, invalid, () => assert.fail());
   assert.equal(invalid.statusCode, 400);
+});
+
+test('fixture matches the shared Node/.NET canonical snapshot hash vector', () => {
+  const vector = JSON.parse(readFileSync(new URL('./fixtures/snapshot-hash.json', import.meta.url)));
+  const { stats, provenance: proof } = vector.canonical;
+  const canonical = captureStats({ ...stats, rank: { label: stats.rank.label, ...stats.rank } },
+    stats.riotId, proof.origin, proof.snapshotId, proof.capturedAtUtc);
+  assert.equal(canonical, JSON.stringify(vector.canonical));
+  assert.equal('sha256:' + createHash('sha256').update(canonical).digest('hex'), vector.snapshotSha256);
 });

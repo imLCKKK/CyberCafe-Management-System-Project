@@ -1,3 +1,5 @@
+import { validateStats } from '../../../../Backend/integrations/opgg/shared.js';
+export { validateStats };
 import { CURRENT_CUSTOMER_ID } from '../home/mockData.js';
 export { opggUrl } from '../../../../Backend/integrations/opgg/shared.js';
 
@@ -30,24 +32,6 @@ export function filterParticipants(rows, query, role, sortKey, direction) {
     if (right == null) return -1;
     return direction * (left - right);
   });
-}
-
-// Normalized response from our OP.GG backend adapter.
-export function validateStats(payload, riotId) {
-  const invalid = () => { throw new Error('Dữ liệu thống kê trả về không hợp lệ.'); };
-  if (!payload || payload.riotId !== riotId || payload.source !== 'opgg'
-    || payload.queue !== 'competitive' || typeof payload.scope !== 'string' || !payload.scope.trim()
-    || payload.scope.length > 160 || !Number.isFinite(Date.parse(payload.fetchedAt))
-    || (payload.matches !== null && (!Number.isInteger(payload.matches) || payload.matches < 0))
-    || (payload.sourceUpdatedAt !== null && (typeof payload.sourceUpdatedAt !== 'string' || !Number.isFinite(Date.parse(payload.sourceUpdatedAt))))) invalid();
-  for (const [key] of statColumns) {
-    const value = payload[key];
-    if (value !== null && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || (key.endsWith('Rate') && value > 100))) invalid();
-    if ((payload.matches === 0 || payload.matches === null) && value !== null) invalid();
-  }
-  const rank = payload.rank ?? null;
-  if (rank !== null && (!Number.isInteger(rank.tier) || rank.tier < 0 || rank.tier > 27 || typeof rank.name !== 'string' || !rank.name.trim() || rank.name.length > 50 || !Number.isInteger(rank.division) || rank.division < 0 || rank.division > 3 || rank.label !== `${rank.name}${rank.division ? ` ${rank.division}` : ''}`)) invalid();
-  return { ...Object.fromEntries(['riotId', 'source', 'queue', 'scope', 'fetchedAt', 'sourceUpdatedAt', 'matches', ...statColumns.map(([key]) => key)].map((key) => [key, payload[key]])), rank };
 }
 
 export function saveParticipantStats(db, registrationId, riotId, payload) {

@@ -12,6 +12,13 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         if (exception is OperationCanceledException && context.RequestAborted.IsCancellationRequested)
             return false;
 
+        if (exception is OpggProviderException provider)
+        {
+            if (provider.Status == 429) context.Response.Headers.RetryAfter = "60";
+            await Results.Json(new { message = provider.Message }, statusCode: provider.Status).ExecuteAsync(context);
+            return true;
+        }
+
         var status = exception switch
         {
             PaymentUnavailableException => StatusCodes.Status503ServiceUnavailable,

@@ -1,0 +1,4 @@
+{
+  "canonical": {"provenance":{"capturedAtUtc":"2026-11-08T01:02:04.000Z","origin":"fixture","snapshotId":"5ca624f0-ccdd-4995-913f-c483fa1fa02f"},"stats":{"damagePerRound":123.45,"fetchedAt":"2026-11-08T01:02:03.456Z","headshotRate":null,"kda":1.2,"matches":10,"queue":"competitive","rank":{"division":2,"label":"Gold 2","name":"Gold","tier":13},"riotId":"Tím#VN1","scope":"Act · Competitive","source":"opgg","sourceUpdatedAt":null,"winRate":0}},
+  "snapshotSha256": "sha256:f00d51ec7e9e107e563720051f6a8f50e157f90ff579dc1c8d9042efa7a1a417"
+}

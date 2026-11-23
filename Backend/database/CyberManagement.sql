@@ -3332,6 +3332,43 @@ GO
 BEGIN TRANSACTION;
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261118094500_RegistrationStatsSnapshots'
+)
+BEGIN
+    CREATE TABLE [RegistrationStatsSnapshots] (
+        [SnapshotId] uniqueidentifier NOT NULL,
+        [RegistrationId] int NOT NULL,
+        [RiotId] nvarchar(128) NOT NULL,
+        [FetchedAt] datetimeoffset NOT NULL,
+        [CanonicalJson] nvarchar(max) NOT NULL,
+        CONSTRAINT [PK_RegistrationStatsSnapshots] PRIMARY KEY ([SnapshotId]),
+        CONSTRAINT [FK_RegistrationStatsSnapshots_TournamentRegistrations_RegistrationId] FOREIGN KEY ([RegistrationId]) REFERENCES [TournamentRegistrations] ([RegistrationId]) ON DELETE NO ACTION
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261118094500_RegistrationStatsSnapshots'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_RegistrationStatsSnapshots_RegistrationId_RiotId_FetchedAt] ON [RegistrationStatsSnapshots] ([RegistrationId], [RiotId], [FetchedAt]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261118094500_RegistrationStatsSnapshots'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261118094500_RegistrationStatsSnapshots', N'10.0.14');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
     WHERE [MigrationId] = N'20261119050701_ImplementFoodOrderCheckout'
 )
 BEGIN

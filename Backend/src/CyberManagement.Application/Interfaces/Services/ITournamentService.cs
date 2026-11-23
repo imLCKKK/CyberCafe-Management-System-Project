@@ -4,6 +4,7 @@ namespace CyberManagement.Application.Interfaces.Services;
 
 public interface ITournamentService
 {
+    Task<OpggSnapshot> RefreshStatsAsync(int tournamentId, int registrationId, int? ownerId, CancellationToken token);
     Task RequireActiveEmployeeAsync(int employeeId, CancellationToken cancellationToken);
     Task<IReadOnlyList<GameDto>> GetGamesAsync(bool includeInactive, CancellationToken cancellationToken);
     Task<IReadOnlyList<GameRankDto>> GetRanksAsync(int gameId, CancellationToken cancellationToken);

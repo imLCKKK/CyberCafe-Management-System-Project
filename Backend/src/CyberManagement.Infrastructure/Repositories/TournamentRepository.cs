@@ -56,7 +56,9 @@ public sealed class TournamentRepository(
                 registration.Customer.FullName, registration.RiotId, registration.RankId,
                 registration.Rank.RankName, registration.PreferredRole, registration.WinRate,
                 registration.HoursPlayed, registration.SkillScore, registration.Status,
-                AsUtc(registration.RegisteredAt), registration.FeeCharged))
+                AsUtc(registration.RegisteredAt), registration.FeeCharged,
+                OpggSnapshot.ForRegistration(registration.StatsSnapshots.Where(s => s.RiotId == registration.RiotId).OrderByDescending(s => s.FetchedAt)
+                    .Select(s => s.CanonicalJson).FirstOrDefault(), registration.RiotId)))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<ClientTournamentRegistrationDto>> GetClientRegistrationsAsync(
@@ -68,8 +70,66 @@ public sealed class TournamentRepository(
                 registration.RegistrationId, registration.Customer.FullName, registration.RiotId,
                 registration.Rank.RankName, registration.PreferredRole, registration.WinRate,
                 registration.HoursPlayed, registration.Status, AsUtc(registration.RegisteredAt),
-                registration.CustomerId == customerId))
+                registration.CustomerId == customerId,
+                OpggSnapshot.ForRegistration(registration.StatsSnapshots.Where(s => s.RiotId == registration.RiotId).OrderByDescending(s => s.FetchedAt)
+                    .Select(s => s.CanonicalJson).FirstOrDefault(), registration.RiotId)))
             .ToListAsync(cancellationToken);
+
+    public async Task<string> GetStatsRiotIdAsync(int tournamentId, int registrationId, int? ownerId, CancellationToken token)
+    {
+        if (ownerId is int customerId && !await database.Customers.AnyAsync(c => c.CustomerId == customerId && c.Status == "Active", token))
+            throw new UnauthorizedAccessException("Tài khoản khách hàng hiện không hoạt động.");
+        return await ReadStatsRiotIdAsync(tournamentId, registrationId, ownerId, token);
+    }
+
+    private async Task<string> ReadStatsRiotIdAsync(int tournamentId, int registrationId, int? ownerId, CancellationToken token)
+    {
+        var row = await database.TournamentRegistrations.AsNoTracking()
+            .Where(r => r.RegistrationId == registrationId && r.TournamentId == tournamentId
+                && (ownerId == null || r.CustomerId == ownerId))
+            .Select(r => new { r.RiotId, r.Status, Game = r.Tournament.Game.GameName, TournamentStatus = r.Tournament.Status })
+            .SingleOrDefaultAsync(token) ?? throw new EntityNotFoundException("Không tìm thấy đăng ký.");
+        if (row.Status != "Registered" || row.TournamentStatus is not ("RegistrationOpen" or "RegistrationClosed"))
+            throw new BusinessRuleException("Giải hoặc đăng ký đã khóa đồng bộ OP.GG.");
+        if (!string.Equals(row.Game.Trim(), "Valorant", StringComparison.OrdinalIgnoreCase))
+            throw new BusinessRuleException("OP.GG chỉ hỗ trợ VALORANT PC Competitive cho giải này.");
+        if (string.IsNullOrWhiteSpace(row.RiotId))
+            throw new ValidationException("Đăng ký chưa có Riot ID.");
+        return row.RiotId;
+    }
+
+    public async Task<(OpggSnapshot Snapshot, bool Changed)> SaveStatsAsync(int tournamentId, int registrationId,
+        int? ownerId, string riotId, string canonical, CancellationToken token)
+    {
+        var incoming = OpggSnapshot.FromCanonical(canonical)!;
+        var fetched = incoming.Stats.GetProperty("fetchedAt").GetDateTimeOffset();
+        await using var transaction = await BeginTransactionAsync(token);
+        if (ownerId is int customerId)
+        {
+            var customer = database.Database.IsSqlServer() ? await wallet.LockCustomerAsync(customerId, token)
+                : await database.Customers.SingleAsync(c => c.CustomerId == customerId, token);
+            if (customer.Status != "Active") throw new UnauthorizedAccessException("Tài khoản khách hàng hiện không hoạt động.");
+        }
+        var tournament = await FindTournamentForUpdateAsync(tournamentId, token);
+        var currentId = await ReadStatsRiotIdAsync(tournamentId, registrationId, ownerId, token);
+        if (!string.Equals(currentId, riotId, StringComparison.Ordinal)
+            || !string.Equals(riotId, incoming.Stats.GetProperty("riotId").GetString(), StringComparison.OrdinalIgnoreCase))
+            throw new BusinessRuleException("Riot ID đã thay đổi. Hãy tải lại đăng ký.");
+        var current = await database.Set<RegistrationStatsSnapshot>().AsNoTracking()
+            .Where(s => s.RegistrationId == registrationId && s.RiotId == riotId).OrderByDescending(s => s.FetchedAt).FirstOrDefaultAsync(token);
+        if (current != null && current.FetchedAt >= fetched && OpggSnapshot.ForRegistration(current.CanonicalJson, riotId) is { } saved)
+            return (saved, false);
+
+        database.Add(new RegistrationStatsSnapshot {
+            SnapshotId = Guid.Parse(incoming.Provenance.SnapshotId), RegistrationId = registrationId,
+            RiotId = riotId, FetchedAt = fetched, CanonicalJson = canonical
+        });
+        // Every new snapshot invalidates team previews bound to this tournament rowversion.
+        database.Entry(tournament).Property(t => t.Status).IsModified = true;
+        await database.SaveChangesAsync(token);
+        if (transaction != null) await transaction.CommitAsync(token);
+        return (incoming, true);
+    }
 
     public async Task<CreateTournamentResult> CreateAsync(
         int employeeId, string key, CreateTournamentRequest request, CancellationToken cancellationToken)
