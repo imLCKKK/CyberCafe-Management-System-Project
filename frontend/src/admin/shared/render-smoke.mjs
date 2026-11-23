@@ -16,7 +16,7 @@ const server = await createServer({ root: frontendRoot, optimizeDeps: { noDiscov
 try {
   const { MemoryRouter } = await server.ssrLoadModule('react-router-dom');
   const { AppRoutes } = await server.ssrLoadModule('/src/app/routes.jsx');
-  const pages = { dashboard: 'Xin chào, Admin', computers: 'Quản lý máy tính', customers: 'Quản lý khách hàng', orders: 'Quản lý gọi món', products: 'Quản lý sản phẩm', inventory: 'Quản lý kho', invoices: 'Hóa đơn', tournaments: 'Quản lý giải đấu', staff: 'Quản lý nhân viên', reports: 'Báo cáo &amp; thống kê' };
+  const pages = { dashboard: 'Xin chào, Admin', computers: 'Quản lý máy tính', customers: 'Quản lý khách hàng', orders: 'Quản lý gọi món', products: 'Quản lý sản phẩm', promotions: 'Quản lý voucher', inventory: 'Quản lý kho', invoices: 'Hóa đơn', tournaments: 'Quản lý giải đấu', staff: 'Quản lý nhân viên', reports: 'Báo cáo &amp; thống kê' };
   for (const [path, title] of Object.entries(pages)) {
     const html = renderToString(React.createElement(MemoryRouter, { initialEntries: [`/admin/${path}`] }, React.createElement(AppRoutes)));
     assert.ok(html.includes(title), `Missing title for ${path}`);
@@ -25,7 +25,7 @@ try {
     if (['reports', 'dashboard'].includes(path)) assert.ok(html.includes('<svg'), `Missing chart in ${path}`);
   }
   assert.deepEqual(warnings, [], 'Unexpected React render warnings');
-  console.log('Admin render smoke: all 10 menu routes rendered with shared data and no placeholders.');
+  console.log('Admin render smoke: all 11 checked menu routes rendered with no placeholders.');
 } finally {
   await server.close(); console.error = originalError;
   delete globalThis.localStorage; delete globalThis.window;

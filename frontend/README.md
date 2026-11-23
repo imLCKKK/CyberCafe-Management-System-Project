@@ -28,6 +28,27 @@ Kiểm tra trình duyệt cần Chrome hoặc Edge; có thể chỉ định exec
 repository. `npm.cmd run test:frontend -- opgg-live` kiểm tra nguồn OP.GG thật
 và cần mạng; các suite mặc định dùng fixture cho OP.GG.
 
+## Voucher quản trị (SCRUM-19)
+
+Mở **Voucher** tại `/admin/promotions`: form tạo/sửa hỗ trợ phần trăm/số tiền
+cố định, thời hạn theo giờ Việt Nam, ngưỡng đơn, trần giảm và hạn mức toàn hệ
+thống/mỗi khách. Ô trần/hạn mức để trống là không giới hạn. Tắt thay cho xóa.
+`promotion.view` được xem; `promotion.manage` được sửa. Cashier mặc định chỉ đọc.
+
+Dùng [API/rule voucher của Trường](../Backend/docs/voucher-api.md).
+Loading/lỗi/empty lấy từ API thật; lỗi server giữ nguyên nội dung form.
+Event `PromotionChanged` chỉ gửi cho nhân viên có `promotion.view`; UI đọc lại
+danh sách khi có event/kết nối lại. Không dùng localStorage để lưu voucher.
+
+```powershell
+npm.cmd --prefix frontend run test:vouchers
+# Từ gốc repo, đặt AUTH_CHECKS_SQL_CONNECTION tới SQL Server thử nghiệm có quyền tạo DB:
+npm.cmd --prefix frontend run test:vouchers:sql
+```
+
+Suite live tự tạo/migrate/xóa DB GUID riêng, đăng nhập qua UI và dùng API/Hub
+thật. Cần Chrome/Edge hoặc `CHROME_PATH`; không trỏ tới DB nghiệp vụ.
+
 ## Auth frontend
 
 Đăng nhập nhân viên và khách dùng chung API client tại `src/shared/auth/api.js`.

@@ -31,7 +31,11 @@ Muốn bắt đầu lại, xóa ba khóa trên trong DevTools → Application �
 
 ## Giới hạn
 
-Đây là bản demo frontend. Vai trò, mật khẩu và nhật ký thao tác nằm trong dữ liệu trình duyệt; chưa có xác thực, phân quyền hay ghi nhận người thao tác từ server. Các route `/admin/auth` và `/admin/promotions` hiện không thuộc mười mục quản trị đã triển khai và vẫn là khung chờ. API ASP.NET Core trong repository là phần riêng, chưa cấp dữ liệu cho các trang admin. Không dùng dữ liệu demo để vận hành quán thật.
+Đây là mô tả luồng demo lịch sử; không dùng dữ liệu demo để vận hành quán thật.
+Auth hiện đã nối API. Bổ sung SCRUM-19: `/admin/promotions` là màn hình voucher
+API/SQL thật, không dùng dữ liệu trình duyệt và không còn là khung chờ.
+Xem [hướng dẫn voucher hiện hành](../Backend/docs/voucher-api.md).
+Trạng thái tích hợp các module khác cần đối chiếu code hiện tại.
 
 ## Kiểm tra
 

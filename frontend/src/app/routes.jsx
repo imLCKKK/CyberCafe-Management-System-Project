@@ -22,6 +22,7 @@ import { TournamentsPage as AdminTournamentsPage } from '../admin/tournaments/To
 import { StaffPage } from '../admin/staff/StaffPage';
 import { ReportsPage } from '../admin/reports/ReportsPage';
 import { TopUpsPage } from '../admin/topups/TopUpsPage';
+import { PromotionsPage } from '../admin/promotions/PromotionsPage';
 
 const admin={
   dashboard:['Tổng quan','C'],computers:['Máy','C'],customers:['Khách hàng','B'],topups:['Nạp tại quầy','M'],orders:['Order','D'],products:['Sản phẩm','D'],inventory:['Kho','E'],invoices:['Hóa đơn & thanh toán','E'],tournaments:['Giải đấu','B'],staff:['Nhân viên','A'],reports:['Báo cáo','E']
@@ -43,8 +44,6 @@ const adminPermissions = {
   staff: 'employee.view', reports: 'report.view',
   topups: 'wallet.topup',
 };
-
-const adminPage=(title,owner)=><div className="page"><div className="placeholder"><h2>{title}</h2><p>Module của thành viên {owner}. Hãy triển khai tại thư mục tương ứng.</p><span>CHƯA TRIỂN KHAI</span></div></div>;
 
 function AuthArea({ accountType, children }) {
   const { principal, loading } = useAuth();
@@ -72,7 +71,7 @@ function RouteTree() {
     <Route path="/admin" element={<AuthArea accountType="employee"><AdminLayout/></AuthArea>}>
       <Route index element={<Navigate to="dashboard" replace/>}/>
       {Object.keys(admin).map((path) => { const Page = adminComponents[path]; return <Route key={path} path={path} element={<PermissionRoute permission={adminPermissions[path]}><Page/></PermissionRoute>}/>; })}
-      <Route path="promotions" element={<PermissionRoute permission="promotion.manage">{adminPage('Khuyến mãi','B')}</PermissionRoute>}/>
+      <Route path="promotions" element={<PermissionRoute permission="promotion.view"><PromotionsPage/></PermissionRoute>}/>
     </Route>
     <Route path="/client" element={<AuthArea accountType="customer"><ClientLayout/></AuthArea>}>
       <Route index element={<Navigate to="home" replace/>}/>
