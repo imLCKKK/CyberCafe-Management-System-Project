@@ -56,8 +56,9 @@ internal static class RevenueReconciliation
             var usages = data.PromotionUsages.Where(x => x.OrderId == order.OrderId).ToArray();
             if (order.VoucherCodeSnapshot is not null)
             {
-                if (usages.Length != 1 || usages.Any(x => x.CustomerId != order.CustomerId))
-                    Issue("VoucherUsageMismatch", "Snapshot voucher không có lượt dùng duy nhất đúng khách.", "Order", order.OrderId, 1, usages.Length, "Count");
+                if (usages.Length != 1 || usages.Any(x => x.CustomerId != order.CustomerId
+                    || !string.Equals(x.Promotion?.Code, order.VoucherCodeSnapshot, StringComparison.Ordinal)))
+                    Issue("VoucherUsageMismatch", "Snapshot voucher không có lượt dùng duy nhất đúng khách và đúng mã.", "Order", order.OrderId, 1, usages.Length, "Count");
                 foreach (var usage in usages)
                     if ((closed && usage.ReleasedAt is null) || (!closed && usage.ReleasedAt is not null)
                         || usage.ReleasedAt < usage.UsedAt)

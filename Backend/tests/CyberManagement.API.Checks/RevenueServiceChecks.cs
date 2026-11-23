@@ -123,9 +123,19 @@ internal static class RevenueServiceChecks
         await Case("Expired order must return stock and release voucher", async () =>
         {
             var f=new Fixture(day); f.Order(1,100); var o=f.Orders.Single(); o.Status="Expired"; o.VoucherCodeSnapshot="CODE";
-            f.Usages.Add(new PromotionUsage { PromotionUsageId=1,OrderId=1,CustomerId=1,UsedAt=day });
+            f.Usages.Add(new PromotionUsage { PromotionUsageId=1,PromotionId=1,OrderId=1,CustomerId=1,UsedAt=day,Promotion=new Promotion { PromotionId=1,Code="CODE" } });
             f.Movements.Add(new InventoryTransaction { InvTransId=1,OrderId=1,OrderDetailId=10,ProductId=1,Type="Sale",Quantity=-1,Before=10,After=9 });
-            var r=await Reconcile(f); Assert(r.Issues.Any(x=>x.Code=="VoucherReleaseMismatch") && r.Issues.Any(x=>x.Code=="StockReturnMismatch"));
+            var r=await Reconcile(f); Assert(r.Issues.Any(x=>x.Code=="VoucherReleaseMismatch") && r.Issues.Any(x=>x.Code=="StockReturnMismatch") && !r.Issues.Any(x=>x.Code=="VoucherUsageMismatch"));
+        });
+        await Case("Voucher usage pointing to another promotion is flagged", async () =>
+        {
+            var f=new Fixture(day); f.Order(1,100); var o=f.Orders.Single(); o.VoucherCodeSnapshot="SAVE10";
+            f.Pay(1,1,100,"Cash");
+            f.Movements.Add(new InventoryTransaction { InvTransId=1,OrderId=1,OrderDetailId=10,ProductId=1,Type="Sale",Quantity=-1,Before=10,After=9 });
+            f.Usages.Add(new PromotionUsage { PromotionUsageId=1,PromotionId=2,OrderId=1,CustomerId=1,UsedAt=day,Promotion=new Promotion { PromotionId=2,Code="OTHER" } });
+            var mismatch=await Reconcile(f); Assert(!mismatch.IsBalanced && mismatch.Issues.Any(x=>x.Code=="VoucherUsageMismatch"));
+            f.Usages[0].Promotion.Code="SAVE10";
+            var balanced=await Reconcile(f); Assert(balanced.IsBalanced);
         });
         await Case("Invoice snapshot mismatch does not change the actual revenue", async () =>
         {

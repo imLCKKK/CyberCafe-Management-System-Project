@@ -71,6 +71,15 @@ internal static class RevenueQueryChecks
             var data = await Read(db);
             Require(data.WalletTransactions.Any(x => x.TransactionId == 102), "Keep refund through its original debit even when source text is invalid");
         });
+        await Check("Promotion usage includes promotion code for voucher snapshot reconciliation", async db =>
+        {
+            AddOrder(db); AddInvoice(db);
+            db.Promotions.Add(new Promotion { PromotionId=5, Code="SAVE10", PromoName="Save 10", DiscountType="Fixed", DiscountValue=10, StartDate=from.AddDays(-5), EndDate=from.AddDays(5) });
+            db.PromotionUsages.Add(new PromotionUsage { PromotionUsageId=301, PromotionId=5, OrderId=11, CustomerId=1, UsedAt=from.AddDays(-3) });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            var data = await Read(db);
+            Require(data.PromotionUsages.Single().Promotion?.Code == "SAVE10", "Load Promotion navigation on PromotionUsage");
+        });
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IRealtimePublisher, NoOpRealtimePublisher>();
@@ -91,9 +100,9 @@ internal static class RevenueQueryChecks
             }
             else Console.WriteLine("PASS Scoped DI registration for IRevenueQueries");
         }
-        Console.WriteLine($"{6-failures.Count}/6 InMemory read-data checks passed; SQL locks/transactions not exercised.");
+        Console.WriteLine($"{7-failures.Count}/7 InMemory read-data checks passed; SQL locks/transactions not exercised.");
         if (failures.Count > 0) throw new InvalidOperationException(string.Join("; ", failures));
-        return 6;
+        return 7;
 
         async Task Check(string name, Func<ApplicationDbContext,Task> test)
         {

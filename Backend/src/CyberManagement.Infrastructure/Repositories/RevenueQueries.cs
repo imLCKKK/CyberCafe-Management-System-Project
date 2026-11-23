@@ -155,7 +155,8 @@ public sealed class RevenueQueries(ApplicationDbContext db) : IRevenueQueries
             (x.OrderId != null && orderIds.Contains(x.OrderId.Value))
             || (x.OrderDetailId != null && detailIds.Contains(x.OrderDetailId.Value)))
             .OrderBy(x => x.InvTransId).ToListAsync(ct);
-        var usages = await db.PromotionUsages.AsNoTracking().Where(x => orderIds.Contains(x.OrderId))
+        var usages = await db.PromotionUsages.AsNoTracking().Include(x => x.Promotion)
+            .Where(x => orderIds.Contains(x.OrderId))
             .OrderBy(x => x.PromotionUsageId).ToListAsync(ct);
 
         return new(payments.OrderBy(x => x.PaymentId).ToArray(), wallets.OrderBy(x => x.TransactionId).ToArray(),
