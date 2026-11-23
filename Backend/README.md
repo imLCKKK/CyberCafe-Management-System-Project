@@ -71,7 +71,7 @@ SQL/DBML được xuất lại từ EF; downgrade bị chặn nếu đã có l�
 Hóa đơn tiếp tục phát hành riêng qua module hóa đơn: checkout lưu Payment theo OrderId,
 ApplyFinancialChange cập nhật hóa đơn đã có cùng transaction, không tự phát hành hoặc thu thêm.
 Event OrderChanged/WalletChanged gửi sau commit tới nhóm được phép. UI đặt món thuộc S2-K-3,
-ZaloPay/giữ chỗ thuộc S2-K-2, hủy/hoàn tiền thuộc S3-K-1; các route đó chưa triển khai ở task này.
+ZaloPay/giữ chỗ được bổ sung ở S2-K-2 bên dưới; hủy/hoàn tiền thuộc S3-K-1.
 Adapter gateway SCRUM-22 từ chối tạo bill ZaloPay cho đơn đã chọn Cash/Wallet; phương thức đơn không đổi sau tạo.
 
 Kiểm tra SQL/API, harness chỉ tạo và dọn DB `CyberManagement_AuthChecks_<ngẫu nhiên>`:
@@ -83,12 +83,60 @@ $env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;Tru
 
 Contract: [004-order-checkout-contract.md](docs/004-order-checkout-contract.md).
 
+## S2-K-2: checkout ZaloPay và giữ chỗ
+
+Triển khai local trên base `f238d5f`, ngày 20/11/2026; backend CyberManagement, không đổi luồng Wallet/Cash.
+`POST /api/client/orders` và `/api/admin/orders` nhận thêm `paymentMethod: "ZaloPay"`.
+Nhân viên cần cả `order.create` và `payment.create`; khách phải dùng phiên Active của mình.
+Server snapshot giá/voucher, ghi Sale và usage như các phương thức khác. Đơn có tiền tạo
+`AwaitingPayment`, `ReservedUntilUtc` và Payment Pending với mã merchant bền vững trong cùng transaction.
+Hạn 15 phút cố định theo contract; `Checkout:ReservationMinutes` nếu cấu hình phải bằng `15`.
+Đơn 0 đồng dùng Pending/NotRequired, không có hạn giữ chỗ hay lời gọi provider.
+
+Sau commit mới gọi adapter ZaloPay. `OrderDto.payment` trả `paymentUrl`, `expiresAtUtc`, `paymentId`
+và `requiresReconciliation`. Provider chưa sẵn sàng/thiếu URL vẫn giữ đơn đã lưu; retry cùng key
+trả cùng đơn/hạn, không tạo bill mới. Client đọc lại GET khi đang chờ, không dùng redirect để đánh dấu Paid.
+URL không trả sau hạn; giao diện menu/giỏ tích hợp các trường này thuộc S2-K-3.
+
+`IOrderZaloPaySettlement.ApplyAsync(orderId)` là điểm nối server phía Order: tự đọc receipt bền vững
+của SCRUM-22, đối chiếu purpose, khách, đơn, merchant và số tiền. Callback/Query gọi điểm nối sau khi
+receipt commit; callback chỉ ACK thành công sau settlement/replay. Trong hạn chuyển Payment Succeeded,
+đơn về Pending để nhân viên nhận món; không trừ tồn/lượt lần hai hoặc ghi ví.
+
+`OrderCheckoutWorker` quét ngay khi startup và mỗi 15 giây, xử lý hết hạn/receipt còn chưa áp dụng.
+`OrderGatewayRecoveryWorker` phục hồi bước tạo bill bị gián đoạn trong vòng HTTP riêng để không chặn
+quét hết hạn. Worker query gateway tiếp tục đối soát cả intent Failed/Expired của đơn có giữ chỗ.
+Expiry và callback dùng chung khóa Customer → phiên liên quan → Order → Payment → Product → Promotion;
+trả từng dòng đúng một lần và giải phóng usage cùng transaction. Event OrderChanged chỉ gửi sau commit.
+
+Tiền xác minh tại/sau hạn vẫn được ghi nhận, đơn giữ Expired/Cancelled; tạo Refund Pending toàn khoản thu
+với ApprovedByEmployeeId/ApprovedAtUtc null và audit hệ thống. Không khôi phục món, không cộng ví, không
+tự gửi hoàn. API duyệt/gửi hoàn thuộc S3-K-1/S3-M-2; TopUp và nghiệm thu sandbox thật thuộc S2-M-3.
+Receipt đã lưu mà settlement lỗi được worker/callback retry phục hồi; không yêu cầu provider thu lại.
+Đơn lịch sử không có ReservedUntilUtc tiếp tục theo adapter cũ, không bị suy diễn thành reservation mới.
+
+Migration mới `20261120081752_AddZaloPayOrderReservations` thêm hạn giữ chỗ và cột duyệt hoàn nullable;
+giữ dữ liệu lịch sử, model 42 bảng/20 migration trên nền 35 bảng. Down bị chặn khi đã có lịch sử mới.
+Chỉ áp migration vào DB triển khai sau khi Trưởng nhóm xem xét; bộ kiểm tra tự tạo/dọn DB thử riêng:
+
+```powershell
+$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;TrustServerCertificate=True'
+dotnet build Backend/tests/CyberManagement.API.Checks --no-restore -m:1 -p:UseSharedCompilation=false
+dotnet run --no-build --project Backend/tests/CyberManagement.API.Checks -- --order-zalopay-only
+dotnet run --no-build --project Backend/tests/CyberManagement.API.Checks -- --orders-only
+dotnet run --no-build --project Backend/tests/CyberManagement.API.Checks -- --gateway-only
+```
+
+Suite mới dùng gateway fixture và SQL thật: xác minh deadline, giữ/trả tồn/lượt, retry, sai số tiền,
+callback không hợp lệ, Failed→Succeeded qua Query, thu muộn, rollback, worker startup và cạnh tranh.
+Đây chưa phải bằng chứng gọi/thanh toán ZaloPay sandbox chính thức hoặc hai máy LAN.
+
 ## SCRUM-22: adapter gateway và callback
 
 [Hợp đồng gateway](docs/007-zalopay-gateway-callbacks.md) mô tả API TopUp/Order, intent/receipt,
 HMAC/callback/Query, cấu hình secret và cách phân biệt fixture với gọi sandbox thật.
-Create lưu ID/số tiền trước HTTP; callback/Query ghi receipt chống lặp. Cộng ví, Payment nghiệp vụ,
-xác nhận Order và realtime hoàn tất thuộc S2-M-3; luồng tiền mặt SCRUM-21 giữ nguyên.
+Create lưu ID/số tiền trước HTTP; callback/Query ghi receipt chống lặp. S2-K-2 bổ sung điểm nối Order
+có giữ chỗ ở trên; cộng ví TopUp và nghiệm thu provider thật thuộc S2-M-3; luồng tiền mặt SCRUM-21 giữ nguyên.
 
 Từ repository root, chạy `.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --zalopay-gateway-checks`;
 chế độ SQL `--gateway-only` yêu cầu `AUTH_CHECKS_SQL_CONNECTION`

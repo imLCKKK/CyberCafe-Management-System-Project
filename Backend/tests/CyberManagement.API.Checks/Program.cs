@@ -24,6 +24,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
+if (args.Contains("--order-zalopay-only"))
+{
+    Console.WriteLine($"{await OrderZaloPayChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} order ZaloPay SQL/API checks passed (fixture gateway; no provider call).");
+    return;
+}
+
 if (args.Contains("--orders-only"))
 {
     Console.WriteLine($"{await OrderChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} order SQL/API checks passed.");

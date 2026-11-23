@@ -286,6 +286,7 @@ Table dbo.Orders {
   LastChangedAtUtc datetime2 [not null]
   OrderTime datetime2 [not null]
   PaymentMethod nvarchar(10) [null]
+  ReservedUntilUtc datetimeoffset [null]
   Status nvarchar(50) [not null]
   TotalAmount decimal(18,0) [not null]
   Version rowversion [not null]
@@ -296,6 +297,7 @@ Table dbo.Orders {
     (CustomerId) [name: 'IX_Orders_CustomerId']
     (EmployeeId) [name: 'IX_Orders_EmployeeId']
     (GamingSessionId) [name: 'IX_Orders_GamingSessionId']
+    (Status, ReservedUntilUtc) [name: 'IX_Orders_Status_ReservedUntilUtc']
   }
 }
 Table dbo.OrderStatusHistory {
@@ -317,6 +319,8 @@ Table dbo.OrderStatusHistory {
 Table dbo.Payments {
   PaymentId int [not null, pk, increment]
   Amount decimal(18,0) [not null]
+  ApprovedAtUtc datetimeoffset [null]
+  ApprovedByEmployeeId int [null]
   ConfirmedAt datetimeoffset [null]
   CreatedAt datetimeoffset [not null]
   GatewayTransactionId nvarchar(50) [null]
@@ -336,6 +340,7 @@ Table dbo.Payments {
   Type nvarchar(10) [not null]
   WalletTransactionId int [null]
   indexes {
+    (ApprovedByEmployeeId) [name: 'IX_Payments_ApprovedByEmployeeId']
     (InvoiceId) [name: 'IX_Payments_InvoiceId']
     (Method, GatewayTransactionId) [name: 'IX_Payments_Method_GatewayTransactionId', unique]
     (Method, MerchantTransactionId) [name: 'IX_Payments_Method_MerchantTransactionId', unique]
@@ -651,6 +656,7 @@ Ref: dbo.Orders.(GamingSessionId) > dbo.GamingSessions.(GamingSessionId)
 Ref: dbo.OrderStatusHistory.(ChangedBy) > dbo.Employees.(EmployeeId)
 Ref: dbo.OrderStatusHistory.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)
 Ref: dbo.OrderStatusHistory.(OrderId) > dbo.Orders.(OrderId)
+Ref: dbo.Payments.(ApprovedByEmployeeId) > dbo.Employees.(EmployeeId)
 Ref: dbo.Payments.(InvoiceId) > dbo.Invoices.(InvoiceId)
 Ref: dbo.Payments.(OrderDetailId) > dbo.OrderDetails.(OrderDetailId)
 Ref: dbo.Payments.(OrderId) > dbo.Orders.(OrderId)

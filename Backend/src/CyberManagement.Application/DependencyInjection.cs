@@ -20,6 +20,8 @@ namespace CyberManagement.Application
             services.AddScoped<ITournamentService, TournamentService>();
             services.AddScoped<CounterTopUpService>();
             services.AddScoped<OrderService>();
+            services.AddSingleton(TimeProvider.System);
+            services.AddScoped<IOrderZaloPaySettlement, OrderZaloPaySettlement>();
             services.AddScoped<IVoucherService, VoucherService>();
             services.AddScoped<IRequestValidator<LoginCommand>, LoginCommandValidator>();
             services.AddScoped<IRequestValidator<CustomerLoginCommand>, CustomerLoginCommandValidator>();

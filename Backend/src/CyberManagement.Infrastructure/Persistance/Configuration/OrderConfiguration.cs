@@ -20,6 +20,7 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(x => x.ActorType).HasMaxLength(10).IsRequired();
         builder.Property(x => x.PaymentMethod).HasMaxLength(10);
         builder.Property(x => x.Version).IsRowVersion();
+        builder.HasIndex(x => new { x.Status, x.ReservedUntilUtc });
         builder.ToTable("Orders", t =>
         {
             t.HasCheckConstraint("CK_Orders_CheckoutMethod", "[PaymentMethod] IS NULL OR [PaymentMethod] IN ('Wallet','Cash','ZaloPay')");

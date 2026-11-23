@@ -8,9 +8,9 @@ using CyberManagement.Domain.Entities;
 
 namespace CyberManagement.Application.Services;
 
-// SCRUM-22 persists verified gateway receipts. S2-M-3 owns business settlement of those receipts.
+// SCRUM-22 persists verified receipts; S2-K-2 consumes Order receipts. TopUp settlement belongs to S2-M-3.
 public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, IZaloPayGateway gateway,
-    TimeProvider clock) : IZaloPayPaymentService
+    TimeProvider clock, IOrderZaloPaySettlement? orderSettlement = null) : IZaloPayPaymentService
 {
     public async Task<ZaloPayIntentDto> CreateTopUpAsync(int customerId, decimal amountVnd, Guid requestKey, CancellationToken cancellationToken)
     {
@@ -78,7 +78,10 @@ public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, I
             || callback.AppTime != saved.CreatedAtUtc.ToUnixTimeMilliseconds()
             || callback.AmountVnd != saved.ExpectedAmountVnd) return 2;
         if (saved.Status == "Succeeded")
+        {
+            await SettleOrderAsync(saved, cancellationToken);
             return saved.ProviderTransactionId == callback.TransactionId && saved.ProviderAmountVnd == callback.AmountVnd ? 1 : 2;
+        }
 
         var lease = await repository.AcquireQueryAsync(saved.IntentId, clock.GetUtcNow(), cancellationToken);
         if (!lease.Acquired || lease.Token is null) return 0;
@@ -93,6 +96,7 @@ public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, I
         var confirmation = await repository.RecordReceiptAsync(saved.IntentId, lease.Token.Value,
             receipt,
             clock.GetUtcNow(), cancellationToken);
+        await SettleOrderAsync(confirmation.Intent, cancellationToken);
         if (!matches) return 2;
         return confirmation.Intent.Status == "Succeeded"
             && confirmation.Intent.ProviderTransactionId == callback.TransactionId ? 1 : 0;
@@ -122,9 +126,15 @@ public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, I
             }
             return await repository.SaveQueryResultAsync(intentId, lease.Token.Value, response, clock.GetUtcNow(), cancellationToken);
         }
-        return (await repository.RecordReceiptAsync(intentId, lease.Token.Value, response.Receipt,
+        var result = (await repository.RecordReceiptAsync(intentId, lease.Token.Value, response.Receipt,
             clock.GetUtcNow(), cancellationToken)).Intent;
+        await SettleOrderAsync(result, cancellationToken);
+        return result;
     }
+
+    private Task SettleOrderAsync(ZaloPayIntent intent, CancellationToken ct) =>
+        intent is { Purpose: "Order", OrderId: int id, Status: "Succeeded" } && orderSettlement is not null
+            ? orderSettlement.ApplyAsync(id, ct) : Task.CompletedTask;
 
     private void RequireEnabled()
     {

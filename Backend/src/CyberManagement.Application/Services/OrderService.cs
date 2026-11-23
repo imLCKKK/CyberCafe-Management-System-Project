@@ -16,21 +16,22 @@ namespace CyberManagement.Application.Services;
 
 public sealed class OrderService(IOrderRepository repository, IInventoryRepository products,
     IInventoryService inventory, IVoucherService vouchers, IWalletLedgerWriter wallet,
-    ISessionSettlement settlement, IInvoiceService invoices, IRealtimePublisher realtime)
+    ISessionSettlement settlement, IInvoiceService invoices, IRealtimePublisher realtime,
+    TimeProvider clock, IOrderZaloPaySettlement orderPayments, IZaloPayPaymentService? gateway = null)
 {
     public async Task<OrderResult> CreateAsync(OrderActor actor, StaffCreateOrderRequest request,
         string key, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         await AuthorizeAsync(actor, "order.create", ct);
-        if (actor.Type == "Staff" && request.PaymentMethod == "Wallet")
+        if (actor.Type == "Staff" && request.PaymentMethod is "Wallet" or "ZaloPay")
             await repository.AuthorizeAsync(actor, "payment.create", ct);
         if (actor.Type == "Customer" && request.CustomerId != actor.Id) throw new UnauthorizedAccessException();
         Positive(request.CustomerId);
         if (actor.Type == "Customer" && request.GamingSessionId is null) throw Invalid("Khách phải chọn phiên đang hoạt động.");
         if (request.GamingSessionId is <= 0) throw Invalid("Mã phiên không hợp lệ.");
-        if (request.PaymentMethod is not ("Wallet" or "Cash"))
-            throw Invalid("S2-K-1 hỗ trợ Wallet/Cash; checkout ZaloPay thuộc S2-K-2.");
+        if (request.PaymentMethod is not ("Wallet" or "Cash" or "ZaloPay"))
+            throw Invalid("Phương thức thanh toán không hợp lệ.");
         if (request.Items is null || request.Items.Count is < 1 or > 100
             || request.Items.Any(x => x is null || x.ProductId <= 0 || x.Quantity is < 1 or > 99)
             || request.Items.Select(x => x.ProductId).Distinct().Count() != request.Items.Count)
@@ -48,7 +49,7 @@ public sealed class OrderService(IOrderRepository repository, IInventoryReposito
             if (customer.Status != "Active") throw Conflict("CustomerLocked", "Khách hàng không hoạt động.");
             if (request.PaymentMethod == "Wallet") await repository.LockWalletSourcesAsync(customer.CustomerId, ct);
             await repository.ValidateSessionAsync(customer.CustomerId, request.GamingSessionId, ct);
-            var now = DateTime.UtcNow;
+            var now = clock.GetUtcNow().UtcDateTime;
             // Flush source IDs inside the transaction before downstream writers use them.
             var order = new Order { CustomerId = customer.CustomerId, EmployeeId = actor.EmployeeId,
                 ActorType = actor.Type, PaymentMethod = request.PaymentMethod, GamingSessionId = request.GamingSessionId,
@@ -88,6 +89,16 @@ public sealed class OrderService(IOrderRepository repository, IInventoryReposito
                     throw Conflict(error.Message.Contains("lượt", StringComparison.Ordinal) ? "VoucherLimitExceeded" : "VoucherInvalid", error.Message);
                 }
             }
+            if (order.TotalAmount > 0 && request.PaymentMethod == "ZaloPay")
+            {
+                order.Status = "AwaitingPayment";
+                order.ReservedUntilUtc = new DateTimeOffset(now).AddMinutes(15);
+                order.StatusHistory.Single().NewStatus = order.Status;
+                repository.AddPayment(new Payment { OrderId = order.OrderId, Amount = order.TotalAmount,
+                    Method = "ZaloPay", Status = "Pending", OperationKey = $"OrderPayment:{order.OrderId}",
+                    MerchantTransactionId = new DateTimeOffset(now).ToOffset(TimeSpan.FromHours(7)).ToString("yyMMdd", CultureInfo.InvariantCulture)
+                        + "_" + Guid.NewGuid().ToString("N"), CreatedAt = now });
+            }
             if (order.TotalAmount > 0 && request.PaymentMethod == "Wallet")
             {
                 await settlement.BeforeWalletDebitAsync(customer.CustomerId, now, ct);
@@ -109,7 +120,36 @@ public sealed class OrderService(IOrderRepository repository, IInventoryReposito
             return new OrderResult(await repository.ReadAsync(order.OrderId, Owner(actor), ct), false);
         }, ct);
         await PublishAsync(result, request.PaymentMethod == "Wallet", ct);
+        if (request.PaymentMethod == "ZaloPay" && result.Order.Status == "AwaitingPayment")
+        {
+            await StartGatewayAsync(result.Order.Id, ct);
+            result = result with { Order = await repository.ReadAsync(result.Order.Id, Owner(actor), ct) };
+        }
         return result;
+    }
+
+    // Called only after the order transaction commits. A durable order survives unavailable HTTP/provider.
+    public async Task StartGatewayAsync(int orderId, CancellationToken ct)
+    {
+        if (gateway is null) return;
+        var order = await repository.ReadAsync(orderId, null, ct);
+        if (order.Status != "AwaitingPayment" || order.Payment.ExpiresAtUtc <= clock.GetUtcNow()) return;
+        try
+        {
+            var intent = await repository.GatewayIntentAsync(orderId, ct);
+            if (intent is null)
+            {
+                var key = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes($"OrderPayment:{orderId}"))[..16]);
+                await gateway.CreateOrderAsync(order.CustomerId, orderId, key, ct);
+            }
+            else if (intent.PaymentUrl is null && intent.Status == "Pending")
+                await gateway.SyncOwnAsync(order.CustomerId, intent.IntentId, ct);
+            await orderPayments.ApplyAsync(orderId, ct);
+        }
+        catch (PaymentUnavailableException) { /* Saved intent is retried by the worker. */ }
+        catch (BusinessRuleException) { /* Concurrent intent creation/expiry: read the saved state. */ }
+        catch (HttpRequestException) { /* Outcome unknown; recovery queries the original merchant ID. */ }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { }
     }
 
     public async Task<OrderDto> GetAsync(OrderActor actor, int orderId, CancellationToken ct = default)
