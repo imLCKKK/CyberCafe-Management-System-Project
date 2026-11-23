@@ -44,13 +44,24 @@ public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, I
         if (customerId <= 0 || key == Guid.Empty) throw new ValidationException("Khách hàng và khóa yêu cầu không hợp lệ.");
         var creation = await repository.CreateAsync(customerId, purpose, orderId, amountVnd, key,
             gateway.AppId, clock.GetUtcNow(), cancellationToken);
-        if (!creation.Created) return ToDto(await ApplyVerifiedAsync(creation.Intent, cancellationToken));
-        var intent = creation.Intent;
+        if (!creation.Created)
+            return ToDto(NeedsCreateRecovery(creation.Intent)
+                ? await SyncAsync(creation.Intent.IntentId, cancellationToken)
+                : await ApplyVerifiedAsync(creation.Intent, cancellationToken));
+        var lease = await repository.AcquireCreateAsync(creation.Intent.IntentId, clock.GetUtcNow(), null, cancellationToken);
+        if (!lease.Acquired || lease.Token is null) return ToDto(await ApplyVerifiedAsync(lease.Intent, cancellationToken));
+        return ToDto(await SendCreateAsync(lease, cancellationToken));
+    }
+
+    private async Task<ZaloPayIntent> SendCreateAsync(GatewayCreateLease lease, CancellationToken cancellationToken)
+    {
+        var intent = lease.Intent;
         // The intent, source and merchant ID are durable before HTTP; no SQL transaction crosses this call.
         var response = await gateway.CreateAsync(new GatewayCreateRequest(intent.IntentId, intent.Purpose,
             intent.CustomerId, intent.OrderId, intent.ProviderAppId, intent.MerchantTransactionId,
             intent.ExpectedAmountVnd, intent.CreatedAtUtc, intent.ExpiresAtUtc), cancellationToken);
-        return ToDto(await ApplyVerifiedAsync(await repository.SaveCreateResultAsync(intent.IntentId, response, cancellationToken), cancellationToken));
+        return await ApplyVerifiedAsync(await repository.SaveCreateResultAsync(intent.IntentId, lease.Token!.Value,
+            response, clock.GetUtcNow(), cancellationToken), cancellationToken);
     }
 
     public async Task<ZaloPayIntentDto> GetOwnAsync(int customerId, int intentId, CancellationToken cancellationToken)
@@ -79,9 +90,15 @@ public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, I
             || callback.AppUser != "customer:" + saved.CustomerId.ToString(CultureInfo.InvariantCulture)
             || callback.AppTime != saved.CreatedAtUtc.ToUnixTimeMilliseconds()
             || callback.AmountVnd != saved.ExpectedAmountVnd) return 2;
+        if (saved.FailureReason == "CallbackReceiptMismatch") return 2;
         if (saved.Status == "Succeeded")
         {
-            if (saved.ProviderTransactionId != callback.TransactionId || saved.ProviderAmountVnd != callback.AmountVnd) return 2;
+            if (saved.ProviderTransactionId != callback.TransactionId || saved.ProviderAmountVnd != callback.AmountVnd)
+            {
+                if (saved.AppliedAtUtc is null)
+                    await repository.RecordCallbackMismatchAsync(saved.IntentId, null, clock.GetUtcNow(), cancellationToken);
+                return 2;
+            }
             return Acknowledge(await ApplyVerifiedAsync(saved, cancellationToken));
         }
 
@@ -94,12 +111,15 @@ public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, I
             await repository.SaveQueryResultAsync(saved.IntentId, lease.Token.Value, query, clock.GetUtcNow(), cancellationToken);
             return 0;
         }
-        var matches = receipt.TransactionId == callback.TransactionId && receipt.AmountVnd == callback.AmountVnd;
+        if (receipt.TransactionId != callback.TransactionId || receipt.AmountVnd != callback.AmountVnd)
+        {
+            await repository.RecordCallbackMismatchAsync(saved.IntentId, lease.Token.Value, clock.GetUtcNow(), cancellationToken);
+            return 2;
+        }
         var confirmation = await repository.RecordReceiptAsync(saved.IntentId, lease.Token.Value,
             receipt,
             clock.GetUtcNow(), cancellationToken);
         var applied = await ApplyVerifiedAsync(confirmation.Intent, cancellationToken);
-        if (!matches) return 2;
         return applied.Status == "Succeeded" && applied.ProviderTransactionId == callback.TransactionId ? Acknowledge(applied) : 0;
     }
 
@@ -118,13 +138,28 @@ public sealed class ZaloPayPaymentService(IZaloPayIntentRepository repository, I
         if (!lease.Acquired || lease.Token is null) return await ApplyVerifiedAsync(lease.Intent, cancellationToken);
         var response = await gateway.QueryAsync(lease.Intent.ProviderAppId, lease.Intent.MerchantTransactionId, cancellationToken);
         if (response.Receipt is null)
+        {
+            // Only a definitive NotFound authorizes resending this same saved bill.
+            // Keep the exclusive lease across Query and recovery Create.
+            if (response.State == "NotFound" && NeedsCreateRecovery(lease.Intent))
+            {
+                var create = await repository.AcquireCreateAsync(intentId, clock.GetUtcNow(), lease.Token, cancellationToken);
+                return create.Acquired && create.Token is not null
+                    ? await SendCreateAsync(create, cancellationToken) : create.Intent;
+            }
             return await repository.SaveQueryResultAsync(intentId, lease.Token.Value, response, clock.GetUtcNow(), cancellationToken);
+        }
         return await ApplyVerifiedAsync((await repository.RecordReceiptAsync(intentId, lease.Token.Value, response.Receipt,
             clock.GetUtcNow(), cancellationToken)).Intent, cancellationToken);
     }
 
     private async Task<ZaloPayIntent> ApplyVerifiedAsync(ZaloPayIntent intent, CancellationToken cancellationToken) =>
-        intent.Status == "Succeeded" ? (await settlements.ApplyAsync(intent.IntentId, cancellationToken)).Intent : intent;
+        intent.Status == "Succeeded" && intent.FailureReason != "CallbackReceiptMismatch"
+            ? (await settlements.ApplyAsync(intent.IntentId, cancellationToken)).Intent : intent;
+
+    private static bool NeedsCreateRecovery(ZaloPayIntent intent) => intent.Status == "Pending"
+        && intent.PaymentUrl is null && intent.ProviderTransactionId is null
+        && intent.FailureReason != "CallbackReceiptMismatch";
 
     private static int Acknowledge(ZaloPayIntent intent) => intent.AppliedAtUtc is not null || intent.RequiresReconciliation ? 1 : 0;
 

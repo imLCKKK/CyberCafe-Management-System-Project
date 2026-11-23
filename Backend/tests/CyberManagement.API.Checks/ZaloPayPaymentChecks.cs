@@ -25,12 +25,14 @@ internal sealed class GatewayChecksGateway(IServiceScopeFactory scopes) : IZaloP
     private readonly HttpClient unusedHttp = new(new NoNetwork());
     private readonly ConcurrentDictionary<string, GatewayQueryResult> results = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, GatewayCreateRequest> requests = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, int> merchantQueries = new(StringComparer.Ordinal);
     private int creates;
     private int queries;
     public bool Enabled { get; set; } = true;
     public int AppId => 2553;
     public int CreateCount => Volatile.Read(ref creates);
     public int QueryCount => Volatile.Read(ref queries);
+    public int QueryCountFor(string merchantId) => merchantQueries.GetValueOrDefault(merchantId);
     public int RejectNextCreate;
     public int UnknownNextCreate;
     public Func<GatewayCreateRequest, Task>? OnCreate;
@@ -69,6 +71,7 @@ internal sealed class GatewayChecksGateway(IServiceScopeFactory scopes) : IZaloP
     public async Task<GatewayQueryResult> QueryAsync(int appId, string merchantTransactionId, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref queries);
+        merchantQueries.AddOrUpdate(merchantTransactionId, 1, (_, count) => count + 1);
         if (appId != AppId) throw new InvalidOperationException("Query must use the intent's saved merchant app.");
         if (OnQuery is { } hook) await hook(merchantTransactionId);
         return results.GetValueOrDefault(merchantTransactionId) ?? new("Pending", null, null);
@@ -117,6 +120,7 @@ internal static class ZaloPayPaymentChecks
         var (_, otherToken) = await CreateCustomer("0782200002", "Other gateway owner");
         var (lockedId, lockedToken) = await CreateCustomer("0782200003", "Locked gateway owner");
         await SetCustomerStatus(lockedId, "Locked");
+        await RunCreateRecoveryChecks();
 
         await Expect("Anonymous cannot create a gateway TopUp", HttpStatusCode.Unauthorized,
             await Post(own + "/topups", null, new { amountVnd = 10000 }, Guid.NewGuid().ToString()));
@@ -175,6 +179,40 @@ internal static class ZaloPayPaymentChecks
             await Post(own + "/orders/" + orderId, token, new { }, Guid.NewGuid().ToString()));
         await Expect("Order source ownership is checked on the server", HttpStatusCode.NotFound,
             await Post(own + "/orders/" + orderId, otherToken, new { }, Guid.NewGuid().ToString()));
+
+        var legacyPending = await CreateOrder(owner, 43211, "Pending");
+        var createsAtLegacy = gateway.CreateCount;
+        await Expect("Legacy Pending Order cannot create a ZaloPay bill outside checkout", HttpStatusCode.Conflict,
+            await Post(own + "/orders/" + legacyPending, token, new { }, Guid.NewGuid().ToString()));
+        await using (var scope = app.Services.CreateAsyncScope())
+            Check("Rejected Pending Order creates neither an intent nor provider payment", gateway.CreateCount == createsAtLegacy
+                && !await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Set<ZaloPayIntent>()
+                    .AnyAsync(row => row.OrderId == legacyPending));
+
+        var switchedPendingId = await CreateOrder(owner, 43212);
+        var switchedPendingKey = Guid.NewGuid().ToString();
+        ZaloPayIntentDto switchedIntent;
+        using (var response = await Post(own + "/orders/" + switchedPendingId, token, new { }, switchedPendingKey))
+            switchedIntent = await Body(response);
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            (await db.Orders.SingleAsync(row => row.OrderId == switchedPendingId)).Status = "Pending";
+            await db.SaveChangesAsync();
+        }
+        var createsBeforeSwitchedReplay = gateway.CreateCount;
+        await Expect("Same-key replay cannot expose an unpaid Order URL after its source changes to Pending", HttpStatusCode.Conflict,
+            await Post(own + "/orders/" + switchedPendingId, token, new { }, switchedPendingKey));
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var saved = await db.Set<ZaloPayIntent>().AsNoTracking().SingleAsync(row => row.IntentId == switchedIntent.Id);
+            Check("Rejected switched-source replay preserves one unpaid intent without a provider retry", gateway.CreateCount == createsBeforeSwitchedReplay
+                && saved.MerchantTransactionId == switchedIntent.MerchantTransactionId && saved.PaymentUrl == switchedIntent.PaymentUrl
+                && saved.Status == "Pending" && saved.ProviderTransactionId is null && saved.AppliedAtUtc is null
+                && !await db.Payments.AnyAsync(row => row.OrderId == switchedPendingId)
+                && !await db.WalletTransactions.AnyAsync(row => row.CustomerId == owner));
+        }
 
         // Creation failures are classified without pretending that a timeout means no provider order exists.
         gateway.UnknownNextCreate = 1;
@@ -312,6 +350,7 @@ internal static class ZaloPayPaymentChecks
                 request.CreatedAtUtc, request.ExpiresAtUtc, null, null, null, false, null);
             var receipt = ProviderId();
             gateway.Set(request.MerchantTransactionId, Paid(pending, receipt));
+            await ExpireLease(request.IntentId);
             using var response = await Post(callbackPath, null, Callback(pending, receipt));
             if (await Code(response) != 1) throw new InvalidOperationException("Early callback fixture was not durably recorded.");
         };
@@ -322,7 +361,8 @@ internal static class ZaloPayPaymentChecks
         var orderedProvider = ProviderId();
         gateway.Set(orderIntent.MerchantTransactionId, Paid(orderIntent, orderedProvider));
         var orderPaid = await Sync(orderIntent.Id);
-        Check("Order uses the same receipt route and matching server amount", orderPaid.Status == "Succeeded" && orderPaid.ProviderAmountVnd == 43210);
+        Check("AwaitingPayment Order uses the receipt route without OrderClosed reconciliation", orderPaid.Status == "Succeeded"
+            && orderPaid.ProviderAmountVnd == 43210 && !orderPaid.RequiresReconciliation && orderPaid.FailureReason is null);
         var closedOrderId = await CreateOrder(owner, 22011);
         using var closedOrderResponse = await Post(own + "/orders/" + closedOrderId, token, new { }, Guid.NewGuid().ToString());
         var closedOrderIntent = await Body(closedOrderResponse);
@@ -347,8 +387,8 @@ internal static class ZaloPayPaymentChecks
                     && entry.Amount == row.ExpectedAmountVnd && entry.SourceType == "ZaloPayTopUp"))
                 && await db.Customers.Where(row => row.CustomerId == owner).Select(row => row.WalletBalance).SingleAsync()
                     == expectedCredits.Sum(row => row.ExpectedAmountVnd));
-            Check("Unregistered legacy Order stays unpaid while retaining its gateway receipt", await db.Orders.Where(row => row.OrderId == orderId)
-                .Select(row => row.Status).SingleAsync() == "Pending" && !await db.Payments.AnyAsync(row => row.OrderId == orderId));
+            Check("Unregistered checkout Order waits for its canonical Payment while retaining the receipt", await db.Orders.Where(row => row.OrderId == orderId)
+                .Select(row => row.Status).SingleAsync() == "AwaitingPayment" && !await db.Payments.AnyAsync(row => row.OrderId == orderId));
             Check("Late gateway money never resurrects a cancelled Order", await db.Orders.Where(row => row.OrderId == closedOrderId)
                 .Select(row => row.Status).SingleAsync() == "Cancelled");
         }
@@ -362,6 +402,306 @@ internal static class ZaloPayPaymentChecks
         }
         finally { gateway.Enabled = true; gateway.OnQuery = null; gateway.OnCreate = null; }
         return checks;
+
+        async Task RunCreateRecoveryChecks()
+        {
+            var (recoveryOwner, recoveryToken) = await CreateCustomer("0782200004", "Create recovery owner");
+            var recoveryIds = new List<int>();
+            var key = Guid.NewGuid();
+            var unsent = await SeedUnsent("TopUp", null, 23001, key);
+            gateway.Set(unsent.MerchantTransactionId, new("NotFound", null, null));
+            var before = gateway.CreateCount;
+            using (var response = await Post(own + "/topups", recoveryToken, new { amountVnd = 23001 }, key.ToString()))
+            {
+                var resumed = await Body(response);
+                Check("Retry recovers an intent committed before the first Create HTTP", resumed.PaymentUrl is not null
+                    && resumed.Status == "Pending" && gateway.CreateCount == before + 1);
+                SameSnapshot("Recovered Create reuses merchant, amount, app_time and expiry", unsent, resumed);
+                var sent = gateway.Requests.Single(row => row.IntentId == unsent.Id);
+                Check("Recovery sends the persisted Create parameters without extending the payment window",
+                    sent.MerchantTransactionId == unsent.MerchantTransactionId && sent.AmountVnd == unsent.ExpectedAmountVnd
+                    && sent.CreatedAtUtc == unsent.CreatedAtUtc && sent.ExpiresAtUtc == unsent.ExpiresAtUtc);
+            }
+            await ParkRecoveryRows();
+
+            var raceKey = Guid.NewGuid();
+            var racingUnsent = await SeedUnsent("TopUp", null, 23002, raceKey);
+            gateway.Set(racingUnsent.MerchantTransactionId, new("NotFound", null, null));
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            gateway.OnCreate = async request =>
+            {
+                if (request.IntentId != racingUnsent.Id) return;
+                entered.TrySetResult();
+                await release.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            };
+            var createsAtRace = gateway.CreateCount;
+            var first = Post(own + "/topups", recoveryToken, new { amountVnd = 23002 }, raceKey.ToString());
+            try
+            {
+                await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                using (var second = await Post(own + "/topups", recoveryToken, new { amountVnd = 23002 }, raceKey.ToString()))
+                {
+                    var duringCreate = await Body(second);
+                    SameSnapshot("Concurrent retry observes the same recoverable intent", racingUnsent, duringCreate);
+                    Check("Concurrent retry does not send a second Create while HTTP is running", gateway.CreateCount == createsAtRace + 1);
+                }
+                await Reconcile();
+                Check("Worker shares the Create lease with an in-flight request", gateway.CreateCount == createsAtRace + 1);
+            }
+            finally { release.TrySetResult(); gateway.OnCreate = null; }
+            using (var response = await first)
+                Check("Winning recovery saves one checkout URL after concurrent retries", (await Body(response)).PaymentUrl is not null);
+            await using (var scope = app.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                Check("Concurrent recovery leaves one durable intent and releases its lease", await db.Set<ZaloPayIntent>()
+                    .CountAsync(row => row.MerchantTransactionId == racingUnsent.MerchantTransactionId) == 1
+                    && await db.Set<ZaloPayIntent>().Where(row => row.IntentId == racingUnsent.Id)
+                        .AllAsync(row => row.QueryLeaseToken == null && row.QueryLeaseUntilUtc == null));
+            }
+            await ParkRecoveryRows();
+
+            var fenced = await SeedUnsent("TopUp", null, 23006, Guid.NewGuid());
+            Guid staleCreateToken;
+            await using (var scope = app.Services.CreateAsyncScope())
+            {
+                var lease = await scope.ServiceProvider.GetRequiredService<IZaloPayIntentRepository>()
+                    .AcquireCreateAsync(fenced.Id, DateTimeOffset.UtcNow, null, CancellationToken.None);
+                staleCreateToken = lease.Token ?? throw new InvalidOperationException("Create fence fixture could not claim its first lease.");
+            }
+            await ExpireLease(fenced.Id);
+            await using (var scope = app.Services.CreateAsyncScope())
+            {
+                var repository = scope.ServiceProvider.GetRequiredService<IZaloPayIntentRepository>();
+                var queryLease = await repository.AcquireQueryAsync(fenced.Id, DateTimeOffset.UtcNow, CancellationToken.None);
+                var current = await repository.AcquireCreateAsync(fenced.Id, DateTimeOffset.UtcNow, queryLease.Token, CancellationToken.None);
+                var currentToken = current.Token ?? throw new InvalidOperationException("Create fence fixture could not promote its recovery lease.");
+                var stale = await repository.SaveCreateResultAsync(fenced.Id, staleCreateToken,
+                    new("https://qcgateway.zalopay.vn/openinapp?order=fixture-stale", false, null), DateTimeOffset.UtcNow, CancellationToken.None);
+                Check("A stale Create result cannot publish a URL or release the replacement lease", stale.PaymentUrl is null
+                    && stale.QueryLeaseToken == currentToken && stale.QueryLeaseUntilUtc > DateTimeOffset.UtcNow);
+                var winner = await repository.SaveCreateResultAsync(fenced.Id, currentToken,
+                    new("https://qcgateway.zalopay.vn/openinapp?order=fixture-current", false, null), DateTimeOffset.UtcNow, CancellationToken.None);
+                var lateRejection = await repository.SaveCreateResultAsync(fenced.Id, staleCreateToken,
+                    new(null, true, "ProviderRejected"), DateTimeOffset.UtcNow, CancellationToken.None);
+                Check("The current Create response commits its URL and clears its lease", winner.PaymentUrl is not null
+                    && winner.QueryLeaseToken is null && winner.QueryLeaseUntilUtc is null);
+                Check("A stale rejection cannot downgrade the winning checkout URL", lateRejection.Status == "Pending"
+                    && lateRejection.PaymentUrl == "https://qcgateway.zalopay.vn/openinapp?order=fixture-current"
+                    && lateRejection.FailureReason is null && !lateRejection.RequiresReconciliation);
+            }
+            await ParkRecoveryRows();
+
+            var workerOrderId = await CreateOrder(recoveryOwner, 23003);
+            var workerOrderKey = Guid.NewGuid();
+            var workerOrder = await SeedUnsent("Order", workerOrderId, null, workerOrderKey);
+            gateway.Set(workerOrder.MerchantTransactionId, new("NotFound", null, null));
+            before = gateway.CreateCount;
+            await MakeDue(workerOrder.Id);
+            await Reconcile();
+            var orderResumed = await ReadRecovery(workerOrder.Id);
+            Check("Worker restores a checkout URL for an unsent AwaitingPayment Order", orderResumed.PaymentUrl is not null
+                && gateway.CreateCount == before + 1);
+            SameSnapshot("Worker recovery preserves the Order's source and original payment window", workerOrder, orderResumed);
+            using (var response = await Post(own + "/orders/" + workerOrderId, recoveryToken, new { }, workerOrderKey.ToString()))
+                Check("Order retry reads the recovered bill rather than opening another", (await Body(response)).Id == workerOrder.Id
+                    && gateway.CreateCount == before + 1);
+            await ParkRecoveryRows();
+
+            foreach (var invalidSource in new[] { "Cancelled", "ChangedAmount" })
+            {
+                var changedId = await CreateOrder(recoveryOwner, 23007);
+                var changedKey = Guid.NewGuid();
+                var changed = await SeedUnsent("Order", changedId, null, changedKey);
+                await using (var scope = app.Services.CreateAsyncScope())
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    var source = await db.Orders.SingleAsync(row => row.OrderId == changedId);
+                    if (invalidSource == "Cancelled") source.Status = "Cancelled";
+                    else source.TotalAmount++;
+                    await db.SaveChangesAsync();
+                }
+                gateway.Set(changed.MerchantTransactionId, new("NotFound", null, null));
+                before = gateway.CreateCount;
+                ZaloPayIntentDto stopped;
+                if (invalidSource == "Cancelled")
+                {
+                    await Expect("Cancelled Order same-key replay is rejected before provider HTTP", HttpStatusCode.Conflict,
+                        await Post(own + "/orders/" + changedId, recoveryToken, new { }, changedKey.ToString()));
+                    await MakeDue(changed.Id);
+                    await Reconcile();
+                    stopped = await ReadRecovery(changed.Id);
+                }
+                else
+                {
+                    using var response = await Post(own + "/orders/" + changedId, recoveryToken, new { }, changedKey.ToString());
+                    stopped = await Body(response);
+                }
+                Check("Create recovery rechecks " + invalidSource + " Order before HTTP", gateway.CreateCount == before
+                    && stopped.PaymentUrl is null && stopped.RequiresReconciliation && stopped.FailureReason == "CreateSourceChanged");
+                SameSnapshot("Invalid source recovery preserves its original intent for reconciliation", changed, stopped);
+                await ParkRecoveryRows();
+            }
+
+            var uncertainKey = Guid.NewGuid();
+            gateway.UnknownNextCreate = 1;
+            var uncertain = await CreateRecoveryTopUp(23004, uncertainKey.ToString());
+            recoveryIds.Add(uncertain.Id);
+            var uncertainCreates = gateway.CreateCount;
+            foreach (var observation in new[] { new GatewayQueryResult("Unavailable", null, "QueryUnavailable"), new GatewayQueryResult("Pending", null, null) })
+            {
+                gateway.Set(uncertain.MerchantTransactionId, observation);
+                using var response = await Post(own + "/topups", recoveryToken, new { amountVnd = 23004 }, uncertainKey.ToString());
+                var held = await Body(response);
+                SameSnapshot("An uncertain provider observation preserves the original bill", uncertain, held);
+                Check("Pending or unavailable Query cannot authorize another Create", gateway.CreateCount == uncertainCreates
+                    && held.PaymentUrl is null && held.VerifiedAtUtc is null && held.Status == "Pending");
+            }
+            gateway.Set(uncertain.MerchantTransactionId, new("NotFound", null, null));
+            using (var response = await Post(own + "/topups", recoveryToken, new { amountVnd = 23004 }, uncertainKey.ToString()))
+            {
+                var foundMissing = await Body(response);
+                Check("Confirmed NotFound resumes an ambiguous Create with the same bill", foundMissing.PaymentUrl is not null
+                    && gateway.CreateCount == uncertainCreates + 1);
+                SameSnapshot("NotFound recovery never replaces merchant or extends expiry", uncertain, foundMissing);
+            }
+            await ParkRecoveryRows();
+
+            ZaloPayIntentDto? callbackDuringCreate = null;
+            var earlyProvider = ProviderId();
+            gateway.OnCreate = async request =>
+            {
+                gateway.OnCreate = null;
+                callbackDuringCreate = new(request.IntentId, request.CustomerId, request.Purpose,
+                    request.OrderId ?? request.IntentId, request.AmountVnd, "Pending", null, request.MerchantTransactionId,
+                    request.CreatedAtUtc, request.ExpiresAtUtc, null, null, null, false, null);
+                gateway.Set(request.MerchantTransactionId, Paid(callbackDuringCreate, earlyProvider));
+                using var response = await Post(callbackPath, null, Callback(callbackDuringCreate, earlyProvider));
+                Check("An early callback defers safely while Create holds the shared lease", await Code(response) == 0);
+            };
+            var early = await CreateRecoveryTopUp(23009);
+            recoveryIds.Add(early.Id);
+            Check("Create does not pretend that a deferred callback confirmed payment", early.Status == "Pending"
+                && early.ProviderTransactionId is null && early.PaymentUrl is not null);
+            using (var response = await Post(callbackPath, null, Callback(callbackDuringCreate!, earlyProvider)))
+                Check("Provider retry records the deferred callback after Create releases its lease", await Code(response) == 1);
+            Check("Deferred callback records one original provider receipt", (await ReadRecovery(early.Id)).ProviderTransactionId == earlyProvider);
+            await ParkRecoveryRows();
+
+            var old = await SeedUnsent("TopUp", null, 23005, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-26));
+            gateway.Set(old.MerchantTransactionId, new("NotFound", null, null));
+            before = gateway.CreateCount;
+            await MakeDue(old.Id);
+            await using (var scope = app.Services.CreateAsyncScope())
+                Check("A Pending intent after 26 hours downtime stays in the worker queue", (await scope.ServiceProvider
+                    .GetRequiredService<IZaloPayIntentRepository>().GetDueIdsAsync(DateTimeOffset.UtcNow, 5, CancellationToken.None)).Contains(old.Id));
+            var queriesBeforeDowntime = gateway.QueryCount;
+            await Reconcile();
+            var stillMissing = await ReadRecovery(old.Id);
+            Check("Worker queries an old unresolved bill without recreating an expired payment", gateway.QueryCount > queriesBeforeDowntime
+                && gateway.CreateCount == before && stillMissing.Status == "Pending" && stillMissing.RequiresReconciliation
+                && stillMissing.FailureReason == "CreateRecoveryExpired" && stillMissing.PaymentUrl is null);
+            var oldReceipt = ProviderId();
+            gateway.Set(old.MerchantTransactionId, Paid(old, oldReceipt));
+            await MakeDue(old.Id);
+            await Reconcile();
+            var afterDowntime = await ReadRecovery(old.Id);
+            Check("Worker recovers a receipt lost during more than 24 hours downtime", afterDowntime.Status == "Succeeded"
+                && afterDowntime.ProviderTransactionId == oldReceipt && afterDowntime.ProviderAmountVnd == old.ExpectedAmountVnd
+                && afterDowntime.VerifiedAtUtc is not null && afterDowntime.RequiresReconciliation
+                && afterDowntime.FailureReason == "LatePayment" && gateway.CreateCount == before);
+            SameSnapshot("Late reconciliation preserves the original merchant and timestamps", old, afterDowntime);
+            await ParkRecoveryRows();
+
+            var callbackLost = await SeedUnsent("TopUp", null, 23008, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-26));
+            var lostReceipt = ProviderId();
+            gateway.Set(callbackLost.MerchantTransactionId, Paid(callbackLost, lostReceipt));
+            before = gateway.CreateCount;
+            await MakeDue(callbackLost.Id);
+            await Reconcile();
+            var paidAfterDowntime = await ReadRecovery(callbackLost.Id);
+            Check("An old Pending receipt is discovered on the first Query after 26 hours downtime", paidAfterDowntime.Status == "Succeeded"
+                && paidAfterDowntime.ProviderTransactionId == lostReceipt && paidAfterDowntime.RequiresReconciliation
+                && paidAfterDowntime.FailureReason == "LatePayment" && gateway.CreateCount == before);
+            await ParkRecoveryRows();
+
+            var rejectedRecoveryKey = Guid.NewGuid();
+            gateway.UnknownNextCreate = 1;
+            var rejectedRecovery = await CreateRecoveryTopUp(23010, rejectedRecoveryKey.ToString());
+            recoveryIds.Add(rejectedRecovery.Id);
+            gateway.Set(rejectedRecovery.MerchantTransactionId, new("NotFound", null, null));
+            gateway.RejectNextCreate = 1;
+            before = gateway.CreateCount;
+            using (var response = await Post(own + "/topups", recoveryToken, new { amountVnd = 23010 }, rejectedRecoveryKey.ToString()))
+            {
+                var attempted = await Body(response);
+                Check("A rejected recovery attempt cannot erase uncertainty from the original Create", attempted.Status == "Pending"
+                    && attempted.RequiresReconciliation && attempted.FailureReason == "CreateRecoveryRejected"
+                    && attempted.PaymentUrl is null && attempted.ProviderTransactionId is null && gateway.CreateCount == before + 1);
+                SameSnapshot("Rejected recovery retains the original merchant for further Query", rejectedRecovery, attempted);
+            }
+            var recoveredReceipt = ProviderId();
+            gateway.Set(rejectedRecovery.MerchantTransactionId, Paid(rejectedRecovery, recoveredReceipt));
+            await MakeDue(rejectedRecovery.Id);
+            await Reconcile();
+            var finallyPaid = await ReadRecovery(rejectedRecovery.Id);
+            Check("Worker can still discover payment after a recovery Create was rejected", finallyPaid.Status == "Succeeded"
+                && finallyPaid.ProviderTransactionId == recoveredReceipt && finallyPaid.ExpectedAmountVnd == 23010
+                && gateway.CreateCount == before + 1);
+            await ParkRecoveryRows();
+
+            async Task<ZaloPayIntentDto> CreateRecoveryTopUp(decimal amount, string? key = null)
+            {
+                using var response = await Post(own + "/topups", recoveryToken, new { amountVnd = amount }, key ?? Guid.NewGuid().ToString());
+                return await Body(response);
+            }
+            async Task<ZaloPayIntentDto> ReadRecovery(int id)
+            {
+                using var response = await Get(own + "/" + id, recoveryToken);
+                return await Body(response);
+            }
+            async Task<ZaloPayIntentDto> SeedUnsent(string purpose, int? orderId, decimal? amount, Guid requestKey, DateTimeOffset? now = null)
+            {
+                await using var scope = app.Services.CreateAsyncScope();
+                var result = await scope.ServiceProvider.GetRequiredService<IZaloPayIntentRepository>()
+                    .CreateAsync(recoveryOwner, purpose, orderId, amount, requestKey, gateway.AppId, now ?? DateTimeOffset.UtcNow, CancellationToken.None);
+                var row = result.Intent;
+                Check("Crash fixture commits an intent before provider Create", result.Created && row.PaymentUrl is null
+                    && row.ProviderTransactionId is null && row.Status == "Pending");
+                recoveryIds.Add(row.IntentId);
+                return new(row.IntentId, row.CustomerId, row.Purpose, row.OrderId ?? row.IntentId, row.ExpectedAmountVnd,
+                    row.Status, row.PaymentUrl, row.MerchantTransactionId, row.CreatedAtUtc, row.ExpiresAtUtc,
+                    row.ProviderTransactionId, row.ProviderAmountVnd, row.VerifiedAtUtc, row.RequiresReconciliation, row.FailureReason);
+            }
+            async Task ParkRecoveryRows()
+            {
+                await using var scope = app.Services.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                foreach (var row in await db.Set<ZaloPayIntent>().Where(row => recoveryIds.Contains(row.IntentId)).ToListAsync())
+                    row.NextQueryAtUtc = DateTimeOffset.UtcNow.AddDays(1);
+                await db.SaveChangesAsync();
+            }
+            void SameSnapshot(string name, ZaloPayIntentDto original, ZaloPayIntentDto observed) => Check(name,
+                observed.Id == original.Id && observed.CustomerId == original.CustomerId && observed.Purpose == original.Purpose
+                && observed.SourceId == original.SourceId && observed.MerchantTransactionId == original.MerchantTransactionId
+                && observed.ExpectedAmountVnd == original.ExpectedAmountVnd && observed.CreatedAtUtc == original.CreatedAtUtc
+                && observed.ExpiresAtUtc == original.ExpiresAtUtc);
+        }
+
+        async Task Reconcile()
+        {
+            await using var scope = app.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IZaloPayPaymentService>().ReconcileDueAsync(CancellationToken.None);
+        }
+        async Task MakeDue(int id)
+        {
+            await using var scope = app.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var row = await db.Set<ZaloPayIntent>().SingleAsync(row => row.IntentId == id);
+            row.NextQueryAtUtc = DateTimeOffset.UtcNow.AddSeconds(-1);
+            await db.SaveChangesAsync();
+        }
 
         string ProviderId() => Interlocked.Increment(ref nextProviderId).ToString(CultureInfo.InvariantCulture);
         GatewayQueryResult Paid(ZaloPayIntentDto intent, string receipt) => new("Succeeded", new(gateway.AppId, receipt, intent.ExpectedAmountVnd, null), null);
@@ -405,11 +745,11 @@ internal static class ZaloPayPaymentChecks
             await using var scope = app.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             (await db.Customers.SingleAsync(row => row.CustomerId == id)).Status = status; await db.SaveChangesAsync();
         }
-        async Task<int> CreateOrder(int customerId, decimal amount)
+        async Task<int> CreateOrder(int customerId, decimal amount, string status = "AwaitingPayment")
         {
             await using var scope = app.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var employee = await db.Employees.Where(row => row.Username == "admin").Select(row => row.EmployeeId).SingleAsync();
-            var row = new Order { CustomerId = customerId, EmployeeId = employee, TotalAmount = amount, Status = "Pending" };
+            var row = new Order { CustomerId = customerId, EmployeeId = employee, TotalAmount = amount, Status = status };
             db.Orders.Add(row); await db.SaveChangesAsync(); return row.OrderId;
         }
         async Task ExpireLease(int id)

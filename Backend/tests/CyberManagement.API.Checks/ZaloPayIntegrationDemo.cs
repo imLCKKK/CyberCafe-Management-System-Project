@@ -28,7 +28,7 @@ internal static class ZaloPayIntegrationDemo
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-    public static async Task RunAsync(bool prepareOrder)
+    public static async Task RunAsync(bool prepareOrder, bool newOrderFixture = false)
     {
         var server = Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION");
         if (string.IsNullOrWhiteSpace(server)) throw new InvalidOperationException("AUTH_CHECKS_SQL_CONNECTION is required.");
@@ -73,6 +73,8 @@ internal static class ZaloPayIntegrationDemo
                 && (!HttpMethods.IsPost(context.Request.Method) || context.Request.Path != ZaloPaySandboxOptions.CallbackPath))
             { context.Response.StatusCode = 404; return; }
             await next(context);
+            if (context.Connection.LocalPort == 5100 && context.Request.Path == ZaloPaySandboxOptions.CallbackPath)
+                Console.WriteLine($"CALLBACK_TRANSPORT {DateTimeOffset.UtcNow:O} HTTP {context.Response.StatusCode}; inspect verified SQL state for payment outcome.");
         });
         app.UseExceptionHandler();
         app.UseAuthentication();
@@ -124,7 +126,21 @@ internal static class ZaloPayIntegrationDemo
                 var prior = await db.Set<ZaloPayIntent>().SingleOrDefaultAsync(row => row.OrderId == state.OrderId);
                 if (prior is not null && prior.AppliedAtUtc is not null)
                     throw new InvalidOperationException("The retained Order fixture is already paid. Its evidence is preserved; no extra fixture was created.");
-                if (prior is not null && prior.ExpiresAtUtc <= DateTimeOffset.UtcNow)
+                if (newOrderFixture)
+                {
+                    if (prior is null) throw new InvalidOperationException("Inspect the existing source before replacing a fixture without an intent.");
+                    var verified = await scope.ServiceProvider.GetRequiredService<IZaloPayPaymentService>()
+                        .SyncOwnAsync(state.CustomerId, prior.IntentId, CancellationToken.None);
+                    if (verified.Status != "Expired" || verified.RequiresReconciliation || verified.VerifiedAtUtc is not null
+                        || verified.ProviderTransactionId is not null || verified.AppliedAtUtc is not null)
+                        throw new InvalidOperationException("A new fixture requires the prior provider bill to be conclusively expired and unpaid. Its source and evidence were preserved.");
+                    state.PreviousOrderIds.Add(state.OrderId);
+                    state.OrderId = 0;
+                    state.OrderIntentId = 0;
+                    state.OrderRequestKey = Guid.Empty;
+                    await SaveState();
+                }
+                else if (prior is not null && prior.ExpiresAtUtc <= DateTimeOffset.UtcNow)
                     throw new InvalidOperationException("The retained Order fixture expired. Inspect its proof before explicitly preparing another fixture.");
             }
             if (state.OrderId == 0)
@@ -173,5 +189,6 @@ internal static class ZaloPayIntegrationDemo
         public int OrderId { get; set; }
         public Guid OrderRequestKey { get; set; }
         public int OrderIntentId { get; set; }
+        public List<int> PreviousOrderIds { get; set; } = [];
     }
 }

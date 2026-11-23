@@ -11,7 +11,11 @@ public interface IZaloPayIntentRepository
     Task<(IReadOnlyList<ZaloPayIntent> Items, int TotalCount)> GetOwnPageAsync(int customerId, int page,
         int pageSize, string? purpose, CancellationToken cancellationToken);
     Task<ZaloPayIntent?> FindByMerchantAsync(string merchantId, CancellationToken cancellationToken);
-    Task<ZaloPayIntent> SaveCreateResultAsync(int intentId, GatewayCreateResult result, CancellationToken cancellationToken);
+    Task<GatewayCreateLease> AcquireCreateAsync(int intentId, DateTimeOffset now, Guid? queryToken, CancellationToken cancellationToken);
+    Task<ZaloPayIntent> SaveCreateResultAsync(int intentId, Guid token, GatewayCreateResult result,
+        DateTimeOffset now, CancellationToken cancellationToken);
+    Task<ZaloPayIntent> RecordCallbackMismatchAsync(int intentId, Guid? queryToken,
+        DateTimeOffset now, CancellationToken cancellationToken);
     Task<GatewayQueryLease> AcquireQueryAsync(int intentId, DateTimeOffset now, CancellationToken cancellationToken);
     Task<ZaloPayIntent> SaveQueryResultAsync(int intentId, Guid token, GatewayQueryResult result,
         DateTimeOffset now, CancellationToken cancellationToken);

@@ -27,7 +27,7 @@ using Microsoft.EntityFrameworkCore;
 
 if (args.Contains("--zalopay-integration-host") || args.Contains("--zalopay-integration-prepare-order"))
 {
-    await ZaloPayIntegrationDemo.RunAsync(args.Contains("--zalopay-integration-prepare-order"));
+    await ZaloPayIntegrationDemo.RunAsync(args.Contains("--zalopay-integration-prepare-order"), args.Contains("--new-order-fixture"));
     return;
 }
 

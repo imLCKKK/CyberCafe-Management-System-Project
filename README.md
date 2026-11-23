@@ -28,8 +28,10 @@ DB mới tạo từ migrations CyberManagement; không áp InitialCreate mới l
 
 Luồng ZaloPay **SCRUM-23** có [contract và cách chạy](Backend/docs/008-zalopay-wallet-order-integration.md).
 Demo riêng cổng **5177**, khách `0900000023` / `SandboxCustomer-2026!`, API 5099, callback-only 5100.
-Build backend/cài dependencies frontend trước khi chạy `scripts/start-zalopay-integration.ps1`;
+Build backend/cài dependencies frontend bằng `ci --include=dev` trước khi chạy `scripts/start-zalopay-integration.ps1`;
 cần secret server và callback HTTPS còn hiệu lực. Nạp tại quầy bên dưới giữ cổng/tài khoản riêng.
+Bản sửa review 23–24/11 có kiểm tra SQL callback/retry và build đầy đủ;
+xem hợp đồng để dùng artifacts riêng tránh khóa DLL, chạy QR test với jsqr và xem phần Sandbox thật còn chờ.
 
 ## Thử nạp tại quầy — SCRUM-21
 

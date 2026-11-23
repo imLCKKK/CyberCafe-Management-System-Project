@@ -1,11 +1,15 @@
 param(
     [string]$SqlConnection = 'Server=127.0.0.1\SQLEXPRESS;Integrated Security=true;TrustServerCertificate=true;Connect Timeout=10',
     [string]$CallbackUrl,
-    [switch]$PrepareOrder
+    [switch]$PrepareOrder,
+    [switch]$NewOrderFixture,
+    [string]$ArtifactsPath
 )
 $ErrorActionPreference = 'Stop'
 $taskWorkspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $taskDll = Join-Path $taskWorkspace 'Backend\tests\CyberManagement.API.Checks\bin\Debug\net10.0\CyberManagement.API.Checks.dll'
+if ($ArtifactsPath) { $taskDll = Join-Path ([IO.Path]::GetFullPath($ArtifactsPath)) 'bin\CyberManagement.API.Checks\debug\CyberManagement.API.Checks.dll' }
+if ($NewOrderFixture -and !$PrepareOrder) { throw 'NewOrderFixture requires PrepareOrder and preserves the prior SQL source.' }
 if (!(Test-Path -LiteralPath $taskDll)) { throw 'Build Backend/CyberManagement.slnx first.' }
 if ($CallbackUrl) {
     $callback = [Uri]$CallbackUrl
@@ -20,7 +24,9 @@ $env:VITE_API_PROXY_TARGET = 'http://127.0.0.1:5099'
 Push-Location $taskWorkspace
 try {
     if ($PrepareOrder) {
-        & dotnet $taskDll --zalopay-integration-prepare-order
+        $taskArguments = @($taskDll, '--zalopay-integration-prepare-order')
+        if ($NewOrderFixture) { $taskArguments += '--new-order-fixture' }
+        & dotnet @taskArguments
         if ($LASTEXITCODE -ne 0) { throw 'Could not prepare the retained Order contract fixture.' }
         return
     }

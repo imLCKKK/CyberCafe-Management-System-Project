@@ -14,7 +14,7 @@ namespace CyberManagement.Infrastructure.Repositories;
 
 public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZaloPayIntentRepository
 {
-    private static readonly string[] ManualReasons = ["AmountMismatch", "GatewayTransactionConflict", "ConflictingReceipt"];
+    private static readonly string[] ManualReasons = ["AmountMismatch", "GatewayTransactionConflict", "ConflictingReceipt", "CallbackReceiptMismatch"];
     private DbSet<ZaloPayIntent> Intents => database.Set<ZaloPayIntent>();
 
     public async Task<GatewayIntentCreation> CreateAsync(int customerId, string purpose, int? orderId,
@@ -34,6 +34,12 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
             if (prior.CustomerId != customerId || prior.Purpose != purpose || prior.OrderId != orderId
                 || (purpose == "TopUp" && prior.ExpectedAmountVnd != topUpAmount))
                 throw new BusinessRuleException("Khóa yêu cầu đã được dùng cho nội dung thanh toán khác.");
+            if (purpose == "Order" && prior.Status == "Pending" && prior.AppliedAtUtc is null)
+            {
+                var source = await LockOrderAsync(orderId!.Value, cancellationToken);
+                if (source.CustomerId != customerId || source.Status != "AwaitingPayment")
+                    throw new BusinessRuleException("Đơn hàng không còn chờ thanh toán gateway.");
+            }
             await transaction.CommitAsync(cancellationToken);
             return new(prior, false);
         }
@@ -45,7 +51,7 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
             if (order.CustomerId != customerId) throw new EntityNotFoundException("Không tìm thấy đơn hàng của tài khoản.");
             if (await Intents.AnyAsync(row => row.OrderId == orderId, cancellationToken))
                 throw new BusinessRuleException("Đơn hàng đã có ý định thanh toán. Hãy kiểm tra giao dịch đã lưu.");
-            if (order.Status is not ("Pending" or "AwaitingPayment")) throw new BusinessRuleException("Đơn hàng không còn chờ thanh toán.");
+            if (order.Status != "AwaitingPayment") throw new BusinessRuleException("Đơn hàng không còn chờ thanh toán.");
             var orderCreatedAt = new DateTimeOffset(DateTime.SpecifyKind(order.OrderTime, DateTimeKind.Utc));
             if (orderCreatedAt > now.AddMinutes(5))
                 throw new BusinessRuleException("Mốc thời gian đơn hàng không hợp lệ.");
@@ -99,18 +105,89 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
         return (rows, total);
     }
 
-    public async Task<ZaloPayIntent> SaveCreateResultAsync(int intentId, GatewayCreateResult result, CancellationToken cancellationToken)
+    public async Task<GatewayCreateLease> AcquireCreateAsync(int intentId, DateTimeOffset now, Guid? queryToken,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await BeginWriteAsync(cancellationToken);
+        var (customer, row) = await LockIntentAsync(intentId, cancellationToken);
+        // The same durable lease serializes every Create/Query exchange for this merchant ID.
+        // Only a brand-new intent may skip Query. A retry promotes a held NotFound Query lease.
+        var available = queryToken is Guid token
+            ? row.QueryLeaseToken == token && row.QueryLeaseUntilUtc > now
+            : row.QueryLeaseToken is null && row.LastQueryAtUtc is null
+                && row.FailureReason is null && !row.RequiresReconciliation;
+        var acquired = false;
+        if (available && row.Status == "Pending" && row.PaymentUrl is null
+            && row.ProviderTransactionId is null && !NeedsManualReview(row))
+        {
+            if (queryToken is not null) row.LastQueryAtUtc = now;
+            string? reason = customer.Status != "Active" ? "CreateCustomerLocked"
+                : row.ExpiresAtUtc - now < TimeSpan.FromSeconds(300) ? "CreateRecoveryExpired"
+                : row.MerchantTransactionId[..6] != now.ToOffset(TimeSpan.FromHours(7)).ToString("yyMMdd", CultureInfo.InvariantCulture)
+                    ? "CreateMerchantDayChanged" : null;
+            if (reason is null && row.OrderId is int orderId)
+            {
+                var order = await LockOrderAsync(orderId, cancellationToken);
+                if (order.CustomerId != row.CustomerId || order.Status != "AwaitingPayment"
+                    || order.TotalAmount != row.ExpectedAmountVnd
+                    || new DateTimeOffset(DateTime.SpecifyKind(order.OrderTime, DateTimeKind.Utc)).AddMinutes(15) < row.ExpiresAtUtc
+                    || await database.Payments.AnyAsync(payment => payment.OrderId == orderId
+                        && payment.Type == "Payment" && payment.Status == "Succeeded", cancellationToken))
+                    reason = "CreateSourceChanged";
+            }
+            row.RequiresReconciliation = true;
+            row.FailureReason = reason ?? (queryToken is null ? "CreateUnavailable" : "CreateRecoveryUnavailable");
+            if (reason is null)
+            {
+                row.QueryLeaseToken = queryToken ?? Guid.NewGuid();
+                row.QueryLeaseUntilUtc = now.AddSeconds(30);
+                acquired = true;
+            }
+            else
+            {
+                row.QueryLeaseToken = null;
+                row.QueryLeaseUntilUtc = null;
+                row.NextQueryAtUtc = NextQuery(now, row.ExpiresAtUtc);
+            }
+            await database.SaveChangesAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+        return new(row, acquired ? row.QueryLeaseToken : null, acquired);
+    }
+
+    public async Task<ZaloPayIntent> SaveCreateResultAsync(int intentId, Guid token, GatewayCreateResult result,
+        DateTimeOffset now, CancellationToken cancellationToken)
     {
         await using var transaction = await BeginWriteAsync(cancellationToken);
         var (_, row) = await LockIntentAsync(intentId, cancellationToken);
-        if (row.Status == "Pending" && row.ProviderTransactionId is null && !NeedsManualReview(row))
+        if (row.QueryLeaseToken == token)
         {
+            row.QueryLeaseToken = null;
+            row.QueryLeaseUntilUtc = null;
+            row.NextQueryAtUtc = NextQuery(now, row.ExpiresAtUtc);
+            if (row.Status != "Pending" || row.PaymentUrl is not null
+                || row.ProviderTransactionId is not null || NeedsManualReview(row))
+            {
+                await database.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return row;
+            }
             if (result.Rejected)
             {
-                row.Status = "Failed";
-                row.FailureReason = "CreateRejected";
-                row.RequiresReconciliation = false;
-                row.NextQueryAtUtc = null;
+                // NotFound does not prove an earlier uncertain Create can never arrive.
+                // A rejection of its retry must leave that merchant ID under reconciliation.
+                if (row.FailureReason == "CreateRecoveryUnavailable")
+                {
+                    row.RequiresReconciliation = true;
+                    row.FailureReason = "CreateRecoveryRejected";
+                }
+                else
+                {
+                    row.Status = "Failed";
+                    row.FailureReason = "CreateRejected";
+                    row.RequiresReconciliation = false;
+                    row.NextQueryAtUtc = null;
+                }
             }
             else if (result.PaymentUrl is { } url)
             {
@@ -121,7 +198,7 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
                 row.PaymentUrl ??= url;
                 row.RequiresReconciliation = false;
                 row.FailureReason = null;
-                row.NextQueryAtUtc = row.CreatedAtUtc.AddSeconds(15);
+                row.NextQueryAtUtc = NextQuery(now, row.ExpiresAtUtc);
             }
             else
             {
@@ -138,7 +215,8 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
     {
         await using var transaction = await BeginWriteAsync(cancellationToken);
         var (_, row) = await LockIntentAsync(intentId, cancellationToken);
-        var acquired = row.Status != "Succeeded" && (row.QueryLeaseUntilUtc is null || row.QueryLeaseUntilUtc <= now);
+        var acquired = row.Status != "Succeeded" && row.FailureReason != "CallbackReceiptMismatch"
+            && (row.QueryLeaseUntilUtc is null || row.QueryLeaseUntilUtc <= now);
         if (acquired)
         {
             row.QueryLeaseToken = Guid.NewGuid();
@@ -147,6 +225,28 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
         }
         await transaction.CommitAsync(cancellationToken);
         return new(row, acquired ? row.QueryLeaseToken : null, acquired);
+    }
+
+    public async Task<ZaloPayIntent> RecordCallbackMismatchAsync(int intentId, Guid? queryToken,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var transaction = await BeginWriteAsync(cancellationToken);
+        var (_, row) = await LockIntentAsync(intentId, cancellationToken);
+        var ownsObservation = queryToken is Guid token ? row.QueryLeaseToken == token : row.Status == "Succeeded";
+        // A stale callback must not poison a newer observation or an already committed credit/payment.
+        if (ownsObservation && row.AppliedAtUtc is null && row.FailureReason != "CallbackReceiptMismatch")
+        {
+            row.RequiresReconciliation = true;
+            row.FailureReason = "CallbackReceiptMismatch";
+            row.QueryLeaseToken = null;
+            row.QueryLeaseUntilUtc = null;
+            row.NextQueryAtUtc = null;
+            if (queryToken is not null) row.LastQueryAtUtc = now;
+            if (row.Status == "Succeeded") row.SettlementFailureReason = "CallbackReceiptMismatch";
+            await database.SaveChangesAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+        return row;
     }
 
     public async Task<ZaloPayIntent> SaveQueryResultAsync(int intentId, Guid token, GatewayQueryResult result,
@@ -174,8 +274,9 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
                         row.NextQueryAtUtc = null;
                         break;
                     case "Pending" when row.Status == "Pending":
-                        row.RequiresReconciliation = false;
-                        row.FailureReason = result.RetryableFailure ? "PaymentAttemptFailed" : null;
+                        row.RequiresReconciliation = row.PaymentUrl is null;
+                        row.FailureReason = row.PaymentUrl is null ? "CheckoutUrlMissing"
+                            : result.RetryableFailure ? "PaymentAttemptFailed" : null;
                         break;
                     case "NotFound":
                         row.RequiresReconciliation = true;
@@ -215,6 +316,11 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
         await using var transaction = await BeginWriteAsync(cancellationToken);
         var (customer, row) = await LockIntentAsync(intentId, cancellationToken);
         if (receipt.AppId != row.ProviderAppId) throw new BusinessRuleException("Ứng dụng thanh toán không khớp ý định đã lưu.");
+        if (row.FailureReason == "CallbackReceiptMismatch")
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new(row, false);
+        }
         if (row.ProviderTransactionId is not null)
         {
             var changed = false;
@@ -272,7 +378,7 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
             if (row.OrderId is int orderId)
             {
                 var order = await database.Orders.AsNoTracking().SingleAsync(item => item.OrderId == orderId, cancellationToken);
-                if (order.Status is not ("Pending" or "AwaitingPayment")) row.FailureReason ??= "OrderClosed";
+                if (order.Status != "AwaitingPayment") row.FailureReason ??= "OrderClosed";
                 else if (order.TotalAmount != row.ExpectedAmountVnd) row.FailureReason ??= "OrderAmountChanged";
                 if (await database.Payments.AnyAsync(payment => payment.OrderId == orderId && payment.Type == "Payment"
                         && payment.Status == "Succeeded" && (payment.Method != "ZaloPay"
@@ -289,9 +395,8 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
     public async Task<IReadOnlyList<int>> GetDueIdsAsync(DateTimeOffset now, int take, CancellationToken cancellationToken)
     {
         if (take <= 0) return [];
-        var oldestExpiry = now.AddHours(-24);
         return await Intents.AsNoTracking().Where(row => row.Status == "Pending" && row.ProviderTransactionId == null
-                && row.ExpiresAtUtc >= oldestExpiry && (row.NextQueryAtUtc == null || row.NextQueryAtUtc <= now)
+                && (row.NextQueryAtUtc == null || row.NextQueryAtUtc <= now)
                 && (row.QueryLeaseUntilUtc == null || row.QueryLeaseUntilUtc <= now)
                 && (row.FailureReason == null || !ManualReasons.Contains(row.FailureReason)))
             .OrderBy(row => row.NextQueryAtUtc).ThenBy(row => row.IntentId).Take(Math.Min(take, 5))
@@ -341,6 +446,8 @@ public sealed class ZaloPayIntentRepository(ApplicationDbContext database) : IZa
         row.QueryLeaseToken = null;
         row.QueryLeaseUntilUtc = null;
         row.LastQueryAtUtc = now;
-        row.NextQueryAtUtc = now.AddSeconds(15);
+        row.NextQueryAtUtc = NextQuery(now, row.ExpiresAtUtc);
     }
+    private static DateTimeOffset NextQuery(DateTimeOffset now, DateTimeOffset expiry) =>
+        now - expiry >= TimeSpan.FromHours(24) ? now.AddHours(1) : now.AddSeconds(15);
 }

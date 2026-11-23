@@ -51,6 +51,7 @@ internal static class ZaloPaySettlementChecks
         await RunRejectedTopUps();
         await RunOrderBridge();
         await RunOrderReviewCases();
+        await RunCallbackReceiptMismatchChecks();
         await using (var scope = app.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -325,6 +326,20 @@ internal static class ZaloPaySettlementChecks
                 Check("API returns the canonical Payment marker after Order settlement", saved.PaymentId == paymentId
                     && saved.AppliedAtUtc is not null && saved.WalletTransactionId is null);
             }
+            Guid paidOrderRequestKey;
+            await using (var scope = app.Services.CreateAsyncScope())
+            {
+                var operationKey = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Set<ZaloPayIntent>()
+                    .Where(row => row.IntentId == intent.Id).Select(row => row.OperationKey).SingleAsync();
+                paidOrderRequestKey = Guid.ParseExact(operationKey.Split(':')[^1], "N");
+            }
+            var createsBeforePaidReplay = gateway.CreateCount;
+            using (var response = await Post(own + "/orders/" + fixture.OrderId, ownerToken, new { }, paidOrderRequestKey.ToString()))
+            {
+                var replay = await Body(response);
+                Check("An already settled Order replays its original Payment after the source legitimately becomes Pending", replay.Id == intent.Id
+                    && replay.PaymentId == paymentId && replay.AppliedAtUtc is not null && gateway.CreateCount == createsBeforePaidReplay);
+            }
             await Barrier(otherPeer, RealtimeAccountType.Customer, otherId, "Another customer receives no Order payment event");
             await Barrier(technicianPeer, RealtimeAccountType.Staff, TokenId(staffTokens["Technician"]), "Staff without order.view receives no Order payment event");
             var responses = await Task.WhenAll(Post(callbackPath, null, Callback(intent, provider)),
@@ -385,6 +400,157 @@ internal static class ZaloPaySettlementChecks
                     && await stored.PromotionUsages.CountAsync(row => row.OrderId == fixture.OrderId) == 1
                     && await stored.Orders.Where(row => row.OrderId == fixture.OrderId).Select(row => row.Status).SingleAsync()
                         == (state is "Cancelled" or "Expired" ? state : "AwaitingPayment"));
+            }
+        }
+
+        async Task RunCallbackReceiptMismatchChecks()
+        {
+            foreach (var purpose in new[] { "TopUp", "Order" })
+            foreach (var difference in new[] { "TransactionId", "Amount" })
+            {
+                var fixture = purpose == "Order" ? await CreateOrderFixture(14000) : null;
+                var intent = fixture is null ? await CreateTopUp(ownerToken, 14000) : await CreateOrderIntent(fixture.OrderId);
+                var paymentId = fixture is null ? (int?)null : await Register(intent, fixture.OrderId, intent.ExpiresAtUtc.AddSeconds(-1));
+                var balance = await Balance(ownerId);
+                var claimedProvider = ProviderId();
+                var observedProvider = difference == "TransactionId" ? ProviderId() : claimedProvider;
+                gateway.Set(intent.MerchantTransactionId, new("Succeeded",
+                    new(gateway.AppId, observedProvider, intent.ExpectedAmountVnd + (difference == "Amount" ? 1 : 0), null), null));
+                await using var peer = await RealtimeTestPeer.ConnectAsync(app.GetTestServer(), ownerToken);
+                await using var admin = await RealtimeTestPeer.ConnectAsync(app.GetTestServer(), staffTokens["Admin"]);
+                using (var response = await Post(callbackPath, null, Callback(intent, claimedProvider)))
+                    Check(purpose + " callback rejects a Query " + difference + " mismatch before recording money", await CallbackCode(response) == 2);
+                var quarantined = await Read(intent.Id, ownerToken);
+                Check(purpose + " mismatched callback durably requests reconciliation without a receipt", quarantined.RequiresReconciliation
+                    && quarantined.FailureReason == "CallbackReceiptMismatch" && quarantined.Status == "Pending"
+                    && quarantined.ProviderTransactionId is null && quarantined.ProviderAmountVnd is null
+                    && quarantined.VerifiedAtUtc is null && quarantined.AppliedAtUtc is null);
+                await AssertNoEffect(intent, purpose + " mismatch creates no ledger or settlement marker");
+                Check(purpose + " mismatch leaves the authoritative SQL balance unchanged", await Balance(ownerId) == balance);
+                await AssertUnpaidOrder();
+                await Barrier(peer, RealtimeAccountType.Customer, ownerId, purpose + " mismatch emits no owner payment event");
+                await Barrier(admin, RealtimeAccountType.Staff, TokenId(staffTokens["Admin"]), purpose + " mismatch emits no staff money event");
+
+                // A later valid-looking callback or worker cannot silently clear the manual hold.
+                gateway.Set(intent.MerchantTransactionId, Paid(intent, claimedProvider));
+                var queries = gateway.QueryCountFor(intent.MerchantTransactionId);
+                var retries = await Task.WhenAll(Post(callbackPath, null, Callback(intent, claimedProvider)),
+                    Post(own + "/" + intent.Id + "/sync", ownerToken, new { }),
+                    Post(callbackPath, null, Callback(intent, claimedProvider)));
+                try
+                {
+                    Check(purpose + " quarantined callback retries never acknowledge automatic settlement",
+                        await CallbackCode(retries[0]) != 1 && await CallbackCode(retries[2]) != 1
+                        && retries.All(row => row.StatusCode == HttpStatusCode.OK));
+                }
+                finally { foreach (var response in retries) response.Dispose(); }
+                await using (var scope = app.Services.CreateAsyncScope())
+                {
+                    await scope.ServiceProvider.GetRequiredService<IZaloPayPaymentService>().ReconcileDueAsync(CancellationToken.None);
+                    _ = await scope.ServiceProvider.GetRequiredService<IZaloPaySettlementService>().ApplyAsync(intent.Id, CancellationToken.None);
+                }
+                var replayed = await Read(intent.Id, ownerToken);
+                Check(purpose + " sync and worker retain the callback mismatch quarantine", replayed.FailureReason == "CallbackReceiptMismatch"
+                    && replayed.RequiresReconciliation && replayed.ProviderTransactionId is null && replayed.AppliedAtUtc is null
+                    && gateway.QueryCountFor(intent.MerchantTransactionId) == queries && await Balance(ownerId) == balance);
+                await AssertNoEffect(intent, purpose + " quarantined replays cannot credit money");
+                await AssertUnpaidOrder();
+                await Barrier(peer, RealtimeAccountType.Customer, ownerId, purpose + " quarantine replays emit no owner event");
+                await Barrier(admin, RealtimeAccountType.Staff, TokenId(staffTokens["Admin"]), purpose + " quarantine replays emit no staff event");
+
+                async Task AssertUnpaidOrder()
+                {
+                    if (fixture is null) return;
+                    await using var scope = app.Services.CreateAsyncScope();
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    var payment = await db.Payments.AsNoTracking().SingleAsync(row => row.PaymentId == paymentId);
+                    Check("Mismatched Order keeps one Pending Payment and its reservation", payment.Status == "Pending"
+                        && payment.GatewayTransactionId is null && payment.Amount == intent.ExpectedAmountVnd
+                        && await db.Payments.CountAsync(row => row.OrderId == fixture.OrderId) == 1
+                        && await db.Orders.Where(row => row.OrderId == fixture.OrderId).Select(row => row.Status).SingleAsync() == "AwaitingPayment"
+                        && await db.Products.Where(row => row.ProductId == fixture.ProductId).Select(row => row.Stock).SingleAsync() == 17
+                        && await db.PromotionUsages.CountAsync(row => row.OrderId == fixture.OrderId && row.ReleasedAt == null) == 1);
+                }
+            }
+
+            var unapplied = await CreateTopUp(ownerToken, 14001);
+            var verifiedProvider = await StageReceipt(unapplied);
+            var balanceBeforeUnapplied = await Balance(ownerId);
+            await using (var peer = await RealtimeTestPeer.ConnectAsync(app.GetTestServer(), ownerToken))
+            {
+                using (var response = await Post(callbackPath, null, Callback(unapplied, ProviderId())))
+                    Check("A mismatched callback cannot consume a previously verified but unapplied receipt", await CallbackCode(response) == 2);
+                var held = await Read(unapplied.Id, ownerToken);
+                Check("The existing receipt is retained on mismatch without wallet settlement", held.Status == "Succeeded"
+                    && held.ProviderTransactionId == verifiedProvider && held.VerifiedAtUtc is not null
+                    && held.RequiresReconciliation && held.FailureReason == "CallbackReceiptMismatch" && held.AppliedAtUtc is null);
+                _ = await Sync(unapplied.Id, ownerToken);
+                await using (var scope = app.Services.CreateAsyncScope())
+                    await scope.ServiceProvider.GetRequiredService<IZaloPaySettlementService>().RecoverDueAsync(CancellationToken.None);
+                Check("Recovery cannot consume the quarantined pre-existing receipt", await Balance(ownerId) == balanceBeforeUnapplied
+                    && (await Read(unapplied.Id, ownerToken)).AppliedAtUtc is null);
+                await AssertNoEffect(unapplied, "An unapplied mismatched receipt creates no wallet ledger");
+                await Barrier(peer, RealtimeAccountType.Customer, ownerId, "Quarantined pre-existing receipt emits no owner event");
+            }
+
+            var applied = await CreateTopUp(ownerToken, 14002);
+            var appliedProvider = ProviderId();
+            gateway.Set(applied.MerchantTransactionId, Paid(applied, appliedProvider));
+            var beforeApplied = await Balance(ownerId);
+            var original = await Sync(applied.Id, ownerToken);
+            await using (var peer = await RealtimeTestPeer.ConnectAsync(app.GetTestServer(), ownerToken))
+            {
+                using (var response = await Post(callbackPath, null, Callback(applied, ProviderId())))
+                    Check("A stale callback cannot claim another reference for an already applied receipt", await CallbackCode(response) == 2);
+                var saved = await Read(applied.Id, ownerToken);
+                Check("A rejected stale callback does not poison a completed settlement", saved.AppliedAtUtc == original.AppliedAtUtc
+                    && saved.WalletTransactionId == original.WalletTransactionId && saved.ProviderTransactionId == appliedProvider
+                    && !saved.RequiresReconciliation && saved.FailureReason is null && saved.SettlementFailureReason is null);
+                await AssertTopUp(applied, beforeApplied + 14002, "The already-applied receipt keeps exactly one ledger after a stale callback");
+                await Barrier(peer, RealtimeAccountType.Customer, ownerId, "Rejected stale callback emits no second wallet event");
+            }
+
+            // Reproduce a paused callback Query losing its lease to an independent verified receipt.
+            var staleQuery = await CreateTopUp(ownerToken, 14003);
+            var winnerProvider = ProviderId();
+            var staleCallbackProvider = ProviderId();
+            var staleQueryProvider = ProviderId();
+            var beforeWinner = await Balance(ownerId);
+            gateway.OnQuery = async merchant =>
+            {
+                if (merchant != staleQuery.MerchantTransactionId) return;
+                gateway.OnQuery = null;
+                await using var scope = app.Services.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                (await db.Set<ZaloPayIntent>().SingleAsync(row => row.IntentId == staleQuery.Id)).QueryLeaseUntilUtc = DateTimeOffset.UtcNow.AddSeconds(-1);
+                await db.SaveChangesAsync();
+                var repository = scope.ServiceProvider.GetRequiredService<IZaloPayIntentRepository>();
+                var lease = await repository.AcquireQueryAsync(staleQuery.Id, DateTimeOffset.UtcNow, CancellationToken.None);
+                _ = await repository.RecordReceiptAsync(staleQuery.Id, lease.Token!.Value,
+                    new(gateway.AppId, winnerProvider, staleQuery.ExpectedAmountVnd, null), DateTimeOffset.UtcNow, CancellationToken.None);
+                gateway.Set(merchant, Paid(staleQuery, staleQueryProvider));
+            };
+            await using (var peer = await RealtimeTestPeer.ConnectAsync(app.GetTestServer(), ownerToken))
+            {
+                try
+                {
+                    using var response = await Post(callbackPath, null, Callback(staleQuery, staleCallbackProvider));
+                    Check("A mismatched callback with an obsolete Query lease is rejected", await CallbackCode(response) == 2);
+                }
+                finally { gateway.OnQuery = null; }
+                var winner = await Read(staleQuery.Id, ownerToken);
+                Check("An obsolete mismatch cannot quarantine the winning independent receipt", winner.ProviderTransactionId == winnerProvider
+                    && winner.Status == "Succeeded" && !winner.RequiresReconciliation && winner.FailureReason is null && winner.AppliedAtUtc is null);
+                await Barrier(peer, RealtimeAccountType.Customer, ownerId, "Rejected obsolete callback performs no settlement itself");
+                _ = await Sync(staleQuery.Id, ownerToken);
+                await AssertTopUp(staleQuery, beforeWinner + 14003, "The winning independent receipt can subsequently settle once");
+            }
+
+            async Task<decimal> Balance(int customerId)
+            {
+                await using var scope = app.Services.CreateAsyncScope();
+                return await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Customers.Where(row => row.CustomerId == customerId)
+                    .Select(row => row.WalletBalance).SingleAsync();
             }
         }
 
