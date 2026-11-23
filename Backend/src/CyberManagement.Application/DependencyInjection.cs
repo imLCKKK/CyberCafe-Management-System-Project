@@ -1,7 +1,9 @@
+using CyberManagement.Application.DTOs.Authentication;
+using CyberManagement.Application.DTOs.Revenue;
 using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Interfaces.Validation;
 using CyberManagement.Application.Services;
-using CyberManagement.Application.DTOs.Authentication;
+using CyberManagement.Application.Validators;
 using CyberManagement.Application.Validators.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 namespace CyberManagement.Application
@@ -29,6 +31,9 @@ namespace CyberManagement.Application
             services.AddScoped<InvoiceService>();
             services.AddScoped<IInvoiceService>(provider => provider.GetRequiredService<InvoiceService>());
             services.AddScoped<ISessionInvoiceIssuer>(provider => provider.GetRequiredService<InvoiceService>());
+
+            services.AddScoped<IRequestValidator<RevenueFilterRequest>, RevenueRequestValidator>();
+            services.AddScoped<IRevenueService, RevenueService>();
             return services;
         }
     }

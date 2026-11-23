@@ -53,6 +53,7 @@ internal static class ComputerBrowserHost
         builder.Services.AddScoped<SessionCommitEvents>();
         builder.Services.AddScoped<ISessionRepository, SessionRepository>();
         builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
+        builder.Services.AddScoped<IRevenueQueries, RevenueQueries>();
         builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
         builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
         builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
