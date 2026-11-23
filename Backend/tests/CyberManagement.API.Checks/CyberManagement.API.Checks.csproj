@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <None Include="../../integrations/opgg/fixtures/snapshot-hash.json" Link="fixtures/snapshot-hash.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\database\NexoraMenuSeed.sql" Link="Assets\NexoraMenuSeed.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\docs\nexora-menu-assets.json" Link="Assets\nexora-menu-assets.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

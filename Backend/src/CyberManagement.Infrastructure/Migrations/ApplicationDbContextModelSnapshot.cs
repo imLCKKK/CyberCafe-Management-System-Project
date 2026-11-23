@@ -142,7 +142,9 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.HasKey("MaintenanceId");
 
-                    b.HasIndex("ComputerId");
+                    b.HasIndex("ComputerId")
+                        .IsUnique()
+                        .HasFilter("[EndTime] IS NULL");
 
                     b.HasIndex("EmployeeId");
 
@@ -476,6 +478,25 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("GamingSessionId"));
 
+                    b.Property<string>("CloseOperationKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("CloseReason")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("ClosedByActorType")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("ClosedByEmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ClosingInvoiceId")
+                        .HasColumnType("int");
+
                     b.Property<int>("ComputerId")
                         .HasColumnType("int");
 
@@ -485,8 +506,25 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<DateTime?>("EndTime")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal?>("HourlyRateSnapshot")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
                     b.Property<DateTime?>("LastChargedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("OpenOperationKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<int>("OpenSessionSlot")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("int")
+                        .HasComputedColumnSql("CASE WHEN [Status] = N'Active' OR [EndTime] IS NULL THEN 0 ELSE [GamingSessionId] END", true);
+
+                    b.Property<int?>("OpenedByEmployeeId")
+                        .HasColumnType("int");
 
                     b.Property<decimal?>("PricePerHourSnapshot")
                         .HasPrecision(18)
@@ -506,11 +544,32 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.HasKey("GamingSessionId");
 
-                    b.HasIndex("ComputerId");
+                    b.HasIndex("CloseOperationKey")
+                        .IsUnique()
+                        .HasFilter("[CloseOperationKey] IS NOT NULL");
 
-                    b.HasIndex("CustomerId");
+                    b.HasIndex("ClosedByEmployeeId");
 
-                    b.ToTable("GamingSessions", (string)null);
+                    b.HasIndex("OpenOperationKey")
+                        .IsUnique()
+                        .HasFilter("[OpenOperationKey] IS NOT NULL");
+
+                    b.HasIndex("OpenedByEmployeeId");
+
+                    b.HasIndex("ComputerId", "OpenSessionSlot")
+                        .IsUnique()
+                        .HasDatabaseName("UX_GamingSessions_OpenComputer");
+
+                    b.HasIndex("CustomerId", "OpenSessionSlot")
+                        .IsUnique()
+                        .HasDatabaseName("UX_GamingSessions_OpenCustomer");
+
+                    b.ToTable("GamingSessions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_GamingSessions_OperationKeys", "([OpenOperationKey] IS NULL OR LEN(LTRIM(RTRIM([OpenOperationKey]))) > 0) AND ([CloseOperationKey] IS NULL OR LEN(LTRIM(RTRIM([CloseOperationKey]))) > 0)");
+
+                            t.HasCheckConstraint("CK_GamingSessions_RateSnapshot", "[HourlyRateSnapshot] IS NULL OR [HourlyRateSnapshot] > 0");
+                        });
                 });
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.InventoryTransaction", b =>
@@ -606,6 +665,13 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("InvoiceId"));
 
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasDefaultValue("Staff");
+
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
 
@@ -613,7 +679,7 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
 
-                    b.Property<int>("EmployeeId")
+                    b.Property<int?>("EmployeeId")
                         .HasColumnType("int");
 
                     b.Property<int?>("GamingSessionId")
@@ -650,6 +716,8 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.ToTable("Invoices", null, t =>
                         {
+                            t.HasCheckConstraint("CK_Invoices_Actor", "([ActorType] = 'Staff' AND [EmployeeId] IS NOT NULL) OR ([ActorType] = 'System' AND [EmployeeId] IS NULL AND [GamingSessionId] IS NOT NULL)");
+
                             t.HasCheckConstraint("CK_Invoices_Amounts", "[Subtotal] >= 0 AND [Discount] >= 0 AND [Discount] <= [Subtotal] AND [TotalAmount] = [Subtotal] - [Discount]");
 
                             t.HasCheckConstraint("CK_Invoices_Status", "[Status] IN ('Unpaid','Paid','Cancelled')");
@@ -667,6 +735,12 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<decimal>("Amount")
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
+
+                    b.Property<decimal>("CancelledAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)")
+                        .HasDefaultValue(0m);
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -694,6 +768,18 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
 
+                    b.Property<string>("VoucherCodeSnapshot")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("VoucherDiscountTypeSnapshot")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal?>("VoucherDiscountValueSnapshot")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.HasKey("InvoiceDetailId");
 
                     b.HasIndex("InvoiceId");
@@ -708,6 +794,8 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.ToTable("InvoiceDetails", null, t =>
                         {
+                            t.HasCheckConstraint("CK_InvoiceDetails_Cancelled", "[CancelledAmount] >= 0 AND [CancelledAmount] <= [Amount]");
+
                             t.HasCheckConstraint("CK_InvoiceDetails_Source", "([OrderDetailId] IS NOT NULL AND [SessionChargeId] IS NULL) OR ([OrderDetailId] IS NULL AND [SessionChargeId] IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_InvoiceDetails_Values", "[Quantity] > 0 AND [UnitPrice] >= 0 AND [Amount] >= 0 AND [Amount] <= [UnitPrice] * [Quantity]");
@@ -766,6 +854,11 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("OrderId"));
 
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
 
@@ -773,14 +866,24 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
 
-                    b.Property<int>("EmployeeId")
+                    b.Property<int?>("EmployeeId")
                         .HasColumnType("int");
 
                     b.Property<int?>("GamingSessionId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("LastChangedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("OrderTime")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTimeOffset?>("ReservedUntilUtc")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -790,6 +893,12 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
+
+                    b.Property<byte[]>("Version")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("VoucherCodeSnapshot")
                         .HasMaxLength(50)
@@ -811,9 +920,15 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.HasIndex("GamingSessionId");
 
+                    b.HasIndex("Status", "ReservedUntilUtc");
+
                     b.ToTable("Orders", null, t =>
                         {
+                            t.HasCheckConstraint("CK_Orders_Actor", "([ActorType] = 'Staff' AND [EmployeeId] IS NOT NULL) OR ([ActorType] = 'Customer' AND [EmployeeId] IS NULL)");
+
                             t.HasCheckConstraint("CK_Orders_Amounts", "[TotalAmount] >= 0 AND [DiscountAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_Orders_CheckoutMethod", "[PaymentMethod] IS NULL OR [PaymentMethod] IN ('Wallet','Cash','ZaloPay')");
 
                             t.HasCheckConstraint("CK_Orders_VoucherSnapshot", "([VoucherCodeSnapshot] IS NULL AND [VoucherDiscountTypeSnapshot] IS NULL AND [VoucherDiscountValueSnapshot] IS NULL AND [DiscountAmount] = 0) OR ([VoucherCodeSnapshot] IS NOT NULL AND LEN(LTRIM(RTRIM([VoucherCodeSnapshot]))) > 0 AND [VoucherDiscountTypeSnapshot] IS NOT NULL AND [VoucherDiscountValueSnapshot] IS NOT NULL AND (([VoucherDiscountTypeSnapshot] = 'Percent' AND [VoucherDiscountValueSnapshot] > 0 AND [VoucherDiscountValueSnapshot] <= 100) OR ([VoucherDiscountTypeSnapshot] = 'Fixed' AND [VoucherDiscountValueSnapshot] > 0 AND [VoucherDiscountValueSnapshot] = ROUND([VoucherDiscountValueSnapshot], 0))))");
                         });
@@ -827,9 +942,18 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("OrderDetailId"));
 
+                    b.Property<DateTime?>("ConfirmedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ConfirmedByEmployeeId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("int");
 
                     b.Property<int>("OrderId")
                         .HasColumnType("int");
@@ -845,11 +969,20 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Pending");
+
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
 
                     b.HasKey("OrderDetailId");
+
+                    b.HasIndex("ConfirmedByEmployeeId");
 
                     b.HasIndex("OrderId");
 
@@ -859,7 +992,63 @@ namespace CyberManagement.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("CK_OrderDetails_NameSnapshot", "LEN(LTRIM(RTRIM([ProductNameSnapshot]))) > 0");
 
+                            t.HasCheckConstraint("CK_OrderDetails_Status", "[Status] IN ('Pending','Confirmed','Cancelled')");
+
                             t.HasCheckConstraint("CK_OrderDetails_Values", "[Quantity] > 0 AND [UnitPrice] >= 0 AND [DiscountAmount] >= 0 AND [DiscountAmount] <= [UnitPrice] * [Quantity]");
+                        });
+                });
+
+            modelBuilder.Entity("CyberManagement.Domain.Entities.OrderOperation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ActorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .IsFixedLength();
+
+                    b.Property<string>("Route")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("ActorType", "ActorId", "Route", "Key")
+                        .IsUnique();
+
+                    b.ToTable("OrderOperations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrderOperations_Actor", "[ActorType] IN ('Staff','Customer') AND [ActorId] > 0");
                         });
                 });
 
@@ -871,10 +1060,15 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HistoryId"));
 
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<DateTime>("ChangedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("ChangedBy")
+                    b.Property<int?>("ChangedBy")
                         .HasColumnType("int");
 
                     b.Property<string>("NewStatus")
@@ -886,12 +1080,21 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int?>("OrderDetailId")
+                        .HasColumnType("int");
+
                     b.Property<int>("OrderId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
 
                     b.HasKey("HistoryId");
 
                     b.HasIndex("ChangedBy");
+
+                    b.HasIndex("OrderDetailId");
 
                     b.HasIndex("OrderId");
 
@@ -909,6 +1112,12 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<decimal>("Amount")
                         .HasPrecision(18)
                         .HasColumnType("decimal(18,0)");
+
+                    b.Property<DateTimeOffset?>("ApprovedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int?>("ApprovedByEmployeeId")
+                        .HasColumnType("int");
 
                     b.Property<DateTimeOffset?>("ConfirmedAt")
                         .HasColumnType("datetimeoffset");
@@ -978,6 +1187,8 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("PaymentId");
+
+                    b.HasIndex("ApprovedByEmployeeId");
 
                     b.HasIndex("InvoiceId");
 
@@ -1053,6 +1264,10 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.Property<int>("CategoryId")
                         .HasColumnType("int");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -1333,14 +1548,34 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Property<int>("GamingSessionId")
                         .HasColumnType("int");
 
+                    b.Property<string>("OperationKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("WalletTransactionId")
+                        .HasColumnType("int");
+
                     b.HasKey("ChargeId");
 
-                    b.HasIndex("GamingSessionId");
+                    b.HasIndex("OperationKey")
+                        .IsUnique()
+                        .HasFilter("[OperationKey] IS NOT NULL");
 
-                    b.ToTable("SessionCharges", (string)null);
+                    b.HasIndex("WalletTransactionId")
+                        .IsUnique()
+                        .HasFilter("[WalletTransactionId] IS NOT NULL");
+
+                    b.HasIndex("GamingSessionId", "EndTime")
+                        .IsUnique();
+
+                    b.ToTable("SessionCharges", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SessionCharges_BillingMetadata", "[OperationKey] IS NULL OR (LEN(LTRIM(RTRIM([OperationKey]))) > 0 AND [Amount] > 0 AND [EndTime] > [StartTime])");
+                        });
                 });
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.Shift", b =>
@@ -1758,7 +1993,132 @@ namespace CyberManagement.Infrastructure.Migrations
 
                     b.ToTable("WalletTransactions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_WalletTransactions_WriterMetadata", "([OperationKey] IS NULL AND [Kind] IS NULL AND [SourceType] IS NULL AND [SourceId] IS NULL AND [OriginalDebitId] IS NULL AND [ActorType] IS NULL AND [ActorEmployeeId] IS NULL) OR ([OperationKey] IS NOT NULL AND LEN(LTRIM(RTRIM([OperationKey]))) > 0 AND [Kind] IS NOT NULL AND [Kind] IN ('Credit','Debit','Refund') AND [SourceType] IS NOT NULL AND LEN(LTRIM(RTRIM([SourceType]))) > 0 AND [SourceId] IS NOT NULL AND LEN(LTRIM(RTRIM([SourceId]))) > 0 AND [ActorType] IS NOT NULL AND (([ActorType] = 'Staff' AND [ActorEmployeeId] IS NOT NULL) OR ([ActorType] = 'System' AND [ActorEmployeeId] IS NULL)) AND [BalanceAfter] >= 0 AND (([Kind] = 'Debit' AND [Amount] < 0 AND [OriginalDebitId] IS NULL) OR ([Kind] = 'Credit' AND [Amount] > 0 AND [OriginalDebitId] IS NULL) OR ([Kind] = 'Refund' AND [Amount] > 0 AND [OriginalDebitId] IS NOT NULL AND [OriginalDebitId] <> [TransactionId])))");
+                            t.HasCheckConstraint("CK_WalletTransactions_WriterMetadata", "([OperationKey] IS NULL AND [Kind] IS NULL AND [SourceType] IS NULL AND [SourceId] IS NULL AND [OriginalDebitId] IS NULL AND [ActorType] IS NULL AND [ActorEmployeeId] IS NULL) OR ([OperationKey] IS NOT NULL AND LEN(LTRIM(RTRIM([OperationKey]))) > 0 AND [Kind] IS NOT NULL AND [Kind] IN ('Credit','Debit','Refund') AND [SourceType] IS NOT NULL AND LEN(LTRIM(RTRIM([SourceType]))) > 0 AND [SourceId] IS NOT NULL AND LEN(LTRIM(RTRIM([SourceId]))) > 0 AND [ActorType] IS NOT NULL AND (([ActorType] = 'Staff' AND [ActorEmployeeId] IS NOT NULL) OR ([ActorType] = 'System' AND [ActorEmployeeId] IS NULL) OR ([ActorType] = 'Customer' AND [ActorEmployeeId] IS NULL AND [Kind] = 'Debit' AND [Type] = 'OrderPayment' AND [SourceType] = 'Order')) AND [BalanceAfter] >= 0 AND (([Kind] = 'Debit' AND [Amount] < 0 AND [OriginalDebitId] IS NULL) OR ([Kind] = 'Credit' AND [Amount] > 0 AND [OriginalDebitId] IS NULL) OR ([Kind] = 'Refund' AND [Amount] > 0 AND [OriginalDebitId] IS NOT NULL AND [OriginalDebitId] <> [TransactionId])))");
+                        });
+                });
+
+            modelBuilder.Entity("CyberManagement.Domain.Entities.ZaloPayIntent", b =>
+                {
+                    b.Property<int>("IntentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IntentId"));
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("ExpectedAmountVnd")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTimeOffset?>("LastQueryAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("MerchantTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateTimeOffset?>("NextQueryAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OperationKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<int?>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PaymentUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<decimal?>("ProviderAmountVnd")
+                        .HasPrecision(18)
+                        .HasColumnType("decimal(18,0)");
+
+                    b.Property<int>("ProviderAppId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ProviderOccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(19)
+                        .HasColumnType("nvarchar(19)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<Guid?>("QueryLeaseToken")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("QueryLeaseUntilUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("RequiresReconciliation")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateTimeOffset?>("VerifiedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("IntentId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("MerchantTransactionId")
+                        .IsUnique();
+
+                    b.HasIndex("OperationKey")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasFilter("[OrderId] IS NOT NULL");
+
+                    b.HasIndex("ProviderAppId", "ProviderTransactionId")
+                        .IsUnique()
+                        .HasFilter("[ProviderTransactionId] IS NOT NULL");
+
+                    b.HasIndex("Status", "NextQueryAtUtc");
+
+                    b.ToTable("ZaloPayIntents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ZaloPayIntents_ConfirmedAmount", "[Status] <> N'Succeeded' OR ([ProviderAmountVnd] IS NOT NULL AND [ProviderAmountVnd] = [ExpectedAmountVnd])");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_MerchantId", "LEN([MerchantTransactionId]) = 39 AND SUBSTRING([MerchantTransactionId],1,6) NOT LIKE '%[^0-9]%' AND SUBSTRING([MerchantTransactionId],7,1) = '_' AND SUBSTRING([MerchantTransactionId],8,32) NOT LIKE '%[^0-9a-f]%'");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_QueryLease", "([QueryLeaseToken] IS NULL AND [QueryLeaseUntilUtc] IS NULL) OR ([QueryLeaseToken] IS NOT NULL AND [QueryLeaseUntilUtc] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_Receipt", "([ProviderTransactionId] IS NULL AND [ProviderAmountVnd] IS NULL AND [ProviderOccurredAtUtc] IS NULL AND [VerifiedAtUtc] IS NULL AND [Status] <> N'Succeeded') OR ([ProviderTransactionId] IS NOT NULL AND TRY_CONVERT(bigint,[ProviderTransactionId]) IS NOT NULL AND TRY_CONVERT(bigint,[ProviderTransactionId]) > 0 AND CONVERT(varchar(19),TRY_CONVERT(bigint,[ProviderTransactionId])) = [ProviderTransactionId] AND [ProviderTransactionId] NOT LIKE '%[^0-9]%' AND [ProviderAmountVnd] IS NOT NULL AND [ProviderAmountVnd] > 0 AND [VerifiedAtUtc] IS NOT NULL AND ([Status] = N'Succeeded' OR [RequiresReconciliation] = 1))");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_Source", "([Purpose] = N'TopUp' AND [OrderId] IS NULL) OR ([Purpose] = N'Order' AND [OrderId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ZaloPayIntents_Values", "[CustomerId] > 0 AND [ProviderAppId] > 0 AND [ExpectedAmountVnd] BETWEEN 1 AND 999999999 AND [Status] IN (N'Pending',N'Succeeded',N'Failed',N'Expired') AND LEN([OperationKey]) > 0 AND [ExpiresAtUtc] > [CreatedAtUtc]");
                         });
                 });
 
@@ -1878,6 +2238,11 @@ namespace CyberManagement.Infrastructure.Migrations
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.GamingSession", b =>
                 {
+                    b.HasOne("CyberManagement.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("ClosedByEmployeeId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("CyberManagement.Domain.Entities.Computer", "Computer")
                         .WithMany("GamingSessions")
                         .HasForeignKey("ComputerId")
@@ -1889,6 +2254,11 @@ namespace CyberManagement.Infrastructure.Migrations
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("CyberManagement.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("OpenedByEmployeeId")
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Computer");
 
@@ -1945,8 +2315,7 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.HasOne("CyberManagement.Domain.Entities.Employee", "Employee")
                         .WithMany()
                         .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("CyberManagement.Domain.Entities.GamingSession", "GamingSession")
                         .WithMany()
@@ -2033,8 +2402,7 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.HasOne("CyberManagement.Domain.Entities.Employee", "Employee")
                         .WithMany()
                         .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("CyberManagement.Domain.Entities.GamingSession", "GamingSession")
                         .WithMany()
@@ -2050,6 +2418,11 @@ namespace CyberManagement.Infrastructure.Migrations
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.OrderDetail", b =>
                 {
+                    b.HasOne("CyberManagement.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("ConfirmedByEmployeeId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("CyberManagement.Domain.Entities.Order", "Order")
                         .WithMany("Details")
                         .HasForeignKey("OrderId")
@@ -2067,13 +2440,28 @@ namespace CyberManagement.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("CyberManagement.Domain.Entities.OrderOperation", b =>
+                {
+                    b.HasOne("CyberManagement.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("CyberManagement.Domain.Entities.OrderStatusHistory", b =>
                 {
                     b.HasOne("CyberManagement.Domain.Entities.Employee", "ChangedByEmployee")
                         .WithMany()
                         .HasForeignKey("ChangedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CyberManagement.Domain.Entities.OrderDetail", null)
+                        .WithMany()
+                        .HasForeignKey("OrderDetailId")
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("CyberManagement.Domain.Entities.Order", "Order")
                         .WithMany("StatusHistory")
@@ -2088,6 +2476,11 @@ namespace CyberManagement.Infrastructure.Migrations
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.Payment", b =>
                 {
+                    b.HasOne("CyberManagement.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedByEmployeeId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("CyberManagement.Domain.Entities.Invoice", "Invoice")
                         .WithMany("Payments")
                         .HasForeignKey("InvoiceId")
@@ -2216,7 +2609,14 @@ namespace CyberManagement.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("CyberManagement.Domain.Entities.WalletTransaction", "WalletTransaction")
+                        .WithMany()
+                        .HasForeignKey("WalletTransactionId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.Navigation("GamingSession");
+
+                    b.Navigation("WalletTransaction");
                 });
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.Shift", b =>
@@ -2389,6 +2789,24 @@ namespace CyberManagement.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("CyberManagement.Domain.Entities.ZaloPayIntent", b =>
+                {
+                    b.HasOne("CyberManagement.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CyberManagement.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("CyberManagement.Domain.Entities.Category", b =>

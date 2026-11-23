@@ -21,6 +21,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
 
         var status = exception switch
         {
+            PaymentUnavailableException => StatusCodes.Status503ServiceUnavailable,
             EntityNotFoundException => StatusCodes.Status404NotFound,
             BusinessRuleException => StatusCodes.Status409Conflict,
             ValidationException => StatusCodes.Status400BadRequest,
@@ -36,15 +37,18 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
             403 => "Không có quyền truy cập",
             404 => "Không tìm thấy dữ liệu",
             409 => "Không thể thực hiện thao tác",
+            503 => "Cổng thanh toán chưa sẵn sàng",
             _ => "Lỗi hệ thống"
         };
         if (status == 500)
             logger.LogError(exception, "Lỗi xử lý API {Path}; TraceId: {TraceId}", context.Request.Path, context.TraceIdentifier);
 
+        var extensions = new Dictionary<string, object?> { ["traceId"] = context.TraceIdentifier };
+        if (exception is OrderRuleException orderError) extensions["code"] = orderError.Code;
         await Results.Problem(statusCode: status, title: title,
             detail: status == 500 ? "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau." : exception.Message,
             instance: context.Request.Path,
-            extensions: new Dictionary<string, object?> { ["traceId"] = context.TraceIdentifier })
+            extensions: extensions)
             .ExecuteAsync(context);
         return true;
     }

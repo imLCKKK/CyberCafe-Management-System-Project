@@ -10,6 +10,7 @@ public class ComputerMaintenanceConfiguration : IEntityTypeConfiguration<Compute
     {
         builder.ToTable("ComputerMaintenance");
         builder.HasKey(x => x.MaintenanceId);
+        builder.HasIndex(x => x.ComputerId).IsUnique().HasFilter("[EndTime] IS NULL");
 
         builder.Property(x => x.Description).HasMaxLength(255);
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();

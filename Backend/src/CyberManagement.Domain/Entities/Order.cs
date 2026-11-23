@@ -8,7 +8,14 @@ public class Order
 
     public int? GamingSessionId { get; set; }
 
-    public int EmployeeId { get; set; }
+    public int? EmployeeId { get; set; }
+
+    public string ActorType { get; set; } = "Staff";
+    // Null chỉ dành cho đơn lịch sử trước khi tích hợp checkout.
+    public string? PaymentMethod { get; set; }
+    public DateTimeOffset? ReservedUntilUtc { get; set; }
+    public DateTime LastChangedAtUtc { get; set; } = DateTime.UtcNow;
+    public byte[] Version { get; set; } = [];
 
     public DateTime OrderTime { get; set; } = DateTime.UtcNow;
 
@@ -26,7 +33,7 @@ public class Order
 
     public GamingSession? GamingSession { get; set; }
 
-    public Employee Employee { get; set; } = null!;
+    public Employee? Employee { get; set; }
 
     public ICollection<OrderDetail> Details { get; set; } = new List<OrderDetail>();
 

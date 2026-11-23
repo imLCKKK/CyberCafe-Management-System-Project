@@ -18,7 +18,129 @@ SCRUM-5 đã nối tạo/đọc khách và đọc hồ sơ/ví chính chủ qua 
 SCRUM-21 / S2-M-1 triển khai shared credit/debit/refund và nạp tại quầy qua transaction SQL chung;
 writer không tự SaveChanges/commit. Hai migration bổ sung giữ ledger/Approved lịch sử, tính tiền tặng
 cho Pending và tạo model 39 bảng/bảy migration trên base SCRUM-13. Bảng dự án bên trên mô tả nền gốc.
-Quyết định phiên/đơn ngày 14/11 giữ nguyên; gateway ZaloPay, worker phiên và checkout theo task riêng.
+Quyết định phiên/đơn ngày 14/11 giữ nguyên; worker phiên đã triển khai tại SCRUM-24.
+
+## SCRUM-24: máy, phiên, tiền giờ và Home API
+
+Giữ API CRUD/bảo trì hiện có, gồm GET/POST `computers/{id}/maintenances`, PUT theo maintenanceId và POST `.../{maintenanceId}/complete`. Catalog dùng transaction ReadCommitted với application lock thống nhất để tránh deadlock khi tạo máy đồng thời ở các phòng/loại khác nhau.
+
+`GET/POST /api/admin/sessions` đọc phiên chưa đóng/mở phiên; `POST /api/admin/sessions/{id}/close` đóng phiên với body `{}`. Mở/đóng dùng header `Idempotency-Key`; quyền tương ứng `session.view/start/end`, đóng cần thêm `invoice.create`. Server lấy actor từ JWT, từ chối giá, thời lượng, số tiền hoặc actor do browser tự gửi. `GET /api/client/home` chỉ đọc máy/loại/cấu hình, snapshot, phí và số dư của khách đăng nhập.
+
+Server tính tổng phí `ceil(priceSnapshot * floor(elapsedSeconds) / 3600)`, thu chênh lệch theo khóa Customer → Computer → GamingSession. SessionCharge, ledger GamingCharge, Payment, số dư và mốc thu cùng transaction; đóng liên kết các khoản thu với hóa đơn tiền giờ riêng và giải phóng máy trong cùng transaction. Retry giữ kết quả đã lưu, không thu/phát hành lặp.
+
+Worker chạy khi khởi động và mỗi 10 giây, dùng cùng quyết toán trước debit ví khác. Không đủ trả giây tiếp theo thì chốt tại mốc đủ ngân sách và ghi System, độc lập người mở. Event SessionChanged/WalletChanged/ComputerChanged chỉ phát sau commit, kể cả khi caller ví quyết toán phiên. Rollback không phát event.
+
+Migration PrepareSessionBilling được giữ nguyên. Migration `20261118090000_ComputerSessionsBilling` chỉ bổ sung actor/kết quả đóng và unique hồ sơ bảo trì đang mở; không xóa snapshot, computed open slot hoặc metadata cũ. Phiên mới lưu cả snapshot tương thích cũ và PricePerHourSnapshot, khoản thu lưu OperationKey/liên kết ledger. Sau khi tích hợp SCRUM-22, model có 41 bảng, 18 migration. Không tự áp migration lên DB ứng dụng.
+
+Kiểm tra từ repository root:
+
+```powershell
+dotnet run --project Backend/tests/CyberManagement.API.Checks -- --sessions-only
+dotnet run --project Backend/tests/CyberManagement.API.Checks -- --session-schema
+node --test frontend/tests/session-api.test.mjs frontend/tests/computer-api.test.mjs
+node frontend/tests/run.mjs computers-management sessions-billing realtime
+```
+
+SQL suite dùng `AUTH_CHECKS_SQL_CONNECTION`, luôn tạo/dọn DB thử riêng; gồm 32 tạo máy đồng thời, retry, rollback giữa debit và hóa đơn, nhiều worker/System, outer rollback không event và hai kết nối SignalR. Browser dùng HTTP/SDK fixtures; chưa thay thế kiểm chứng hai máy LAN thật.
+
+## SCRUM-27 / S2-K-1: đặt món, voucher và thanh toán
+
+API đơn món dùng SQL thật: `POST/GET /api/client/orders`, `GET /api/client/orders/{id}`;
+nhân viên dùng các route tương ứng tại `/api/admin/orders`. Tạo đơn chỉ nhận ID món/số lượng,
+phương thức `Wallet` hoặc `Cash`, phiên và mã voucher tùy chọn. Server lấy giá, snapshot tên/giá/giảm,
+trừ tồn qua InventoryService và dùng lượt qua VoucherService trong cùng transaction.
+Wallet quyết toán phí phiên qua ISessionSettlement trước debit và ghi Payment; Cash chờ thực thu.
+Nếu quyết toán buộc đóng phiên, checkout trả 409 và rollback toàn bộ, kể cả số dư lẻ còn đủ trả món.
+Áp dụng cả đơn tại quầy không truyền phiên; worker tính tiền giờ xử lý độc lập sau đó.
+
+Nhân viên xác nhận tiền mặt tại `POST /api/admin/orders/{id}/cash-collections` với
+`{"expectedVersion":"<base64 từ GET>","cashReceived":true}` và quyền `payment.create`.
+Nhận món tại `POST /api/admin/orders/{id}/items/{detailId}/confirm` với `expectedVersion` và
+`order.status.update`; server chặn khi chưa thanh toán đủ. Waiter chỉ được đặt Cash và nhận món đã trả tiền.
+Mọi POST cần `Idempotency-Key` 8–100 ký tự ASCII chữ/số hoặc `._:-`; retry giữ nguyên body/key.
+Replay trả 200, cùng OrderId và header `Idempotency-Replayed: true`; payload khác trả 409.
+Cash phải giữ bằng chứng tiếp nhận tại quầy theo contract mục 7.1.1, không thu lại chỉ vì timeout.
+
+Migration `20261119050701_ImplementFoodOrderCheckout` thêm rowversion, phương thức/actor,
+audit nhận món và bảng OrderOperations (model sau tích hợp SCRUM-22/SCRUM-24 có 42 bảng/19 migration,
+trên nền CyberManagement 35 bảng).
+EmployeeId/ChangedBy nullable cho khách, ledger Customer chỉ cho debit OrderPayment; không dùng nhân viên giả.
+Đơn lịch sử giữ PaymentMethod null, tiền và người thực hiện cũ; không tự suy phương thức thanh toán.
+SQL/DBML được xuất lại từ EF; downgrade bị chặn nếu đã có lịch sử checkout mới.
+
+Hóa đơn tiếp tục phát hành riêng qua module hóa đơn: checkout lưu Payment theo OrderId,
+ApplyFinancialChange cập nhật hóa đơn đã có cùng transaction, không tự phát hành hoặc thu thêm.
+Event OrderChanged/WalletChanged gửi sau commit tới nhóm được phép. UI đặt món thuộc S2-K-3,
+ZaloPay/giữ chỗ được bổ sung ở S2-K-2 bên dưới; hủy/hoàn tiền thuộc S3-K-1.
+Adapter gateway SCRUM-22 từ chối tạo bill ZaloPay cho đơn đã chọn Cash/Wallet; phương thức đơn không đổi sau tạo.
+
+Kiểm tra SQL/API, harness chỉ tạo và dọn DB `CyberManagement_AuthChecks_<ngẫu nhiên>`:
+
+```powershell
+$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;TrustServerCertificate=True'
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --orders-only
+```
+
+Contract: [004-order-checkout-contract.md](docs/004-order-checkout-contract.md).
+
+## S2-K-2: checkout ZaloPay và giữ chỗ
+
+Triển khai local trên base `f238d5f`, ngày 20/11/2026; backend CyberManagement, không đổi luồng Wallet/Cash.
+`POST /api/client/orders` và `/api/admin/orders` nhận thêm `paymentMethod: "ZaloPay"`.
+Nhân viên cần cả `order.create` và `payment.create`; khách phải dùng phiên Active của mình.
+Server snapshot giá/voucher, ghi Sale và usage như các phương thức khác. Đơn có tiền tạo
+`AwaitingPayment`, `ReservedUntilUtc` và Payment Pending với mã merchant bền vững trong cùng transaction.
+Hạn 15 phút cố định theo contract; `Checkout:ReservationMinutes` nếu cấu hình phải bằng `15`.
+Đơn 0 đồng dùng Pending/NotRequired, không có hạn giữ chỗ hay lời gọi provider.
+
+Sau commit mới gọi adapter ZaloPay. `OrderDto.payment` trả `paymentUrl`, `expiresAtUtc`, `paymentId`
+và `requiresReconciliation`. Provider chưa sẵn sàng/thiếu URL vẫn giữ đơn đã lưu; retry cùng key
+trả cùng đơn/hạn, không tạo bill mới. Client đọc lại GET khi đang chờ, không dùng redirect để đánh dấu Paid.
+URL không trả sau hạn; giao diện menu/giỏ tích hợp các trường này thuộc S2-K-3.
+
+`IOrderZaloPaySettlement.ApplyAsync(orderId)` là điểm nối server phía Order: tự đọc receipt bền vững
+của SCRUM-22, đối chiếu purpose, khách, đơn, merchant và số tiền. Callback/Query gọi điểm nối sau khi
+receipt commit; callback chỉ ACK thành công sau settlement/replay. Trong hạn chuyển Payment Succeeded,
+đơn về Pending để nhân viên nhận món; không trừ tồn/lượt lần hai hoặc ghi ví.
+
+`OrderCheckoutWorker` quét ngay khi startup và mỗi 15 giây, xử lý hết hạn/receipt còn chưa áp dụng.
+`OrderGatewayRecoveryWorker` phục hồi bước tạo bill bị gián đoạn trong vòng HTTP riêng để không chặn
+quét hết hạn. Worker query gateway tiếp tục đối soát cả intent Failed/Expired của đơn có giữ chỗ.
+Expiry và callback dùng chung khóa Customer → phiên liên quan → Order → Payment → Product → Promotion;
+trả từng dòng đúng một lần và giải phóng usage cùng transaction. Event OrderChanged chỉ gửi sau commit.
+
+Tiền xác minh tại/sau hạn vẫn được ghi nhận, đơn giữ Expired/Cancelled; tạo Refund Pending toàn khoản thu
+với ApprovedByEmployeeId/ApprovedAtUtc null và audit hệ thống. Không khôi phục món, không cộng ví, không
+tự gửi hoàn. API duyệt/gửi hoàn thuộc S3-K-1/S3-M-2; TopUp và nghiệm thu sandbox thật thuộc S2-M-3.
+Receipt đã lưu mà settlement lỗi được worker/callback retry phục hồi; không yêu cầu provider thu lại.
+Đơn lịch sử không có ReservedUntilUtc tiếp tục theo adapter cũ, không bị suy diễn thành reservation mới.
+
+Migration mới `20261120081752_AddZaloPayOrderReservations` thêm hạn giữ chỗ và cột duyệt hoàn nullable;
+giữ dữ liệu lịch sử, model 42 bảng/20 migration trên nền 35 bảng. Down bị chặn khi đã có lịch sử mới.
+Chỉ áp migration vào DB triển khai sau khi Trưởng nhóm xem xét; bộ kiểm tra tự tạo/dọn DB thử riêng:
+
+```powershell
+$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;TrustServerCertificate=True'
+dotnet build Backend/tests/CyberManagement.API.Checks --no-restore -m:1 -p:UseSharedCompilation=false
+dotnet run --no-build --project Backend/tests/CyberManagement.API.Checks -- --order-zalopay-only
+dotnet run --no-build --project Backend/tests/CyberManagement.API.Checks -- --orders-only
+dotnet run --no-build --project Backend/tests/CyberManagement.API.Checks -- --gateway-only
+```
+
+Suite mới dùng gateway fixture và SQL thật: xác minh deadline, giữ/trả tồn/lượt, retry, sai số tiền,
+callback không hợp lệ, Failed→Succeeded qua Query, thu muộn, rollback, worker startup và cạnh tranh.
+Đây chưa phải bằng chứng gọi/thanh toán ZaloPay sandbox chính thức hoặc hai máy LAN.
+
+## SCRUM-22: adapter gateway và callback
+
+[Hợp đồng gateway](docs/007-zalopay-gateway-callbacks.md) mô tả API TopUp/Order, intent/receipt,
+HMAC/callback/Query, cấu hình secret và cách phân biệt fixture với gọi sandbox thật.
+Create lưu ID/số tiền trước HTTP; callback/Query ghi receipt chống lặp. S2-K-2 bổ sung điểm nối Order
+có giữ chỗ ở trên; cộng ví TopUp và nghiệm thu provider thật thuộc S2-M-3; luồng tiền mặt SCRUM-21 giữ nguyên.
+
+Từ repository root, chạy `.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --zalopay-gateway-checks`;
+chế độ SQL `--gateway-only` yêu cầu `AUTH_CHECKS_SQL_CONNECTION`
+và tạo/dọn DB thử riêng. Chi tiết các lệnh nằm trong hợp đồng; không ghi keys hoặc URL token vào log.
 
 ## SCRUM-21: nạp tiền mặt và tiền tặng
 
@@ -59,7 +181,7 @@ Cần .NET 10 SDK; `global.json` chọn bản ổn định. Wrapper tìm SDK por
 
 ## Cấu hình DB mới và secret
 
-`ConnectionStrings:DefaultConnection` trong cấu hình chung được để trống. API yêu cầu cấp connection string và JWT signing key bằng User Secrets hoặc biến môi trường. `appsettings.Development.json` nếu dùng chỉ là file local được ignore; không đặt signing key dùng chung trong repo.
+`ConnectionStrings:DefaultConnection` phải trỏ đúng server/DB của môi trường đang chạy; file chung hiện có giá trị cục bộ từ dev. Dùng cấu hình Development, User Secrets hoặc biến môi trường để ghi đè và cấp JWT signing key riêng. `appsettings.Development.json` nếu dùng chỉ là file local được ignore; không đặt signing key dùng chung trong repo.
 
 Ví dụ với SQL Server cục bộ, dùng **tên DB mới của bạn**, từ repository root:
 
@@ -132,6 +254,19 @@ Seed test nằm trong `src/CyberManagement.Infrastructure/DataTest/InventoryRead
 SQL/DBML được xuất từ migrations/model hiện tại ở [database](database/).
 Hướng dẫn DB thử, seed, đăng nhập, màn hình và kiểm thử: [SCRUM-13](../docs/scrum-13-inventory-setup.md).
 
+## SCRUM-24 bước 2: schema phiên và khóa quyết toán
+
+`20261114104346_PrepareSessionBilling` bổ sung snapshot giá/actor, khóa mở/đóng/thu, liên kết ledger và unique slot phiên chưa đóng theo máy/khách; giữ 38 bảng tại baseline bước 2. Metadata lịch sử giữ null, không backfill giá hoặc nhân viên giả. Migration dừng nếu có phiên chưa đóng trùng hoặc khoản thu trùng mốc; downgrade dừng khi đã có metadata tiền mới. API phiên/thu tiền hiện đã triển khai ở mục SCRUM-24 phía trên; không tự áp migration lên DB chung.
+
+Kiểm tra schema offline, không cần connection string và không mở kết nối SQL:
+
+```powershell
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --session-schema
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.Inventory.Checks -- --check-schema
+```
+
+Đối chiếu trường/ràng buộc và giới hạn tích hợp tại [contract máy/phiên](docs/002-computer-session-contract.md). Cần phê duyệt DB thử cụ thể trước khi áp migrations/chạy ca SQL; kết quả offline/InMemory không thay thế kiểm chứng SQL Server hoặc hai máy LAN.
+
 ## S1-K-1 / SCRUM-10: danh mục, sản phẩm và menu
 
 Module dùng `Categories`/`Products` và DbContext CyberManagement hiện có, bao gồm migration
@@ -166,6 +301,59 @@ Có tìm/lọc, tải lại và tải lại khi cửa sổ nhận focus; lỗi/r
 Giỏ chỉ lưu lựa chọn tạm trong màn hình; reload toàn trang làm trống giỏ. Lịch sử demo còn được gắn nhãn riêng.
 Đường đặt ví/tiền mặt demo đã được gỡ khỏi menu SQL: nút gửi đơn chưa khả dụng cho đến khi
 task checkout triển khai; không dùng ProductId thật để tạo đơn/trừ tiền localStorage.
+
+### SCRUM-34 — ảnh sản phẩm
+
+Migration mới `20261117130111_AddProductImageUrl` thêm `Products.ImageUrl` nullable `nvarchar(500)`;
+không sửa migration cũ. GET sản phẩm/menu trả thêm `imageUrl`. POST/PUT nhận trường ảnh tùy chọn:
+
+```json
+{"name":"Mì xào bò","categoryId":1,"currentPrice":32000,"isActive":true,"imageUrl":"/food/mi-xao-bo-v1.640.jpg"}
+```
+
+Ảnh cho phép đường dẫn từ gốc frontend (`/food/…`) hoặc URL HTTP/HTTPS không chứa thông tin đăng nhập,
+tối đa 500 ký tự sau trim; từ chối URL kiểu `javascript:`, `data:`, `file:`, đường dẫn `//`, ký tự điều khiển và dấu gạch chéo ngược.
+PUT không gửi `imageUrl` giữ nguyên ảnh cũ; gửi `null`, chuỗi trống hoặc toàn khoảng trắng xóa ảnh.
+Thay ảnh không ghi tồn hoặc giá lịch sử. Form admin có trường đường dẫn ảnh không bắt buộc và thumbnail.
+
+[Menu đã chốt](../docs/nexora-menu.md) và [bảng URL ảnh](../docs/nexora-menu-assets.json) phục vụ đối chiếu
+sản phẩm SQL; chúng không phải nguồn sản phẩm thay API. Backend không tự tải hoặc upload ảnh;
+đường dẫn `/food/…` được frontend phục vụ. Áp migration trên DB đúng đích theo quy trình cấu hình ở trên.
+
+### Nạp menu NEXORA vào Development
+
+Ngày 17/11/2026, nhánh SCRUM-34 đã đồng bộ `origin/dev` tại `490303a` (21 commit mới), giữ phần ảnh/menu local. API/web dùng DB Development đã cập nhật schema; chức năng nạp tại quầy từ SCRUM-21 hiện có tại `/client/wallet` và `/admin/topups`. Đăng nhập lại sau cập nhật để nhận phiên/quyền mới.
+
+Theo yêu cầu ngày 17/11/2026, đã tạo DB **`localhost / CyberManagement_Dev`**, áp đủ 15 migration
+và nạp **7 danh mục, 62 sản phẩm** cùng giá/ảnh theo menu đã chốt. Tất cả món mới có tồn bằng 0;
+nhập/điều chỉnh tồn vẫn thuộc nghiệp vụ kho. Combo và món thêm là các dòng danh mục;
+script này chưa triển khai cấu thành combo, trừ tồn thành phần hay lựa chọn cấp cay.
+
+Cấu hình máy hiện tại nằm trong `src/CyberManagement.API/appsettings.Development.json` (được Git ignore).
+File chứa connection string Windows Authentication, signing key riêng và mật khẩu ngẫu nhiên cho năm
+tài khoản Development do seeder hiện có tạo. Đăng nhập admin bằng `admin`; lấy mật khẩu tại
+`SeedAccounts:Admin:Password` trong file local, không copy file hoặc các secret lên Git.
+
+Script [NexoraMenuSeed.sql](database/NexoraMenuSeed.sql) chạy thủ công sau migration;
+không được gọi tự động trong API startup. Từ repo root:
+
+```powershell
+$env:ConnectionStrings__DefaultConnection = 'Server=localhost;Database=CyberManagement_Dev;Integrated Security=True;TrustServerCertificate=True'
+.\scripts\ef-local.cmd database update --project Backend\src\CyberManagement.Infrastructure --startup-project Backend\src\CyberManagement.API
+sqlcmd -S localhost -E -C -d CyberManagement_Dev -b -f 65001 -i Backend/database/NexoraMenuSeed.sql
+```
+
+Script chỉ nhận `CyberManagement_Dev` hoặc DB thử riêng `CyberManagement_AuthChecks_*`, kiểm tra migration
+ảnh đã áp, dừng nếu tên bị trùng/mapping danh mục mơ hồ. Chạy lại chỉ thêm dòng thiếu, giữ nguyên ID,
+giá, ảnh, trạng thái và tồn đã sửa; không xóa dữ liệu ngoài danh sách. Giá/ảnh của sản phẩm đã có cần
+được cập nhật qua form quản lý nếu muốn thay đổi. Bộ ảnh không thay nguồn dữ liệu API.
+
+Kiểm tra seed bằng SQL Server trong DB thử riêng do harness tự tạo và dọn:
+
+```powershell
+$env:AUTH_CHECKS_SQL_CONNECTION = 'Server=localhost;Integrated Security=True;TrustServerCertificate=True'
+.\scripts\dotnet-local.cmd run --project Backend\tests\CyberManagement.API.Checks -- --menu-seed-only
+```
 Checkout tương lai phải lấy lại giá/tồn tại server theo [contract đơn](docs/004-order-checkout-contract.md).
 Không có event SignalR mới trong task catalog.
 
@@ -234,3 +422,7 @@ Probe chỉ kiểm tra HTTPS/chữ ký, không có SQL/ghi tiền hoặc acknowl
 Ngày 09/11/2026 Query sandbox bằng AppId 554/Key1 dùng thử đã đạt controls chữ ký đúng/sai
 (`2/-101` và `2/-402`), gỡ blocker kết nối trước đó. Xem phạm vi và bằng chứng trong contract;
 Create, callback từ khoản thanh toán thật và ghi tiền vẫn thuộc luồng tích hợp S2.
+
+## Hóa đơn SCRUM-31
+
+[API, phát hành/in và điểm gọi transaction](docs/invoice-api.md).

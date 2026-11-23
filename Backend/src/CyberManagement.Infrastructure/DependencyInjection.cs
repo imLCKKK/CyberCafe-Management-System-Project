@@ -1,4 +1,4 @@
-﻿using CyberManagement.Application.Interfaces.Repositories;
+using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Infrastructure.Persistance;
 using CyberManagement.Infrastructure.Repositories;
@@ -16,6 +16,8 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructureServices(
         this IServiceCollection services, IConfiguration configuration)
     {
+        if (configuration["Checkout:ReservationMinutes"] is { } reservationMinutes && reservationMinutes != "15")
+            throw new InvalidOperationException("Checkout:ReservationMinutes must be 15 under the agreed checkout contract.");
         var connectionString = configuration.GetConnectionString("DefaultConnection");
         if (string.IsNullOrWhiteSpace(connectionString))
         {
@@ -23,15 +25,19 @@ public static class DependencyInjection
                 "Configure ConnectionStrings:DefaultConnection with User Secrets or an environment variable for the 35-table database.");
         }
 
-        services.AddDbContext<ApplicationDbContext>(options =>
+        services.AddScoped<SessionCommitEvents>();
+        services.AddScoped<ISessionRepository, SessionRepository>();
+        services.AddDbContext<ApplicationDbContext>((provider, options) =>
             options.UseSqlServer(connectionString, b =>
-                b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+                b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName))
+                .AddInterceptors(provider.GetRequiredService<SessionCommitEvents>()));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<IInventoryQueries, InventoryQueries>();
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IInventoryMovementRepository,InventoryMovementRepository>();
         services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
         services.AddScoped<ICatalogRepository, CatalogRepository>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<ICustomerIdentityRepository, CustomerIdentityRepository>();
         services.AddScoped<IComputerRepository, ComputerRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
@@ -41,7 +47,12 @@ public static class DependencyInjection
         services.AddScoped<ISessionSettlement, SessionSettlement>();
         services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
         services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
+        services.AddScoped<IVoucherRepository, VoucherRepository>();
+        services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
+        services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
 
+        services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
         return services;
     }
 }

@@ -6,6 +6,7 @@ using CyberManagement.API.Controller;
 using CyberManagement.API.Realtime;
 using CyberManagement.Application;
 using CyberManagement.Application.DTOs.Identity;
+using CyberManagement.Application.Services;
 using CyberManagement.Application.Interfaces.Repositories;
 using CyberManagement.Application.Interfaces.Services;
 using CyberManagement.Application.Security;
@@ -23,6 +24,59 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
+if (args.Contains("--order-zalopay-only"))
+{
+    Console.WriteLine($"{await OrderZaloPayChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} order ZaloPay SQL/API checks passed (fixture gateway; no provider call).");
+    return;
+}
+
+if (args.Contains("--orders-only"))
+{
+    Console.WriteLine($"{await OrderChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} order SQL/API checks passed.");
+    return;
+}
+
+if (args.Contains("--sessions-only"))
+{
+    Console.WriteLine($"{await SessionBillingChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} session SQL/API checks passed.");
+    return;
+}
+
+if (args.Contains("--session-schema"))
+{
+    SessionSchemaChecks.RunModel();
+    return;
+}
+
+if (args.Contains("--menu-seed-only"))
+{
+    await NexoraMenuSeedChecks.RunAsync();
+    return;
+}
+
+if (args.Contains("--zalopay-live-checks"))
+{
+    await ZaloPayLiveChecks.RunAsync();
+    return;
+}
+
+if (args.Contains("--zalopay-gateway-checks"))
+{
+    Console.WriteLine($"{ZaloPayContractChecks.Run()} configuration/signature fixtures and {await ZaloPayGatewayChecks.RunAsync()} gateway protocol fixtures passed (no provider call).");
+    return;
+}
+
+if (args.Contains("--voucher-only"))
+{
+    Console.WriteLine($"{await VoucherChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"))} voucher SQL/API checks passed.");
+    return;
+}
+
+if (args.Contains("--invoice-only") || args.Contains("--invoice-browser-host"))
+{
+    Console.WriteLine($"{await InvoiceChecks.RunAsync(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"), args.Contains("--invoice-browser-host"))} invoice SQL/API checks passed.");
+    return;
+}
 if (args.Contains("--counter-demo-seed"))
 {
     await CounterDemoSeed.RunAsync();
@@ -76,10 +130,11 @@ if (args.Contains("--catalog-browser-host"))
 var catalogOnly = args.Contains("--catalog-only");
 var customerOnly = args.Contains("--customer-only");
 var walletOnly = args.Contains("--wallet-only");
-if (new[] { catalogOnly, customerOnly, walletOnly }.Count(value => value) > 1)
-    throw new ArgumentException("Select one of --catalog-only, --customer-only or --wallet-only.");
-if (walletOnly && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION")))
-    throw new ArgumentException("--wallet-only requires AUTH_CHECKS_SQL_CONNECTION; wallet writers are verified on SQL Server.");
+var gatewayOnly = args.Contains("--gateway-only");
+if (new[] { catalogOnly, customerOnly, walletOnly, gatewayOnly }.Count(value => value) > 1)
+    throw new ArgumentException("Select one focused check mode at a time.");
+if ((walletOnly || gatewayOnly) && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION")))
+    throw new ArgumentException("Wallet/gateway persistence checks require AUTH_CHECKS_SQL_CONNECTION.");
 
 var databaseFixture = new AuthCheckDatabase(Environment.GetEnvironmentVariable("AUTH_CHECKS_SQL_CONNECTION"));
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -103,10 +158,13 @@ var opggChecks = opggLive || args.Contains("--opgg-checks");
 if (opggLive && databaseFixture.Provider != "SQL Server")
     throw new ArgumentException("--opgg-live requires AUTH_CHECKS_SQL_CONNECTION for an isolated SQL database.");
 var realtimeSaveFailure = new RealtimeSaveFailure();
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+builder.Services.AddScoped<SessionCommitEvents>();
+builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+builder.Services.AddDbContext<ApplicationDbContext>((provider, options) =>
 {
     databaseFixture.Configure(options);
     options.AddInterceptors(realtimeSaveFailure);
+    options.AddInterceptors(provider.GetRequiredService<SessionCommitEvents>());
 });
 builder.Services.AddApplicationServices();
 builder.Services.AddApiServices(builder.Configuration);
@@ -122,19 +180,30 @@ builder.Services.AddScoped<IWalletLedgerWriter, WalletLedgerWriter>();
 builder.Services.AddScoped<ISessionSettlement, SessionSettlement>();
 builder.Services.AddScoped<IComputerRepository, ComputerRepository>();
 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IInventoryQueries, InventoryQueries>();
+builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
+builder.Services.AddScoped<IPromotionUsageRepository, PromotionUsageRepository>();
+builder.Services.AddScoped<IVoucherUnitOfWork, VoucherUnitOfWork>();
+builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+builder.Services.AddScoped<IInvoiceUnitOfWork, InvoiceUnitOfWork>();
 builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
 builder.Services.AddScoped<IInventoryUnitOfWork, InventoryUnitOfWork>();
 builder.Services.AddScoped<IEmployeePasswordHasher, EmployeePasswordHasher>();
 builder.Services.AddScoped<ICustomerPasswordHasher, CustomerPasswordHasher>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<GatewayChecksGateway>();
+builder.Services.AddSingleton<IZaloPayGateway>(provider => provider.GetRequiredService<GatewayChecksGateway>());
+builder.Services.AddScoped<IZaloPayIntentRepository, ZaloPayIntentRepository>();
+builder.Services.AddScoped<IZaloPayPaymentService, ZaloPayPaymentService>();
 builder.Services
     .AddControllers()
     .AddApplicationPart(typeof(AuthController).Assembly);
 
 await using var app = builder.Build();
 HttpClient client = null!;
-var checks = ZaloPayContractChecks.Run();
+var checks = ZaloPayContractChecks.Run() + await ZaloPayGatewayChecks.RunAsync();
 var started = false;
 try
 {
@@ -278,21 +347,27 @@ try
         return;
     }
 
-    if (!catalogOnly && !customerOnly && !walletOnly)
+    if (!catalogOnly && !customerOnly && !walletOnly && !gatewayOnly)
     {
         checks += await ComputerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
         checks += await RealtimeChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+        checks += await ComputerManagementChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
+        checks += SessionSchemaChecks.RunModel();
+        await using var sessionSchemaScope = app.Services.CreateAsyncScope();
+        checks += await SessionSchemaChecks.RunSqlAsync(sessionSchemaScope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
         checks += await TournamentChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
     }
-    if (!customerOnly && !walletOnly)
+    if (!customerOnly && !walletOnly && !gatewayOnly)
         checks += await CatalogChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
-    if (!catalogOnly && !walletOnly)
+    if (!catalogOnly && !walletOnly && !gatewayOnly)
         checks += await CustomerChecks.RunAsync(app.Services, client, staffTokens, customer.AccessToken);
-    if (!catalogOnly && !customerOnly && databaseFixture.Provider == "SQL Server")
+    if (!catalogOnly && !customerOnly && !gatewayOnly && databaseFixture.Provider == "SQL Server")
     {
         checks += await CounterTopUpChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
         checks += await WalletLedgerChecks.RunAsync(app.Services);
     }
+    if (!catalogOnly && !customerOnly && !walletOnly && databaseFixture.Provider == "SQL Server")
+        checks += await ZaloPayPaymentChecks.RunAsync(app, client, staffTokens, customer.AccessToken, realtimeSaveFailure);
 
     await CheckStatus("Expired token is rejected", HttpStatusCode.Unauthorized,
         await SendWithToken(HttpMethod.Get, "/api/auth/me",

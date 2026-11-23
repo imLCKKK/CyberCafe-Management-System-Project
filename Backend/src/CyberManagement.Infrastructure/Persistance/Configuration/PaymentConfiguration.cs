@@ -17,6 +17,7 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
             t.HasCheckConstraint("CK_Payments_Method", "([Method] <> 'Wallet' OR [Status] <> 'Succeeded' OR [WalletTransactionId] IS NOT NULL) AND ([Method] <> 'ZaloPay' OR [Type] <> 'Payment' OR ([MerchantTransactionId] IS NOT NULL AND LEN(LTRIM(RTRIM([MerchantTransactionId]))) > 0 AND ([Status] <> 'Succeeded' OR ([GatewayTransactionId] IS NOT NULL AND LEN(LTRIM(RTRIM([GatewayTransactionId]))) > 0))))");
         });
         builder.HasKey(x => x.PaymentId);
+        builder.HasOne<Employee>().WithMany().HasForeignKey(x => x.ApprovedByEmployeeId).OnDelete(DeleteBehavior.NoAction);
         builder.Property(x => x.Amount).HasPrecision(18, 0);
         builder.Property(x => x.Type).HasMaxLength(10).IsRequired();
         builder.Property(x => x.Method).HasMaxLength(10).IsRequired();

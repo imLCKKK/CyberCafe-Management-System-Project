@@ -1,4 +1,4 @@
-# Màn hình máy — SCRUM-7
+# Màn hình máy — SCRUM-7 / SCRUM-8 / SCRUM-24 bước 1
 
 `ComputersPage` dùng API cho danh sách máy/phòng/loại và đổi trạng thái. Không đọc `computerStore` hoặc ghép khách/phiên/đơn demo với ID SQL. Dashboard/reports/Home giữ nguồn cũ theo phạm vi task; màn hình máy không cam kết đã đồng bộ với các màn hình đó.
 
@@ -24,7 +24,9 @@ SCRUM-8 dùng `accessToken` đã xác minh từ `useAuth()` cho Hub và cùng au
 - Search/lọc phòng/loại/trạng thái, dạng lưới/bảng và thông số nullable lấy từ response. Trạng thái không biết vẫn hiển thị, không cho đổi.
 - Chỉ người có `computer.status.update` thấy nút thay đổi; phiên/bảo trì chưa đóng chặn thao tác theo contract. PATCH gửi đúng `status` và `expectedStatus`, chờ response hợp lệ mới cập nhật UI; không lưu lạc quan hoặc ghi máy vào localStorage.
 - Loading, empty, lỗi kết nối/server và dữ liệu JSON sai có thông báo riêng. `409` đọc lại danh sách; `401` chuyển về login; `403` khi ghi báo lỗi và đọc lại dữ liệu. Reload trang xác minh lại principal và đọc API; không fallback dữ liệu mẫu.
-- CRUD tên/phòng/loại và hồ sơ bảo trì chưa thuộc bước này nên form tạo/sửa máy demo được gỡ khỏi trang SQL.
+- SCRUM-24 bước 1 bổ sung form tạo/sửa/xóa máy và loại máy qua API; quyền `computer.manage`. Máy mới luôn `Available`, không nhận trạng thái/phiên từ form; máy đang chơi hoặc có bảo trì mở không được sửa metadata. Máy có lịch sử và loại máy đang được tham chiếu không được xóa.
+- Người có `maintenance.view` xem lịch sử tại chi tiết máy; `maintenance.manage` được bắt đầu, sửa mô tả hồ sơ đang mở và hoàn tất bảo trì. API lấy nhân viên/thời gian từ server; hoàn tất bảo trì trả máy về trống trong cùng transaction. Hồ sơ đã kết thúc được giữ nguyên để truy vết.
+- `ComputerChanged`, `ComputerTypesChanged`, `MaintenanceChanged` và reconnect đều kích hoạt đọc lại API. Event hồ sơ chỉ phát cho `maintenance.view`; event gửi sau commit. Form không ghi dữ liệu nghiệp vụ vào localStorage.
 
 Từ repository root, dùng Node.js 22+:
 
@@ -39,6 +41,7 @@ npm.cmd --prefix frontend run build
 node --test frontend/tests/computer-proxy.test.mjs
 npm.cmd --prefix frontend run test:frontend:render
 npm.cmd --prefix frontend run test:frontend -- computers-api auth-area
+npm.cmd --prefix frontend run test:frontend -- computers-management
 ```
 
 `computer-api.test.mjs` dùng fetch giả; `computer-proxy.test.mjs` dùng HTTP host thử cho dev/preview và cả hai biến cấu hình proxy. Browser suite `computers-api` thao tác form login thật với HTTP fixtures qua CDP, giữ trạng thái máy ở test process qua reload. Kiểm tra chờ xác minh phiên, token legacy bị bỏ qua, login → đọc → PATCH → reload, chỉ xem, lỗi GET/PATCH, hết phiên và giao diện 390/320px. Đây không phải bằng chứng UI–API–SQL thật. API/SQL có bộ `Backend/tests/CyberManagement.API.Checks`; cần môi trường SQL thử được chỉ định để kiểm chứng đầu-cuối.

@@ -14,6 +14,12 @@ public class OrderDetail
     public string ProductNameSnapshot { get; set; } = null!;
     public decimal DiscountAmount { get; set; }
 
+    // Trạng thái nguồn theo contract checkout, để chụp đúng dòng đã hủy.
+    public string Status { get; set; } = "Pending";
+    public int LineNumber { get; set; }
+    public int? ConfirmedByEmployeeId { get; set; }
+    public DateTime? ConfirmedAtUtc { get; set; }
+
     public Order Order { get; set; } = null!;
 
     public Product Product { get; set; } = null!;

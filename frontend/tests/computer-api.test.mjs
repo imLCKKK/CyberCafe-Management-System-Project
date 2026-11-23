@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { apiRequest, ApiError } from '../src/shared/apiClient.js';
 import { AUTH_STORAGE_KEY, readStoredSession, storeSession, markSessionVerified, clearVerifiedSession } from '../src/shared/auth/api.js';
-import { getComputerData, updateComputerStatus } from '../src/admin/computers/computerApi.js';
+import { getComputerData, updateComputerStatus, saveComputer, saveComputerType, getMaintenances,
+  saveMaintenance, completeMaintenance, deleteComputer } from '../src/admin/computers/computerApi.js';
 import { computerFixture } from './computer-fixture.mjs';
 
 const originalFetch = globalThis.fetch;
@@ -129,4 +130,46 @@ test('computer requests wait for the shared session to be verified', async () =>
   storeSession({ accessToken: 'unverified-token', accountType: 'employee' });
   await assert.rejects(getComputerData(), (error) => error.code === 'AUTH_SESSION_UNVERIFIED');
   assert.equal(requests.length, 0);
+});
+
+test('computer CRUD sends metadata without injected status, flags or financial data', async () => {
+  const row = fixture.computers[0];
+  let sent;
+  globalThis.fetch = async (url, options) => { sent = { url, ...options }; return Response.json(row); };
+  const saved = await saveComputer(101, { ComputerName: ' API-PC-01 ', RoomId: '11', ComputerTypeId: '21',
+    Status: 'Occupied', HasOpenSession: true, WalletBalance: 1 });
+  assert.equal(saved.ComputerId, 101);
+  assert.equal(sent.method, 'PUT');
+  assert.deepEqual(JSON.parse(sent.body), { computerName: 'API-PC-01', roomId: 11, computerTypeId: 21 });
+  globalThis.fetch = async () => Response.json({ ...row, computerId: 102 });
+  await assert.rejects(saveComputer(101, saved), ApiError);
+  globalThis.fetch = async () => new Response(null, { status: 204 });
+  await deleteComputer(101);
+});
+
+test('type updates normalize optional specs and preserve server ID/price', async () => {
+  let sent;
+  globalThis.fetch = async (_url, options) => { sent = JSON.parse(options.body); return Response.json(fixture.types[0]); };
+  const result = await saveComputerType(21, { TypeName: ' API Standard ', PricePerHour: '12345', CPU: ' ', RAM: ' 32 GB ' });
+  assert.equal(result.PricePerHour, 12345);
+  assert.deepEqual(sent, { typeName: 'API Standard', pricePerHour: 12345, cpu: null, ram: '32 GB', gpu: null, description: null });
+  globalThis.fetch = async () => Response.json({ ...fixture.types[0], pricePerHour: '12345' });
+  await assert.rejects(saveComputerType(21, { TypeName: 'Type', PricePerHour: 12345 }), ApiError);
+});
+
+test('maintenance rejects another machine record and malformed completion rather than reporting success', async () => {
+  const record = { maintenanceId: 8, computerId: 101, employeeId: 7, description: 'Clean',
+    startTime: '2026-11-14T10:00:00Z', endTime: null, status: 'InProgress' };
+  let sent;
+  globalThis.fetch = async (_url, options) => { sent = JSON.parse(options.body); return Response.json(record); };
+  await saveMaintenance(101, null, ' Clean ');
+  assert.deepEqual(sent, { description: 'Clean' });
+  globalThis.fetch = async () => Response.json(record);
+  await assert.rejects(completeMaintenance(101, 8), ApiError);
+  globalThis.fetch = async () => Response.json([{ ...record, computerId: 102 }]);
+  await assert.rejects(getMaintenances(101), ApiError);
+  globalThis.fetch = async () => Response.json([{ ...record, startTime: 'invalid' }]);
+  await assert.rejects(getMaintenances(101), ApiError);
+  globalThis.fetch = async () => Response.json({ ...record, endTime: '2026-11-14T11:00:00Z', status: 'Completed' });
+  assert.equal((await completeMaintenance(101, 8)).status, 'Completed');
 });

@@ -1,0 +1,44 @@
+.computer-management fieldset {
+  display: grid;
+  gap: 14px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.computer-management textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+  padding: 10px 12px;
+  color: #44536a;
+  background: #fff;
+  border: 1px solid #dfe6ef;
+  border-radius: 8px;
+  font: inherit;
+}
+.computer-type-list, .maintenance-list {
+  padding: 0;
+  margin: 16px 0;
+  list-style: none;
+}
+.computer-type-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.computer-type-list li, .maintenance-list li {
+  padding: 12px 0;
+  border-bottom: 1px solid #dfe6ef;
+  overflow-wrap: anywhere;
+}
+.computer-type-list p, .maintenance-list p { margin: 6px 0; }
+.maintenance-panel { margin-top: 20px; }
+.maintenance-panel .cafe-dialog-actions, .computer-management .cafe-dialog-actions { flex-wrap: wrap; }
+.computer-delete-confirm { margin-top: 16px; }
+.computer-delete-confirm button { margin: 4px; }
+@media (max-width: 480px) {
+  .computer-type-list li { align-items: flex-start; flex-direction: column; }
+}

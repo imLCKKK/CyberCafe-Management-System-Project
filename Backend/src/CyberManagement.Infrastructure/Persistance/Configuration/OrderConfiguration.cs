@@ -17,6 +17,15 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(x => x.VoucherDiscountTypeSnapshot).HasMaxLength(10);
         builder.Property(x => x.VoucherDiscountValueSnapshot).HasPrecision(18, 2);
         builder.Property(x => x.DiscountAmount).HasPrecision(18, 0);
+        builder.Property(x => x.ActorType).HasMaxLength(10).IsRequired();
+        builder.Property(x => x.PaymentMethod).HasMaxLength(10);
+        builder.Property(x => x.Version).IsRowVersion();
+        builder.HasIndex(x => new { x.Status, x.ReservedUntilUtc });
+        builder.ToTable("Orders", t =>
+        {
+            t.HasCheckConstraint("CK_Orders_CheckoutMethod", "[PaymentMethod] IS NULL OR [PaymentMethod] IN ('Wallet','Cash','ZaloPay')");
+            t.HasCheckConstraint("CK_Orders_Actor", "([ActorType] = 'Staff' AND [EmployeeId] IS NOT NULL) OR ([ActorType] = 'Customer' AND [EmployeeId] IS NULL)");
+        });
         builder.HasKey(x => x.OrderId);
 
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();

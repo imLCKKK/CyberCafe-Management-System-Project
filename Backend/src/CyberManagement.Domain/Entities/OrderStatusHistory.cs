@@ -10,11 +10,14 @@ public class OrderStatusHistory
 
     public string NewStatus { get; set; } = null!;
 
-    public int ChangedBy { get; set; }
+    public int? ChangedBy { get; set; }
+    public string ActorType { get; set; } = "Staff";
+    public int? OrderDetailId { get; set; }
+    public string? Reason { get; set; }
 
     public DateTime ChangedAt { get; set; } = DateTime.UtcNow;
 
     public Order Order { get; set; } = null!;
 
-    public Employee ChangedByEmployee { get; set; } = null!;
+    public Employee? ChangedByEmployee { get; set; }
 }

@@ -12,5 +12,11 @@ public class SessionCharge
 
     public decimal Amount { get; set; }
 
+    public string? OperationKey { get; set; }
+
+    public int? WalletTransactionId { get; set; }
+
+    public WalletTransaction? WalletTransaction { get; set; }
+
     public GamingSession GamingSession { get; set; } = null!;
 }

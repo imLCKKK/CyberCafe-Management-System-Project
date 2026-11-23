@@ -5,6 +5,8 @@ import { useCatalog } from '../../shared/catalog/useCatalog';
 import { disableCatalogItem, saveCategory, saveProduct } from '../../shared/catalog/catalogApi';
 import { AdminPage, StatCard, Panel, Table, Toolbar, Filter, Status, Notice, FormDialog, DetailDialog, ExportButton } from '../shared/AdminUI';
 import { matches, money } from '../shared/adminModel';
+import { FoodArt } from '../../shared/food/FoodArt';
+import './ProductsPage.css';
 
 export function ProductsPage() {
   const { principal } = useAuth();
@@ -20,6 +22,7 @@ export function ProductsPage() {
     { name: 'name', label: 'Tên sản phẩm', maxLength: 150 },
     { name: 'category_id', label: 'Danh mục', options: db.product_categories.filter(c => c.is_active || c.id === editing?.category_id).map(c => [c.id, c.name + (c.is_active ? '' : ' (ngừng dùng — hãy chọn danh mục khác)')]) },
     { name: 'current_price', label: 'Giá bán (VNĐ)', type: 'number', min: 0, max: 999999999, step: 1 },
+    { name: 'image_url', label: 'Đường dẫn ảnh (không bắt buộc)', required: false, maxLength: 500, placeholder: '/food/ten-mon-v1.640.jpg' },
     { name: 'is_active', label: 'Đang kinh doanh', type: 'checkbox' },
   ];
 
@@ -48,7 +51,7 @@ export function ProductsPage() {
           <Filter label="Trạng thái sản phẩm" value={status} onChange={setStatus} options={ [['all', 'Tất cả trạng thái'], ['active', 'Đang bán'], ['inactive', 'Ngừng bán']] }/>
         </Toolbar>
         <Table rows={rows} resetKey={query + category + status} columns={[
-          { key: 'name', label: 'Sản phẩm', sortValue: p => p.name, render: p => <><strong>{p.name}</strong><small>#SP{p.id} · {db.product_categories.find(c => c.id === p.category_id)?.name}</small></> },
+          { key: 'name', label: 'Sản phẩm', sortValue: p => p.name, render: p => <div className="catalog-product-cell"><FoodArt product={p} small/><div><strong>{p.name}</strong><small>#SP{p.id} · {db.product_categories.find(c => c.id === p.category_id)?.name}</small></div></div> },
           { key: 'price', label: 'Giá bán', sortValue: p => p.current_price, render: p => money(p.current_price) },
           { key: 'stock', label: 'Tồn khả dụng', sortValue: p => p.stock_quantity, render: p => `${p.stock_quantity} phần` },
           { key: 'status', label: 'Trạng thái', render: p => <Status value={p.is_active ? 'Active' : 'Inactive'}>{p.is_active ? 'Đang bán' : 'Ngừng bán'}</Status> },
@@ -56,7 +59,7 @@ export function ProductsPage() {
         ]}/>
       </Panel>
     </>}
-    {canManage && editing !== undefined && <FormDialog title={editing ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm'} fields={fields} initial={editing || { name: '', category_id: db.product_categories.find(c => c.is_active)?.id, current_price: 20000, is_active: true }} description="Sản phẩm mới có tồn bằng 0. Ngừng bán sẽ ẩn món khỏi menu và gợi ý." onClose={() => setEditing(undefined)} onSave={form => save(form)}/>}
+    {canManage && editing !== undefined && <FormDialog title={editing ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm'} fields={fields} initial={editing || { name: '', category_id: db.product_categories.find(c => c.is_active)?.id, current_price: 20000, image_url: '', is_active: true }} description="Sản phẩm mới có tồn bằng 0. Ảnh có thể dùng đường dẫn /food/… hoặc URL HTTP/HTTPS. Để trống ảnh sẽ hiển thị ô thay thế." onClose={() => setEditing(undefined)} onSave={form => save(form)}/>}
     {categoriesOpen && <DetailDialog title="Danh mục sản phẩm" onClose={() => setCategoriesOpen(false)}>
       {!db.product_categories.length && <p>Chưa có danh mục. Hãy thêm danh mục trước khi tạo món.</p>}
       {db.product_categories.map(c => <div className="admin-detail-line" key={c.id}><strong>{c.name}{!c.is_active && ' · Ngừng dùng'}</strong>{canManage && <div className="admin-actions"><button className="cafe-button" onClick={() => setCategoryEdit(c)}>Chỉnh sửa danh mục</button>{c.is_active && <button className="cafe-button" onClick={() => disable('categories', c.id)}>Ngừng dùng</button>}</div>}</div>)}

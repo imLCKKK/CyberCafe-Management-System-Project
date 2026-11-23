@@ -14,13 +14,21 @@ namespace CyberManagement.Application
             services.AddScoped<IIdentitySeeder, IdentitySeeder>();
             services.AddScoped<ICustomerIdentityService, CustomerIdentityService>();
             services.AddScoped<IComputerService, ComputerService>();
+            services.AddScoped<ISessionService, SessionService>();
             services.AddScoped<CatalogService>();
             services.AddScoped<ICustomerService, CustomerService>();
             services.AddScoped<ITournamentService, TournamentService>();
             services.AddScoped<CounterTopUpService>();
+            services.AddScoped<OrderService>();
+            services.AddSingleton(TimeProvider.System);
+            services.AddScoped<IOrderZaloPaySettlement, OrderZaloPaySettlement>();
+            services.AddScoped<IVoucherService, VoucherService>();
             services.AddScoped<IRequestValidator<LoginCommand>, LoginCommandValidator>();
             services.AddScoped<IRequestValidator<CustomerLoginCommand>, CustomerLoginCommandValidator>();
             services.AddScoped<IInventoryService, InventoryService>();
+            services.AddScoped<InvoiceService>();
+            services.AddScoped<IInvoiceService>(provider => provider.GetRequiredService<InvoiceService>());
+            services.AddScoped<ISessionInvoiceIssuer>(provider => provider.GetRequiredService<InvoiceService>());
             return services;
         }
     }
