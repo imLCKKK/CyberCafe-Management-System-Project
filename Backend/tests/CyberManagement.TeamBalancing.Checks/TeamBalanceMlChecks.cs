@@ -57,6 +57,20 @@ internal static class TeamBalanceMlChecks
         var baseline = metrics.RootElement.GetProperty("allocationBaselineB0");
         Check("allocation baseline covers invalid role rosters explicitly", baseline.GetProperty("validRosters").GetInt32()
             + baseline.GetProperty("invalidRoleRosters").GetArrayLength() == 150);
+        var optimized = metrics.RootElement.GetProperty("allocationOptimizedM1").GetProperty("rosters").EnumerateArray()
+            .ToDictionary(r => r.GetProperty("matchId").GetString()!);
+        var baselineRows = baseline.GetProperty("rosters").EnumerateArray().ToArray();
+        Check("optimizer reports every test roster and is no worse than any valid snake allocation",
+            optimized.Keys.ToHashSet().SetEquals(prepared.Rows["test"].Select(r => r.MatchId)) && baselineRows.Length > 0
+            && baselineRows.All(r => optimized.TryGetValue(r.GetProperty("matchId").GetString()!, out var ml)
+                && ml.GetProperty("roleCoverageValid").GetBoolean()
+                && ml.GetProperty("surrogateImbalance").GetDouble() <= r.GetProperty("surrogateImbalance").GetDouble()));
+        Check("optimizer keeps both recoverable and impossible baseline role failures in the report",
+            baseline.GetProperty("invalidRoleRosters").EnumerateArray().Select(r => r.GetString()).ToHashSet().SetEquals(["m998", "m999"])
+            && optimized["m998"].GetProperty("roleCoverageValid").GetBoolean()
+            && !optimized["m999"].GetProperty("roleCoverageValid").GetBoolean()
+            && optimized["m999"].GetProperty("surrogateProbabilityA").ValueKind == JsonValueKind.Null
+            && optimized["m999"].GetProperty("warnings").EnumerateArray().Any(w => w.GetString() == "ROLE_CONSTRAINT_UNSATISFIABLE"));
         Check("save/load and symmetry checks were measured", metrics.RootElement.GetProperty("symmetryGatePassed").GetBoolean()
             && metrics.RootElement.GetProperty("reloadError").GetDouble() <= 1e-6);
         using var selection = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(artifactDirectory, "selection.json")));

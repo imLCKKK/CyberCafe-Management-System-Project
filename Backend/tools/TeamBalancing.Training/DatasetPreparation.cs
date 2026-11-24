@@ -160,6 +160,8 @@ public static class DatasetPreparation
         var gaps = new List<double>();
         var invalid = new List<string>();
         var details = new List<AllocationBaselineRow>();
+        var optimizerRosters = new List<AllocationRoster>(matches.Count);
+        var balancing = new TeamBalancingService();
         foreach (var match in matches)
         {
             // Match datasets have no SQL registrations: stable pseudonymous order provides tie-break IDs.
@@ -170,12 +172,15 @@ public static class DatasetPreparation
                 TeamBalanceVersions.Baseline, 1, 1, "valorant", "RegistrationClosed", 5, 2, false, "AAAAAAAAAAE=", "",
                 match.StartedAtUtc, new(0, null, 0), participants);
             input = input with { RosterVersion = TeamBalanceValidation.RosterVersion(input) };
+            var stats = TeamBalanceValidation.Roster(input);
+            var vectors = stats.ToDictionary(p => p.Key, p => TeamBalanceFeatures.Player(p.Value, medians));
+            var warnings = stats.Values.SelectMany(s => s.Warnings).Distinct().Order(StringComparer.Ordinal).ToArray();
+            optimizerRosters.Add(new(match.MatchId, participants.Select(p =>
+                new AllocationPlayer(p.PreferredRole, vectors[p.RegistrationId])).ToArray(), warnings));
             try
             {
-                var proposal = new TeamBalancingService().Propose(input);
+                var proposal = balancing.Propose(input);
                 gaps.Add(proposal.Quality.RankMeanGap);
-                var vectors = participants.ToDictionary(p => p.RegistrationId, p => TeamBalanceFeatures.Player(
-                    TeamBalanceValidation.Snapshot(p.Snapshot, p.RiotId, match.StartedAtUtc), medians));
                 details.Add(new(match.MatchId, proposal.Quality.RankMeanGap, TeamBalanceFeatures.Difference(
                     proposal.Teams[0].Members.Select(m => vectors[m.RegistrationId]).ToArray(),
                     proposal.Teams[1].Members.Select(m => vectors[m.RegistrationId]).ToArray()), proposal.Warnings));
@@ -187,6 +192,7 @@ public static class DatasetPreparation
             method = TeamBalanceVersions.Baseline, fold = "test", totalRosters = matches.Count,
             validRosters = gaps.Count, invalidRoleRosters = invalid, validityRate = (double)gaps.Count / matches.Count,
             validRosterDetails = details,
+            optimizerRosters,
             meanRankGapOnValidRosters = gaps.Count == 0 ? (double?)null : gaps.Average(),
             predictionBaseline = new { method = "constant-0.5", brier = .25, logLoss = Math.Log(2) },
             warning = "Rank gap is descriptive; no observed outcomes exist for newly proposed teams. Rank-only learned B2 and M1 are step 2."

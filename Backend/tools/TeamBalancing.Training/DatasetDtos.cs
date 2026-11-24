@@ -34,3 +34,5 @@ public sealed record PreparationResult(
     string GeneralizationLimit, string Status);
 
 public sealed record AllocationBaselineRow(string MatchId, double RankMeanGap, double[] Features, IReadOnlyList<string> Warnings);
+public sealed record AllocationPlayer(string PreferredRole, double[] Features);
+public sealed record AllocationRoster(string MatchId, AllocationPlayer[] Players, string[] Warnings);

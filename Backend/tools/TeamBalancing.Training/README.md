@@ -98,8 +98,9 @@ median train và overlap. Hash binary xác định code thực chạy ngay cả 
 `baseline.json` báo B0 `rank-snake-v1` trên **mọi roster test**, tỷ lệ thỏa vai trò,
 các case vai trò không khả thi và mean rank gap trên roster hợp lệ; B1 hằng 0,5 có
 Brier=0,25 và log loss=ln(2). Đây là chỉ số mô tả, chưa có kết quả trận sau chia đội.
-Dữ liệu trận ngoài SQL không có RegistrationId: khi đo B0 offline, đánh số 1..10 theo
-playerKey tăng dần làm tie-break, công khai khác biệt này với ID đăng ký production.
+Dữ liệu trận ngoài SQL không có RegistrationId. Khi đo B0 và optimizer offline, đánh số
+1..10 theo playerKey tăng dần để phân xử khi bằng nhau. File baseline giữ vai trò và vector
+đã xử lý của 10 người theo thứ tự đó để đánh giá optimizer, không lưu Riot ID, tên hay snapshot gốc.
 B2 logistic chỉ dùng rank, M1 ML.NET và metric dự đoán được bổ sung ở bước 2 bên dưới.
 
 ## Gọi preview từ luồng giải đấu
@@ -160,8 +161,9 @@ Implementation dùng [SDCA Logistic Regression](https://learn.microsoft.com/en-u
 và [ML.NET save/load](https://learn.microsoft.com/en-us/dotnet/machine-learning/how-to-guides/save-load-machine-learning-models-ml-net).
 
 - Trước train, đọc một bản bất biến của sáu file prepared, kiểm tra hash và kiểm tra
-  lại số mẫu/nhãn, nhóm/alias, ID, thời gian, vector và augment. Thay đổi schema của
-  prepared manifest ở bước 2 yêu cầu chạy lại `prepare` trên nguồn raw đã đối chiếu.
+  lại số mẫu/nhãn, nhóm/alias, ID, thời gian, vector và augment. Nếu `baseline.json`
+  chưa có `optimizerRosters`, chạy lại `prepare` trên nguồn raw đã đối chiếu với một
+  tập đánh giá chưa được sử dụng.
 - B1: xác suất hằng 0,5. B2: logistic chỉ giữ feature chênh lệch rank, chín chiều
   còn lại đặt zero trong cả fit/predict. M1: logistic dùng đủ 10 feature.
 - Normalization chỉ fit từ train. B2/M1 đều thử L2 `{0.01,0.1,1}`, L1=0,
@@ -180,9 +182,12 @@ và [ML.NET save/load](https://learn.microsoft.com/en-us/dotnet/machine-learning
 - Prediction gate: AUC>=0,60; Brier<=0,24 và <=95% Brier của **cả** B1/B2;
   log loss không tệ hơn baseline tốt nhất. Kiểm tra đảo đội và save/load sai số<=1e-6.
   Không nới gate khi fixture hoặc model đầu tiên chưa đạt.
-- B0 được đo trên toàn bộ roster test; case sai vai trò được báo riêng.
-  M1 tính xác suất/imbalance surrogate trên B0 hợp lệ từ feature cùng preprocessing.
-  Chưa có so sánh với optimizer 126 phân hoạch hoặc trận thật sau đề xuất ở bước này.
+- `metrics.json` báo B0 và optimizer M1 trên cùng roster test. Ghép
+  `allocationBaselineB0.rosters` và `allocationOptimizedM1.rosters` theo `matchId`
+  để đối chiếu chênh rank và `surrogateImbalance`. Optimizer dùng cùng logic và
+  tie-break với API. B0 ghi riêng các roster vi phạm vai trò. M1 ghi kết quả cho
+  mọi roster và trả xác suất null khi không có phương án đủ vai trò.
+  Các chỉ số dùng xác suất M1, chưa đo kết quả trận thật sau đề xuất.
 
 Artifact gồm `model.zip`, `rank-only-model.zip`, `selection.json`, `metrics.json`,
 `split-manifest.json`, `model-manifest.json`, hash manifest và `artifact-hashes.json`.

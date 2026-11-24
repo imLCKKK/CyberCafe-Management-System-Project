@@ -3,12 +3,13 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using CyberManagement.Application.DTOs.Tournaments;
 using CyberManagement.Application.Exceptions;
+using CyberManagement.Application.Services;
 using CyberManagement.Infrastructure.TeamBalancing;
 
 namespace CyberManagement.TeamBalancing.Training;
 
 public sealed record VerifiedPreparedDataset(string Directory, PreparationResult Manifest, byte[] SplitManifestBytes,
-    IReadOnlyDictionary<string, PreparedMatch[]> Rows, JsonElement Baseline);
+    IReadOnlyDictionary<string, PreparedMatch[]> Rows, JsonElement Baseline, AllocationRoster[] OptimizerRosters);
 
 public static class PreparedDatasetReader
 {
@@ -87,7 +88,17 @@ public static class PreparedDatasetReader
             && manifest.Folds.Single(f => f.Name == "validation").Matches.Max(m => m.ResultVerifiedAtUtc) < manifest.TestFromUtc,
             "Nhãn train/validation chưa có sẵn trước thời điểm bắt đầu evaluation.");
         using var baseline = JsonDocument.Parse(files["baseline.json"]);
-        return new(Path.GetFullPath(directory), manifest, files["split-manifest.json"], rows, baseline.RootElement.Clone());
+        Require(baseline.RootElement.TryGetProperty("optimizerRosters", out var rosterJson)
+            && rosterJson.ValueKind == JsonValueKind.Array, "Thiếu roster đánh giá optimizer; chạy lại prepare với tập đánh giá chưa sử dụng.");
+        var rosters = rosterJson.Deserialize<AllocationRoster[]>(DatasetPreparation.JsonOptions);
+        Require(rosters is not null && rosters.Length == rows["test"].Length
+            && rosters.All(r => r is not null && r.Warnings is not null && r.Players is { Length: 10 }
+                && r.Players.All(p => p is not null && TeamBalanceValidation.Roles.Contains(p.PreferredRole)
+                    && p.Features is { Length: 10 } && p.Features.All(x => double.IsFinite(x))
+                    && p.Features[0] is >= 1 and <= 27 && p.Features[0] == Math.Truncate(p.Features[0])))
+            && rosters.Select(r => r.MatchId).ToHashSet(StringComparer.Ordinal).SetEquals(rows["test"].Select(r => r.MatchId)),
+            "Roster đánh giá optimizer không khớp tập test hoặc có vai trò/feature không hợp lệ.");
+        return new(Path.GetFullPath(directory), manifest, files["split-manifest.json"], rows, baseline.RootElement.Clone(), rosters);
     }
 
     private static bool IsHash(string? text) => text is not null && Regex.IsMatch(text, "^sha256:[0-9a-f]{64}$");

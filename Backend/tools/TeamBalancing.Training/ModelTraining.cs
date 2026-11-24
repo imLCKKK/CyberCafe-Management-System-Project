@@ -70,13 +70,15 @@ public static class ModelTraining
         var symmetryPassed = symmetryError <= 1e-6 && reloadError <= 1e-6;
         var fixture = dataset.Manifest.Source.DataKind == "generated-fixture";
         var baselineAllocation = AllocationReport(dataset, selected.Model);
+        var optimizedAllocation = OptimizerReport(dataset, selected.Model);
         Write("metrics.json", new
         {
             dataKind = dataset.Manifest.Source.DataKind, evaluation = "held-out test; symmetric probability p(d)=(q(d)+1-q(-d))/2",
             constantBaselineB1 = constantReport, rankOnlyBaselineB2 = rankReport, modelM1 = modelReport,
             predictionGatePassed = predictionPassed, symmetryGatePassed = symmetryPassed, symmetryError, reloadError,
             allocationBaselineB0 = baselineAllocation,
-            limits = new[] { "No cold-player holdout; no outcomes for proposed teams; no full 126-partition service/latency verification in step 2.",
+            allocationOptimizedM1 = optimizedAllocation,
+            limits = new[] { "No cold-player holdout, observed outcomes for proposed teams, or end-to-end API latency measurement.",
                 fixture ? "GENERATED FIXTURES: technical tests only, never eligible for production inference." : "Source authenticity/usage terms require independent verification of raw captures/results." }
         });
         var metadata = dataset.Manifest;
@@ -90,7 +92,7 @@ public static class ModelTraining
             HashFile(Path.Combine(outputDirectory, "model.zip")), HashFile(Path.Combine(outputDirectory, "rank-only-model.zip")), splitHash,
             HashFile(Path.Combine(outputDirectory, "metrics.json")), predictionPassed, symmetryPassed, !fixture && predictionPassed && symmetryPassed,
             new[] { "No verified cold-player generalization, map/agent/party effects or observed post-proposal balance.",
-                "Full roster optimization/API/permission/version/token integration and end-to-end latency remain for step 3.",
+                "Allocation evaluation uses the service optimizer offline; end-to-end SQL/API latency is unverified.",
                 fixture ? "Generated fixtures: blocked for production inference." : "Limited to the verified source population and training scopes/patches." });
         Write("model-manifest.json", manifest);
         var manifestHash = HashFile(Path.Combine(outputDirectory, "model-manifest.json"));
@@ -117,8 +119,41 @@ public static class ModelTraining
             validityRate = (double)rows.Length / testIds.Count,
             rosters = rows.Select((r, i) => new { r.MatchId, r.RankMeanGap, r.Warnings,
                 surrogateProbabilityA = probabilities[i], surrogateImbalance = Math.Abs(probabilities[i] - .5) }).ToArray(),
-            warning = "M1 probabilities on proposed B0 teams are surrogate only; these teams have no observed labels. No optimizer comparison yet."
+            warning = "M1 probabilities on proposed B0 teams are surrogate only; these teams have no observed labels."
         };
+    }
+
+    private static object OptimizerReport(VerifiedPreparedDataset dataset, TeamBalanceMlModel model)
+    {
+        var valid = 0;
+        var rosters = dataset.OptimizerRosters.Select(roster =>
+        {
+            var members = roster.Players.Select((player, i) => (RegistrationId: i + 1, player.PreferredRole)).ToArray();
+            var features = roster.Players.Select((player, i) => (Id: i + 1, player.Features))
+                .ToDictionary(player => player.Id, player => player.Features);
+            double? probability = null;
+            double? imbalance = null;
+            double? rankMeanGap = null;
+            var warnings = roster.Warnings.ToList();
+            try
+            {
+                var (teams, p) = TeamBalancingService.Optimize(members, features, model.Predict);
+                probability = p;
+                imbalance = Math.Abs(p - .5);
+                rankMeanGap = Math.Abs(teams[0].Members.Average(m => features[m.RegistrationId][0])
+                    - teams[1].Members.Average(m => features[m.RegistrationId][0]));
+                if (imbalance > .10) warnings.Add("BALANCE_TARGET_UNMET");
+                valid++;
+            }
+            catch (TeamBalanceException error) when (error.Code == "ROLE_CONSTRAINT_UNSATISFIABLE")
+            {
+                warnings.Add(error.Code);
+            }
+            return new { roster.MatchId, roleCoverageValid = probability.HasValue, rankMeanGap,
+                surrogateProbabilityA = probability, surrogateImbalance = imbalance, warnings };
+        }).ToArray();
+        return new { method = "ml", totalRosters = rosters.Length, validRosters = valid,
+            validityRate = (double)valid / rosters.Length, rosters };
     }
 
     private static string HashFile(string path) => TeamBalanceModelArtifact.Hash(File.ReadAllBytes(path));

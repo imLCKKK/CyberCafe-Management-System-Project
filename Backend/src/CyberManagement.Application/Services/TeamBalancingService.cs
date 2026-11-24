@@ -18,7 +18,9 @@ public sealed class TeamBalancingService(ITeamBalanceScorer? scorer = null) : IT
             if (scorer is null) throw new TeamBalanceException("MODEL_UNAVAILABLE", "Chưa có model đủ điều kiện suy luận.");
             if (!scorer.Supports(stats.Values.First().Scope))
                 throw new TeamBalanceException("STATS_SCOPE_MISMATCH", "Model không hỗ trợ scope của giải.");
-            (teams, probability) = Optimize(input, stats, scorer);
+            var players = input.Participants.Select(p => (p.RegistrationId, p.PreferredRole)).ToArray();
+            var features = stats.ToDictionary(p => p.Key, p => TeamBalanceFeatures.Player(p.Value, scorer.TrainingMedians));
+            (teams, probability) = Optimize(players, features, scorer.Predict);
             if (Math.Abs(probability.Value - .5) > .10) warnings.Add("BALANCE_TARGET_UNMET");
         }
         else teams = Snake(input, stats);
@@ -43,11 +45,11 @@ public sealed class TeamBalancingService(ITeamBalanceScorer? scorer = null) : IT
             AssignRoles(g, i < 26 ? ((char)('A' + i)).ToString() : $"Team{i + 1}")).ToArray();
     }
 
-    private static (TeamBalanceTeam[], double) Optimize(TeamBalanceInput input,
-        IReadOnlyDictionary<int, TeamBalancePlayerStats> stats, ITeamBalanceScorer model)
+    // Both callers validate the ten-player roster and build the same feature vectors before optimizing.
+    public static (TeamBalanceTeam[] Teams, double ProbabilityA) Optimize(IReadOnlyList<(int RegistrationId, string PreferredRole)> roster,
+        IReadOnlyDictionary<int, double[]> features, Func<IReadOnlyList<double[]>, double[]> predict)
     {
-        var players = input.Participants.OrderBy(p => p.RegistrationId).ToArray();
-        var features = stats.ToDictionary(p => p.Key, p => TeamBalanceFeatures.Player(p.Value, model.TrainingMedians));
+        var players = roster.OrderBy(p => p.RegistrationId).ToArray();
         var candidates = new List<(TeamBalanceTeam[] Teams, double[] Difference)>(126);
         // Enumerate in lexicographic order, fixing player 0 in A. Stable ordering resolves exact ties.
         foreach (var indices in TeamASelections())
@@ -59,12 +61,12 @@ public sealed class TeamBalancingService(ITeamBalanceScorer? scorer = null) : IT
                 a.Select(p => features[p.RegistrationId]).ToArray(), other.Select(p => features[p.RegistrationId]).ToArray())));
         }
         if (candidates.Count == 0) throw new TeamBalanceException("ROLE_CONSTRAINT_UNSATISFIABLE", "Không có hai đội phủ đủ bốn vai trò.");
-        var probabilities = model.Predict(candidates.Select(c => c.Difference).ToArray());
+        var probabilities = predict(candidates.Select(c => c.Difference).ToArray());
         if (probabilities.Length != candidates.Count || probabilities.Any(p => !double.IsFinite(p) || p < 0 || p > 1))
             throw new TeamBalanceException("MODEL_UNAVAILABLE", "Model trả xác suất không hợp lệ.");
         var best = Enumerable.Range(0, candidates.Count).OrderBy(i => Math.Abs(probabilities[i] - .5))
-            .ThenBy(i => Math.Abs(candidates[i].Teams[0].Members.Sum(m => stats[m.RegistrationId].RankTier)
-                - candidates[i].Teams[1].Members.Sum(m => stats[m.RegistrationId].RankTier))).First();
+            .ThenBy(i => Math.Abs(candidates[i].Teams[0].Members.Sum(m => features[m.RegistrationId][0])
+                - candidates[i].Teams[1].Members.Sum(m => features[m.RegistrationId][0]))).First();
         return (candidates[best].Teams, probabilities[best]);
     }
 
@@ -77,7 +79,7 @@ public sealed class TeamBalancingService(ITeamBalanceScorer? scorer = null) : IT
             yield return [0, b, c, d, e];
     }
 
-    private static bool CanCover(TeamBalanceParticipant[] players) =>
+    private static bool CanCover((int RegistrationId, string PreferredRole)[] players) =>
         players.Where(p => p.PreferredRole != "Flex").Select(p => p.PreferredRole).Distinct().Count()
         + players.Count(p => p.PreferredRole == "Flex") >= 4;
 
@@ -92,6 +94,9 @@ public sealed class TeamBalancingService(ITeamBalanceScorer? scorer = null) : IT
     }
 
     public static TeamBalanceTeam AssignRoles(IReadOnlyList<TeamBalanceParticipant> players, string teamKey)
+        => AssignRoles(players.Select(p => (p.RegistrationId, p.PreferredRole)).ToArray(), teamKey);
+
+    private static TeamBalanceTeam AssignRoles(IReadOnlyList<(int RegistrationId, string PreferredRole)> players, string teamKey)
     {
         var missing = new Queue<string>(TeamBalanceValidation.Roles.Take(4)
             .Where(role => !players.Any(p => p.PreferredRole == role)));

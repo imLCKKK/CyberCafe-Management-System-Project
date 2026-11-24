@@ -177,6 +177,14 @@ MatchRecord Match(int index)
         var id = index % 20 * 10 + i;
         return new MatchPlayer($"p{id}", roles[i - 1], Snapshot(id, 28 - i, time: started));
     }).ToArray();
+    if (index == 998)
+    {
+        string[] rolesWithInvalidSnake = ["Duelist", "Initiator", "Controller", "Duelist", "Sentinel",
+            "Sentinel", "Initiator", "Controller", "Controller", "Controller"];
+        players = players.Select((player, i) => player with { PreferredRole = rolesWithInvalidSnake[i] }).ToArray();
+    }
+    if (index == 999)
+        players = players.Select(player => player with { PreferredRole = "Duelist" }).ToArray();
     return new($"m{index}", Array.Empty<string>(), $"g{index}", "Act · Competitive", "test-patch", started,
         started.AddMinutes(30), "provider", "https://fixtures.invalid/results", started.AddMinutes(31), "A", players[..5], players[5..]);
 }
